@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod paths;
 pub mod runtime;
 mod supervisor;

@@ -4,9 +4,7 @@ import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
 import { AutostartToggle } from "@/features/autostart-toggle/ui/AutostartToggle";
-import { OAuthCallbackCard } from "@/features/oauth-callback/ui/OAuthCallbackCard";
 import { UpdateCheck } from "@/features/update-check/ui/UpdateCheck";
-import { AppHeader } from "@/widgets/app-header/ui/AppHeader";
 import { ConnectionsCard } from "@/widgets/connections-card/ui/ConnectionsCard";
 import { EngineCard } from "@/widgets/engine-card/ui/EngineCard";
 import { EngineOverview } from "@/widgets/engine-overview/ui/EngineOverview";
@@ -35,70 +33,48 @@ export const DashboardPage = observer(function DashboardPage({
   const failures = sync.summary?.failures ?? [];
 
   return (
-    <div className="shell">
-      <AppHeader engine={engine} />
+    <>
+      <EngineOverview engine={engine} sync={sync} />
 
-      <main className="content">
-        <EngineOverview engine={engine} sync={sync} />
-
-        {error ? (
-          <Notice
-            variant="error"
-            action={
-              <Button variant="link" onClick={dismissError}>
-                {t("actions.dismiss")}
-              </Button>
-            }
-          >
-            <strong>{t("notices.attention")}</strong>
-            <span>{error}</span>
-          </Notice>
-        ) : null}
-
-        {sync.summary ? (
-          <Notice variant="info">
-            <strong>
-              {t("notices.syncQueued", {
-                queued: sync.summary.queued,
-                total: sync.summary.total,
-              })}
-            </strong>
-            <span>
-              {failures.length > 0
-                ? failures
-                    .map((failure) => `${failure.connectionId}: ${failure.error}`)
-                    .join(" · ")
-                : t("notices.syncAccepted")}
-            </span>
-          </Notice>
-        ) : null}
-
-        <div className="grid">
-          <EngineCard engine={engine} connections={connections} />
-          <PathsCard engine={engine} />
-          <ConnectionsCard connections={connections} engine={engine} />
-          <AutostartToggle engine={engine} />
-          <UpdateCheck settings={settings} />
-        </div>
-
-        <OAuthCallbackCard engine={engine} />
-      </main>
-
-      <footer className="footer">
-        <span>
-          {t("footer.desktop", { version: engine.desktopVersion })} ·{" "}
-          {engine.version
-            ? t("footer.engine", { version: engine.version })
-            : t("footer.engineOffline")}
-        </span>
-        <Button
-          variant="link"
-          disabled={engine.busy !== null}
-          onClick={() => void engine.quit()}
+      {error ? (
+        <Notice
+          variant="error"
+          action={
+            <Button variant="link" onClick={dismissError}>
+              {t("actions.dismiss")}
+            </Button>
+          }
         >
-          {t("actions.quit")}
-        </Button>
-      </footer>
-    </div>
+          <strong>{t("notices.attention")}</strong>
+          <span>{error}</span>
+        </Notice>
+      ) : null}
+
+      {sync.summary ? (
+        <Notice variant="info">
+          <strong>
+            {t("notices.syncQueued", {
+              queued: sync.summary.queued,
+              total: sync.summary.total,
+            })}
+          </strong>
+          <span>
+            {failures.length > 0
+              ? failures
+                  .map((failure) => `${failure.connectionId}: ${failure.error}`)
+                  .join(" · ")
+              : t("notices.syncAccepted")}
+          </span>
+        </Notice>
+      ) : null}
+
+      <div className="grid">
+        <EngineCard engine={engine} connections={connections} />
+        <PathsCard engine={engine} />
+        <ConnectionsCard connections={connections} engine={engine} />
+        <AutostartToggle engine={engine} />
+        <UpdateCheck settings={settings} />
+      </div>
+    </>
   );
 });

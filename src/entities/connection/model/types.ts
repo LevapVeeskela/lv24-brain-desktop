@@ -13,6 +13,23 @@ export interface Connection {
   settings?: Record<string, string>;
 }
 
+export interface CreateConnectionInput {
+  id: string;
+  provider: string;
+  backend?: ConnectionBackend;
+  account?: string;
+  baseUrl?: string;
+  projects?: string[];
+  schedule?: string;
+  publish?: PublishPolicy;
+  settings?: Record<string, string>;
+}
+
+export interface Schedule {
+  connectionId: string;
+  schedule: string;
+}
+
 export type ConnectorStatus = "running" | "success" | "partial" | "failed";
 
 export interface RunStats {

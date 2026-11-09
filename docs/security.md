@@ -1,4 +1,4 @@
-# Security model (v0.2.0)
+# Security model (v0.3.0)
 
 The shell is the only component that ever holds the local API bearer token.
 This document records the boundary and the accepted residual risks.
@@ -36,6 +36,11 @@ This document records the boundary and the accepted residual risks.
 - **Deep-link validation.** Only `lv24brain://oauth/...` and
   `lv24brain://auth/...` are accepted. A manually crafted executable argument
   cannot inject an arbitrary URL into the UI.
+- **Engine CLI bridge.** The shell runs fixed engine subcommands with the
+  resolved binary/config. Provider and secret output is parsed; the keychain
+  command lists names only, never values. OAuth output is streamed as bounded
+  text and the process times out after five minutes. The bridge shares the
+  desktop's filesystem permissions and is not a privilege boundary.
 - **Updater verification.** Tauri's updater checks an Ed25519 signature against
   the public key compiled into the app before installing. HTTPS endpoints are
   required in production.

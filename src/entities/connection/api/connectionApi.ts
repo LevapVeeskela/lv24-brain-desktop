@@ -1,10 +1,12 @@
 import { apiClient, toApiError } from "@/shared/api/client";
 import type {
   Connection,
+  CreateConnectionInput,
   ConnectorStatus,
   Run,
   RunAccepted,
   RunStats,
+  Schedule,
 } from "../model/types";
 
 export class ConnectionApi {
@@ -25,6 +27,67 @@ export class ConnectionApi {
       throw toApiError(response, error);
     }
     return parseConnection(data);
+  }
+
+  async create(input: CreateConnectionInput): Promise<Connection> {
+    const { data, error, response } = await apiClient.POST("/v1/connections", {
+      body: {
+        id: input.id,
+        provider: input.provider,
+        backend: input.backend,
+        account: input.account,
+        baseUrl: input.baseUrl,
+        projects: input.projects,
+        schedule: input.schedule,
+        publish: input.publish,
+        settings: input.settings,
+      },
+    });
+    if (error) {
+      throw toApiError(response, error);
+    }
+    return parseConnection(data);
+  }
+
+  async remove(id: string): Promise<void> {
+    const { error, response } = await apiClient.DELETE(
+      "/v1/connections/{id}",
+      { params: { path: { id } } },
+    );
+    if (error) {
+      throw toApiError(response, error);
+    }
+  }
+
+  async setCredential(id: string, field: string, value: string): Promise<void> {
+    const { error, response } = await apiClient.POST(
+      "/v1/connections/{id}/credentials/{field}",
+      {
+        params: { path: { id, field } },
+        body: { value },
+      },
+    );
+    if (error) {
+      throw toApiError(response, error);
+    }
+  }
+
+  async setSchedule(id: string, schedule: string): Promise<void> {
+    const { error, response } = await apiClient.PUT("/v1/schedules/{connectionId}", {
+      params: { path: { connectionId: id } },
+      body: { schedule },
+    });
+    if (error) {
+      throw toApiError(response, error);
+    }
+  }
+
+  async listSchedules(): Promise<Schedule[]> {
+    const { data, error, response } = await apiClient.GET("/v1/schedules");
+    if (error) {
+      throw toApiError(response, error);
+    }
+    return parseSchedules(data);
   }
 
   async run(id: string): Promise<RunAccepted> {
@@ -105,6 +168,22 @@ export function parseRuns(value: unknown): Run[] {
     throw new Error("local API returned a non-array runs response");
   }
   return value.map(parseRun);
+}
+
+export function parseSchedules(value: unknown): Schedule[] {
+  if (!Array.isArray(value)) {
+    throw new Error("local API returned a non-array schedules response");
+  }
+  return value.map((item) => {
+    if (
+      !isRecord(item) ||
+      typeof item.connectionId !== "string" ||
+      typeof item.schedule !== "string"
+    ) {
+      throw new Error("local API returned an invalid schedule");
+    }
+    return { connectionId: item.connectionId, schedule: item.schedule };
+  });
 }
 
 function parseRun(value: unknown): Run {

@@ -6,6 +6,7 @@ use tauri_plugin_updater::UpdaterExt;
 
 use crate::autostart::{self, AutostartStatus};
 use crate::deep_link;
+use crate::engine::cli::AuthOutcome;
 use crate::engine::{EngineStatus, Supervisor};
 
 #[derive(Clone, Debug, Serialize)]
@@ -88,6 +89,46 @@ pub async fn engine_sync_all(app: AppHandle) -> Result<crate::engine::SyncSummar
         .sync_all()
         .await
         .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn engine_providers(app: AppHandle) -> Result<serde_json::Value, String> {
+    let supervisor = supervisor(&app);
+    let binary = supervisor.engine_binary().map_err(|err| err.to_string())?;
+    let config = supervisor.engine_config().map_err(|err| err.to_string())?;
+    crate::engine::cli::providers(&binary, &config)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn engine_secrets(app: AppHandle) -> Result<Vec<String>, String> {
+    let supervisor = supervisor(&app);
+    let binary = supervisor.engine_binary().map_err(|err| err.to_string())?;
+    let config = supervisor.engine_config().map_err(|err| err.to_string())?;
+    crate::engine::cli::secret_names(&binary, &config)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub async fn engine_connection_auth(
+    app: AppHandle,
+    connection_id: String,
+    client_id: Option<String>,
+) -> Result<AuthOutcome, String> {
+    let supervisor = supervisor(&app);
+    let binary = supervisor.engine_binary().map_err(|err| err.to_string())?;
+    let config = supervisor.engine_config().map_err(|err| err.to_string())?;
+    crate::engine::cli::connection_auth(
+        &app,
+        &binary,
+        &config,
+        &connection_id,
+        client_id.as_deref(),
+    )
+    .await
+    .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

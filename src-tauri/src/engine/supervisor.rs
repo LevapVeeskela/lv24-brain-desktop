@@ -49,6 +49,7 @@ pub struct EngineStatus {
     pub engine_bin: Option<std::path::PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub engine_source: Option<String>,
+    pub update_channel: Option<String>,
     pub restarts: u32,
 }
 
@@ -113,6 +114,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: 0,
         };
         fill_paths(&app, &settings, &mut status);
@@ -148,6 +150,15 @@ impl Supervisor {
 
     pub fn log_dir(&self) -> &std::path::Path {
         &self.inner.paths.log_dir
+    }
+
+    pub fn engine_config(&self) -> AppResult<EngineConfig> {
+        let settings = self.inner.settings.get();
+        paths::resolve_config(&self.inner.app, settings.config_path.as_deref())
+    }
+
+    pub fn engine_binary(&self) -> AppResult<EngineBinary> {
+        paths::locate_engine(&self.inner.app)
     }
 
     /// Background reconciler: keeps one agent healthy unless the user paused it.
@@ -507,6 +518,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: self.inner.restarts.load(Ordering::Relaxed),
         };
         fill_paths(&self.inner.app, &self.inner.settings, &mut next);
@@ -527,6 +539,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: self.inner.restarts.load(Ordering::Relaxed),
         };
         fill_paths(&self.inner.app, &self.inner.settings, &mut next);
@@ -547,6 +560,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: self.inner.restarts.load(Ordering::Relaxed),
         };
         fill_paths(&self.inner.app, &self.inner.settings, &mut next);
@@ -568,6 +582,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: self.inner.restarts.load(Ordering::Relaxed),
         };
         fill_paths(&self.inner.app, &self.inner.settings, &mut next);
@@ -588,6 +603,7 @@ impl Supervisor {
             config_path: None,
             engine_bin: None,
             engine_source: None,
+            update_channel: None,
             restarts: self.inner.restarts.load(Ordering::Relaxed),
         };
         fill_paths(&self.inner.app, &self.inner.settings, &mut next);
@@ -617,10 +633,12 @@ fn fill_paths(app: &AppHandle, settings: &SettingsStore, status: &mut EngineStat
         path,
         data_dir,
         mode: _,
+        update_channel,
     }) = paths::resolve_config(app, snapshot.config_path.as_deref())
     {
         status.config_path = Some(path);
         status.data_dir = Some(data_dir);
+        status.update_channel = Some(update_channel);
     }
     if let Ok(EngineBinary { path, source }) = paths::locate_engine(app) {
         status.engine_bin = Some(path);

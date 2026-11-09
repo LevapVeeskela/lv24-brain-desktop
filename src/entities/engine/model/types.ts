@@ -18,6 +18,7 @@ export interface EngineStatus {
   configPath?: string;
   engineBin?: string;
   engineSource?: string;
+  updateChannel?: string;
   restarts: number;
 }
 

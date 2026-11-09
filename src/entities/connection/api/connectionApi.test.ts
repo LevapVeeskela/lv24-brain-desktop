@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConnections, parseRuns } from "./connectionApi";
+import { parseConnections, parseRuns, parseSchedules } from "./connectionApi";
 
 describe("local API response parsing", () => {
   it("parses a connection list without leaking unknown fields", () => {
@@ -65,5 +65,18 @@ describe("local API response parsing", () => {
     expect(() => parseRuns([{ id: "x", source: "y", startedAt: "z", status: "wat" }])).toThrow(
       /unknown run status/,
     );
+  });
+
+  it("parses schedules", () => {
+    expect(
+      parseSchedules([
+        { connectionId: "github-main", schedule: "@daily" },
+        { connectionId: "folders", schedule: "manual" },
+      ]),
+    ).toEqual([
+      { connectionId: "github-main", schedule: "@daily" },
+      { connectionId: "folders", schedule: "manual" },
+    ]);
+    expect(() => parseSchedules([{ connectionId: 1 }])).toThrow(/invalid/);
   });
 });

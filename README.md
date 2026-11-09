@@ -7,12 +7,11 @@ It keeps the local brain agent running, exposes it through a token-safe proxy,
 and provides the tray, autostart, updater and OAuth deep-link plumbing the
 desktop UI is built on.
 
-**Status: v0.2.0, WP5.2 UI foundation.** The app now has an FSD layout,
-MobX stores (Engine, Connections, Sync, Settings), a typed client generated from
-the local `localapi-v1` OpenAPI contract, and ru/en/zh localization. Full
-screens (WP5.3) and signed packaging (WP5.4) are next. The window in this
-repository is still a working status and controls surface, not the final
-product UI.
+**Status: v0.3.0, WP5.3 screens.** The dashboard, connections list, add
+connection wizard, connection detail (schedule, credentials, runs, live log),
+activity, projects and settings screens are implemented. Signed packaging
+(WP5.4) is next; the engine is still resolved from the environment, not
+bundled.
 
 ## What works
 
@@ -40,9 +39,17 @@ product UI.
   the webview never sees the bearer token or loopback port.
 - **i18n (v0.2.0)**: English, Russian and Chinese dictionaries with a typed key
   set, persisted locale and a header switcher.
+- **Screens (v0.3.0)**: dashboard, connections list, add-connection wizard
+  (provider descriptors, auth modes, settings, secrets, save + test),
+  connection detail (schedule, credentials, runs, SSE live log, OAuth, delete),
+  activity, projects and settings (paths, autostart, language, desktop update,
+  update channel and OS keychain secret names).
+- **Read-only engine CLI bridge (v0.3.0)**: `engine_providers`,
+  `engine_secrets` and streaming `engine_connection_auth` commands reuse the
+  engine binary/config; the webview never receives a secret value.
 - **Structured tests** for path allow-listing, config discovery, runtime
   records, SSE parsing, settings persistence, the HTTP proxy, the typed
-  transport, API parsers, stores and i18n key parity.
+  transport, API parsers, stores, provider descriptors and i18n key parity.
 
 ## Architecture
 
@@ -148,10 +155,8 @@ Signing status: macOS signing/notarization waits for Apple Developer Program
 approval; Windows signing waits for SignPath Foundation approval. Until then,
 release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
-## Known limitations (v0.2.0)
+## Known limitations (v0.3.0)
 
-- No full connection/settings screens; WP5.3 adds them. The dashboard currently
-  lists connections read-only and exposes engine/sync/startup/update controls.
 - The engine binary is resolved from the environment, not bundled.
 - Pause stops the agent. If an agent was started outside the desktop, Pause
   asks it to shut down through the local API; if it refuses, the shell reports
@@ -160,8 +165,13 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
   local control. Same-user malware can read `agent/runtime.json`, as documented
   by the engine's security acceptance.
 - macOS autostart requires the signed app bundle and macOS 13+.
-- OAuth callbacks are routed to the UI but the engine connection flow is not
-  wired into the desktop UI yet.
+- OAuth callbacks are routed to the UI and the detail page can run the engine
+  OAuth command; a live GitHub/GitLab OAuth app validation still needs client
+  IDs from the owner.
+- Settings displays the data directory/update channel but does not edit
+  `brain.yaml`; use the engine CLI or edit the file.
+- Provider config labels/help come from the engine descriptors and are English;
+  the desktop chrome is fully localized.
 - Full packaging/CI (NSIS per-user, DMG + zip, AppImage + deb/rpm) is WP5.4.
 
 ## License

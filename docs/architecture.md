@@ -1,24 +1,26 @@
-# Shell architecture (WP5.1 + WP5.2)
+# Shell architecture (WP5.1–WP5.3)
 
-This document describes the v0.2.0 desktop shell. The UI foundation arrived in
-WP5.2; the screens land in WP5.3. The shell contracts below are intended to stay
-stable.
+This document describes the v0.3.0 desktop shell. WP5.2 added the UI foundation
+and WP5.3 the screens; signed packaging remains WP5.4.
 
 ## Frontend layers (FSD)
 
 ```
 src/
-  app/        RootStore composition, providers, global styles
-  pages/      dashboard page
-  widgets/    app header, engine overview/card, paths, connections
+  app/        RootStore composition, providers, router, layout, global styles
+  pages/      dashboard, connections, connection detail/wizard, activity,
+              projects, settings
+  widgets/    app header/nav, engine overview/card, paths, connections,
+              run log panel
   features/   engine controls, autostart, update check, locale, OAuth callback
-  entities/   engine, connection, sync, settings (stores + API adapters)
-  shared/     API transport/client, i18n, UI primitives, error helpers
+  entities/   engine, connection, run, project, provider, sync, settings
+  shared/     API transport/client, i18n, UI primitives, error/format helpers
 ```
 
-- `RootStore` owns the Engine, Connections, Sync and Settings stores. It is
-  created once by `RootStoreProvider`; the provider starts polling/event
-  subscriptions and disposes them on unmount (StrictMode-safe).
+- `RootStore` owns the Engine, Connections, Sync, Settings, Runs, Projects and
+  Providers stores. It is created once by `RootStoreProvider`; the provider
+  starts polling/event subscriptions and disposes them on unmount
+  (StrictMode-safe).
 - `EngineStore` polls `shell_status` every 4 seconds, listens for
   `engine-status`, `shell-error` and `oauth-callback`, and exposes start, pause,
   autostart and quit actions. An `engine-status` event refreshes the full shell
@@ -27,11 +29,14 @@ src/
   through the typed client, resets on stop and guards stale async results.
 - `SyncStore` ensures the agent is running, loads the catalogue and queues every
   connection through the typed client, collecting per-connection failures.
+- `RunsStore` lists recent runs and owns the SSE log stream. Events are matched
+  by stream id; lines that arrive while `run_log_open` is still resolving are
+  buffered. A finished stream reloads the run list.
+- `ProjectsStore` and `ProvidersStore` load on demand; provider descriptors come
+  from the engine CLI bridge.
 - `SettingsStore` owns the UI locale (persisted in WebView local storage) and
   the desktop update check/install flow.
-- Components receive stores as props from the dashboard page; only the page and
-  the app provider touch the root store. Shared UI components have no store
-  dependencies.
+- Router: `HashRouter`, so a packaged webview never needs server-side routes.
 
 ### Typed client
 
@@ -41,7 +46,17 @@ src/
 client is `openapi-fetch` with a custom fetch implementation that converts
 `Request` to `api_request` and `ApiResponse` back to `Response`. Entity API
 adapters validate response shapes and strip unknown fields; the token never
-enters this layer.
+enters this layer. JSON request bodies are marked `additionalProperties: true`
+to mirror the engine's open decode shapes.
+
+### Engine CLI bridge
+
+Three Tauri commands call the engine executable without exposing a token:
+`engine_providers` (`connection providers --json`), `engine_secrets`
+(`secret list`, names only) and `engine_connection_auth`
+(`connection auth`, stdout/stderr streamed as `connection-auth` events).
+They use the same resolved binary/config as the supervisor. Auth output is
+bounded and the process has a five-minute timeout.
 
 ### i18n
 
@@ -55,6 +70,7 @@ key-parity test fails if a translation is missing.
 
 | Rust module | Responsibility |
 | --- | --- |
+| `engine/cli.rs` | Read-only provider/secret commands and streaming OAuth command. |
 | `engine/paths.rs` | Resolves `brain.yaml` and `data_dir` like the engine; locates the engine executable. |
 | `engine/runtime.rs` | Reads owner-only `agent/runtime.json` and redacts the token from `Debug`. |
 | `engine/supervisor.rs` | Reconciles the agent process, probes health, pauses/resumes, syncs all and shuts down. |
@@ -133,10 +149,11 @@ received before the listener existed.
   is required and the user may need to approve the login item in System
   Settings. The app requires macOS 13+ for this API.
 
-## Deliberate non-goals in v0.2.0
+## Deliberate non-goals in v0.3.0
 
 - No direct webview access to `127.0.0.1` or the token.
 - No remote content in the webview, no `dangerousRemoteDomainIpcAccess`.
-- No write-back or engine update from the desktop yet; the engine's own
+- No write-back or desktop-triggered engine update yet; the engine's own
   `/v1/engine/update` remains behind explicit CLI confirmation.
 - No bundled engine binary (WP5.4 sidecar work).
+- Settings displays `brain.yaml` values but does not edit the file.

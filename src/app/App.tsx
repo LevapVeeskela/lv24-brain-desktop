@@ -1,5 +1,5 @@
 import { observer } from "mobx-react-lite";
-import { DashboardPage } from "@/pages/dashboard";
+import { AppRouter } from "./routing/AppRouter";
 import { I18nProvider } from "@/shared/i18n/I18nProvider";
 import {
   RootStoreProvider,
@@ -13,12 +13,7 @@ const AppShell = observer(function AppShell() {
       locale={store.settings.locale}
       onLocaleChange={store.settings.setLocale}
     >
-      <DashboardPage
-        engine={store.engine}
-        connections={store.connections}
-        sync={store.sync}
-        settings={store.settings}
-      />
+      <AppRouter store={store} />
     </I18nProvider>
   );
 });

@@ -39,6 +39,7 @@ pub struct EngineConfig {
     pub path: PathBuf,
     pub data_dir: PathBuf,
     pub mode: String,
+    pub update_channel: String,
 }
 
 /// The engine executable chosen for this session.
@@ -176,6 +177,7 @@ fn parse_config(path: &Path) -> AppResult<EngineConfig> {
 
     let mut data_dir_raw = None;
     let mut mode = None;
+    let mut update_channel = None;
     for line in raw.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -187,6 +189,7 @@ fn parse_config(path: &Path) -> AppResult<EngineConfig> {
         match key.trim() {
             "data_dir" => data_dir_raw = Some(yaml_scalar(value)),
             "mode" => mode = Some(yaml_scalar(value)),
+            "update_channel" => update_channel = Some(yaml_scalar(value)),
             _ => {}
         }
     }
@@ -201,6 +204,9 @@ fn parse_config(path: &Path) -> AppResult<EngineConfig> {
             path.display()
         )));
     }
+    let update_channel = update_channel
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "stable".to_string());
 
     let config_path = if path.is_absolute() {
         path.to_path_buf()
@@ -227,6 +233,7 @@ fn parse_config(path: &Path) -> AppResult<EngineConfig> {
         path: config_path,
         data_dir,
         mode,
+        update_channel,
     })
 }
 
