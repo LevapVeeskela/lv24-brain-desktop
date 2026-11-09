@@ -16,7 +16,7 @@ pub fn status(app: &AppHandle) -> AutostartStatus {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        return macos::status();
+        macos::status()
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -40,7 +40,7 @@ pub fn set(app: &AppHandle, enabled: bool) -> AppResult<AutostartStatus> {
     #[cfg(target_os = "macos")]
     {
         let _ = app;
-        return macos::set(enabled);
+        macos::set(enabled)
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -95,10 +95,19 @@ mod macos {
     pub fn set(enabled: bool) -> AppResult<AutostartStatus> {
         let service = service();
         if enabled {
-            if service.status() != ServiceStatus::Enabled {
-                service.register().map_err(|err| {
-                    AppError::Message(format!("cannot register login item: {err}"))
-                })?;
+            if matches!(
+                service.status(),
+                ServiceStatus::Enabled | ServiceStatus::RequiresApproval
+            ) {
+                return Ok(status());
+            }
+            match service.register() {
+                Ok(()) | Err(ServiceManagementError::AlreadyRegistered) => {}
+                Err(err) => {
+                    return Err(AppError::Message(format!(
+                        "cannot register login item: {err}"
+                    )))
+                }
             }
             return Ok(status());
         }
