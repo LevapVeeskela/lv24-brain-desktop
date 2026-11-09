@@ -20,6 +20,7 @@ export class RootStore {
 
   start(): void {
     this.engine.start();
+    this.connections.start();
   }
 
   dispose(): void {

@@ -19,7 +19,7 @@ export class ConnectionsStore {
 
   private readonly api: ConnectionsApi;
   private readonly engine: EngineRunningSource;
-  private readonly stopReaction: () => void;
+  private stopReaction: (() => void) | null = null;
   private inFlight: Promise<void> | null = null;
   private loadToken = 0;
 
@@ -27,6 +27,12 @@ export class ConnectionsStore {
     this.api = api;
     this.engine = engine;
     makeAutoObservable(this, {}, { autoBind: true });
+  }
+
+  start(): void {
+    if (this.stopReaction) {
+      return;
+    }
     this.stopReaction = reaction(
       () => this.engine.isRunning,
       (running) => {
@@ -107,7 +113,8 @@ export class ConnectionsStore {
   }
 
   dispose(): void {
-    this.stopReaction();
+    this.stopReaction?.();
+    this.stopReaction = null;
     this.reset();
   }
 }

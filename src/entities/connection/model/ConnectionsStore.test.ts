@@ -16,6 +16,7 @@ describe("ConnectionsStore", () => {
       run: vi.fn(async () => ({ jobId: "job-1" })),
     };
     const store = new ConnectionsStore(api, engine);
+    store.start();
 
     runInAction(() => {
       engine.isRunning = true;
@@ -34,6 +35,27 @@ describe("ConnectionsStore", () => {
     store.dispose();
   });
 
+  it("re-subscribes after dispose so StrictMode remounts still load", async () => {
+    const engine = observable({ isRunning: false });
+    const api: ConnectionsApi = {
+      list: vi.fn(async () => [connection]),
+      run: vi.fn(async () => ({ jobId: "job-1" })),
+    };
+    const store = new ConnectionsStore(api, engine);
+    store.start();
+    store.dispose();
+    store.start();
+
+    runInAction(() => {
+      engine.isRunning = true;
+    });
+    await vi.waitFor(() => {
+      expect(store.loaded).toBe(true);
+    });
+    expect(store.items).toEqual([connection]);
+    store.dispose();
+  });
+
   it("keeps a readable error when the local API fails", async () => {
     const engine = observable({ isRunning: false });
     const api: ConnectionsApi = {
@@ -43,6 +65,7 @@ describe("ConnectionsStore", () => {
       run: vi.fn(async () => ({ jobId: "job-1" })),
     };
     const store = new ConnectionsStore(api, engine);
+    store.start();
     runInAction(() => {
       engine.isRunning = true;
     });
