@@ -126,7 +126,7 @@ export class EngineStore {
         this.status = next;
         this.busy = null;
       });
-      return true;
+      return next.engine.running;
     } catch (cause) {
       runInAction(() => {
         this.error = errorMessage(cause);
