@@ -1,7 +1,7 @@
 {
   "name": "lv24-brain-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "LV24 Brain desktop shell (Tauri v2)",
   "scripts": {
@@ -10,19 +10,28 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "check": "npm run typecheck && vite build"
+    "test": "vitest run",
+    "api:generate": "openapi-typescript src/shared/api/openapi/localapi-v1.json -o src/shared/api/generated/schema.d.ts",
+    "api:check": "npm run api:generate && git diff --exit-code -- src/shared/api/generated/schema.d.ts",
+    "check": "npm run typecheck && npm run test && vite build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",
+    "mobx": "^7.1.5",
+    "mobx-react-lite": "^5.1.2",
+    "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.4",
+    "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "openapi-typescript": "^7.13.0",
     "typescript": "^5.9.3",
-    "vite": "^8.3.7"
+    "vite": "^8.3.7",
+    "vitest": "^5.1.0"
   }
 }

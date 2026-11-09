@@ -1,9 +1,57 @@
-# Shell architecture (WP5.1)
+# Shell architecture (WP5.1 + WP5.2)
 
-This document describes the v0.1.0 desktop shell. The UI foundation and screens
-land in WP5.2/5.3; the shell contracts below are intended to stay stable.
+This document describes the v0.2.0 desktop shell. The UI foundation arrived in
+WP5.2; the screens land in WP5.3. The shell contracts below are intended to stay
+stable.
 
-## Modules
+## Frontend layers (FSD)
+
+```
+src/
+  app/        RootStore composition, providers, global styles
+  pages/      dashboard page
+  widgets/    app header, engine overview/card, paths, connections
+  features/   engine controls, autostart, update check, locale, OAuth callback
+  entities/   engine, connection, sync, settings (stores + API adapters)
+  shared/     API transport/client, i18n, UI primitives, error helpers
+```
+
+- `RootStore` owns the Engine, Connections, Sync and Settings stores. It is
+  created once by `RootStoreProvider`; the provider starts polling/event
+  subscriptions and disposes them on unmount (StrictMode-safe).
+- `EngineStore` polls `shell_status` every 4 seconds, listens for
+  `engine-status`, `shell-error` and `oauth-callback`, and exposes start, pause,
+  autostart and quit actions. An `engine-status` event refreshes the full shell
+  snapshot so a tray pause/resume also updates the persisted pause flag.
+- `ConnectionsStore` reacts to the engine running state: it loads the catalogue
+  through the typed client, resets on stop and guards stale async results.
+- `SyncStore` ensures the agent is running, loads the catalogue and queues every
+  connection through the typed client, collecting per-connection failures.
+- `SettingsStore` owns the UI locale (persisted in WebView local storage) and
+  the desktop update check/install flow.
+- Components receive stores as props from the dashboard page; only the page and
+  the app provider touch the root store. Shared UI components have no store
+  dependencies.
+
+### Typed client
+
+`src/shared/api/openapi/localapi-v1.json` is a copy of the engine's
+`internal/adapters/localapi/openapi.json`. `npm run api:generate` produces
+`src/shared/api/generated/schema.d.ts` with `openapi-typescript`. The runtime
+client is `openapi-fetch` with a custom fetch implementation that converts
+`Request` to `api_request` and `ApiResponse` back to `Response`. Entity API
+adapters validate response shapes and strip unknown fields; the token never
+enters this layer.
+
+### i18n
+
+`src/shared/i18n/messages/{en,ru,zh}.ts` are flat, typed dictionaries.
+`translate(locale, key, params)` interpolates `{name}` placeholders. The locale
+is detected from `localStorage` first, then the system language, and defaults to
+English; the header switcher persists it and updates `document.lang`. The
+key-parity test fails if a translation is missing.
+
+## Rust modules
 
 | Rust module | Responsibility |
 | --- | --- |
@@ -85,7 +133,7 @@ received before the listener existed.
   is required and the user may need to approve the login item in System
   Settings. The app requires macOS 13+ for this API.
 
-## Deliberate non-goals in v0.1.0
+## Deliberate non-goals in v0.2.0
 
 - No direct webview access to `127.0.0.1` or the token.
 - No remote content in the webview, no `dangerousRemoteDomainIpcAccess`.

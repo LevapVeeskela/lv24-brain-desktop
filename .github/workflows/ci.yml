@@ -24,8 +24,8 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+      - run: npm run api:check
+      - run: npm run check
 
   rust:
     name: rust (${{ matrix.os }})

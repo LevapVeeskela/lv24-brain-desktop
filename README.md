@@ -7,9 +7,12 @@ It keeps the local brain agent running, exposes it through a token-safe proxy,
 and provides the tray, autostart, updater and OAuth deep-link plumbing the
 desktop UI is built on.
 
-**Status: v0.1.0, WP5.1 shell.** The full FSD/MobX UI (WP5.2/5.3) and signed
-packaging (WP5.4) are the next packages. The window in this repository is a
-working status and controls surface, not the final product UI.
+**Status: v0.2.0, WP5.2 UI foundation.** The app now has an FSD layout,
+MobX stores (Engine, Connections, Sync, Settings), a typed client generated from
+the local `localapi-v1` OpenAPI contract, and ru/en/zh localization. Full
+screens (WP5.3) and signed packaging (WP5.4) are next. The window in this
+repository is still a working status and controls surface, not the final
+product UI.
 
 ## What works
 
@@ -29,8 +32,17 @@ working status and controls surface, not the final product UI.
   `lv24brain://oauth/...` and `lv24brain://auth/...`, buffers the URL for the UI
   and emits `oauth-callback`. The engine OAuth wiring is consumed by WP5.3.
 - **Persistent pause**: pausing stops the agent and survives desktop restarts.
+- **FSD UI foundation (v0.2.0)**: `app / pages / widgets / features / entities /
+  shared`, MobX stores for Engine, Connections, Sync and Settings, shared UI
+  primitives.
+- **Typed local API client (v0.2.0)**: generated from the vendored
+  `localapi-v1` OpenAPI file; `openapi-fetch` uses a custom Tauri transport, so
+  the webview never sees the bearer token or loopback port.
+- **i18n (v0.2.0)**: English, Russian and Chinese dictionaries with a typed key
+  set, persisted locale and a header switcher.
 - **Structured tests** for path allow-listing, config discovery, runtime
-  records, SSE parsing, settings persistence and the HTTP proxy.
+  records, SSE parsing, settings persistence, the HTTP proxy, the typed
+  transport, API parsers, stores and i18n key parity.
 
 ## Architecture
 
@@ -61,7 +73,7 @@ See [docs/architecture.md](docs/architecture.md) and
 - The LV24 Brain engine `0.12.0` or newer, initialized with `brain init` and
   selected with `brain config use <path>` (or `BRAIN_CONFIG`).
 
-The engine is not bundled in v0.1.0. The supervisor resolves it in this order:
+The engine is not bundled yet. The supervisor resolves it in this order:
 
 1. `LV24_BRAIN_BIN`
 2. `<resource-dir>/engine/brain[.exe]` or `<resource-dir>/brain[.exe]`
@@ -91,12 +103,19 @@ Checks:
 
 ```bash
 npm run typecheck
+npm test
 npm run build
+npm run api:check
 cd src-tauri
 cargo fmt --all --check
 cargo clippy --all-targets -- -D warnings
 cargo test
 ```
+
+`npm run api:generate` regenerates `src/shared/api/generated/schema.d.ts` from
+`src/shared/api/openapi/localapi-v1.json`. The OpenAPI file is a copy of the
+engine's `internal/adapters/localapi/openapi.json`; keep them in sync when the
+`localapi-v1` contract changes. `api:check` fails if the generated file is stale.
 
 A full desktop build without an installer:
 
@@ -113,8 +132,8 @@ The updater is enabled with Tauri's Ed25519 (minisign-compatible) signatures.
 The public key is committed in `src-tauri/tauri.conf.json`. The private key is
 **not** in this repository.
 
-The current public key belongs to the v0.1.0 development key generated on the
-maintainer machine. Before the first public release:
+The current public key belongs to the development key generated for the v0.1.0
+shell. Before the first public release:
 
 1. Generate a production key and store the private key in the release secret
    store (`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
@@ -129,10 +148,10 @@ Signing status: macOS signing/notarization waits for Apple Developer Program
 approval; Windows signing waits for SignPath Foundation approval. Until then,
 release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
-## Known limitations (v0.1.0)
+## Known limitations (v0.2.0)
 
-- No full connection/settings screens; WP5.2 adds FSD/MobX and the typed client,
-  WP5.3 adds the screens.
+- No full connection/settings screens; WP5.3 adds them. The dashboard currently
+  lists connections read-only and exposes engine/sync/startup/update controls.
 - The engine binary is resolved from the environment, not bundled.
 - Pause stops the agent. If an agent was started outside the desktop, Pause
   asks it to shut down through the local API; if it refuses, the shell reports

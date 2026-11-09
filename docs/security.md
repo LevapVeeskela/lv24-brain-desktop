@@ -1,4 +1,4 @@
-# Security model (WP5.1)
+# Security model (v0.2.0)
 
 The shell is the only component that ever holds the local API bearer token.
 This document records the boundary and the accepted residual risks.
