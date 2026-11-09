@@ -44,6 +44,10 @@ export class EngineStore {
     return this.status?.engine.phase === "paused";
   }
 
+  get isUpdating(): boolean {
+    return this.status?.updating ?? false;
+  }
+
   get autostart(): AutostartStatus | null {
     return this.status?.autostart ?? null;
   }

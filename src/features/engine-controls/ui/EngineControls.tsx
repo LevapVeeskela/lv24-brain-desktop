@@ -13,7 +13,7 @@ export const EngineControls = observer(function EngineControls({
 }) {
   const { t } = useI18n();
   const paused = engine.isPaused;
-  const busy = engine.busy !== null || sync.busy;
+  const busy = engine.busy !== null || sync.busy || engine.isUpdating;
 
   return (
     <div className="hero-actions">

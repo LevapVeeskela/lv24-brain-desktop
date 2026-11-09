@@ -24,6 +24,7 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
+      - run: node --test scripts/build-latest-json.test.mjs
       - run: npm run api:check
       - run: npm run check
 

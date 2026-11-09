@@ -44,6 +44,12 @@ bundled.
   connection detail (schedule, credentials, runs, SSE live log, OAuth, delete),
   activity, projects and settings (paths, autostart, language, desktop update,
   update channel and OS keychain secret names).
+- **Packaging (WP5.4)**: manual `desktop.yml` builds NSIS (Windows),
+  DMG + app zip + `.app.tar.gz` (macOS arm64/x64), and AppImage + deb + rpm
+  (Linux) with a checksum-pinned engine sidecar, 7-day artifacts, and an
+  owner-gated signed release path. Updater manifests include all six
+  platform entries (including deb/rpm) and `requireSignedVersion` is enabled.
+  See [docs/release.md](docs/release.md).
 - **Read-only engine CLI bridge (v0.3.0)**: `engine_providers`,
   `engine_secrets` and streaming `engine_connection_auth` commands reuse the
   engine binary/config; the webview never receives a secret value.
@@ -80,7 +86,9 @@ See [docs/architecture.md](docs/architecture.md) and
 - The LV24 Brain engine `0.12.0` or newer, initialized with `brain init` and
   selected with `brain config use <path>` (or `BRAIN_CONFIG`).
 
-The engine is not bundled yet. The supervisor resolves it in this order:
+The engine sidecar is fetched per target during packaging CI; see
+[docs/release.md](docs/release.md). Local development still resolves the engine
+in this order:
 
 1. `LV24_BRAIN_BIN`
 2. `<resource-dir>/engine/brain[.exe]` or `<resource-dir>/brain[.exe]`
@@ -88,7 +96,8 @@ The engine is not bundled yet. The supervisor resolves it in this order:
 4. `PATH`
 5. the npm global platform package (`@lv24/brain-<os>-<arch>`)
 
-WP5.4 will ship an engine sidecar in the installer.
+Release installers bundle `brain` next to the desktop executable through the
+`src-tauri/tauri.bundle.conf.json` override.
 
 ## Development
 
@@ -130,14 +139,41 @@ A full desktop build without an installer:
 npm run tauri build -- --debug --no-bundle
 ```
 
-`npm run tauri build` with bundling requires the updater signing key; see
-below.
+A local packaged build with the engine sidecar (Windows example; derive the
+target triple with `rustc -vV` on other hosts):
+
+```bash
+node scripts/fetch-engine.mjs --version 0.12.0 \
+  --target x86_64-pc-windows-msvc
+npm run tauri build -- --debug --bundles nsis \
+  --config src-tauri/tauri.bundle.conf.json \
+  --config src-tauri/tauri.unsigned.conf.json
+```
+
+See [docs/release.md](docs/release.md) for the CI matrix, release gating and
+artifact list.
+
+## Packaging and release
+
+`.github/workflows/desktop.yml` is a manual workflow that builds NSIS (Windows),
+DMG + app zip + `.app.tar.gz` (macOS arm64/x64), and AppImage/deb/rpm (Linux) on
+free standard runners. It downloads the matching engine release with
+`scripts/fetch-engine.mjs`, verifies its release checksum and reviewed pin, and
+bundles it as a Tauri sidecar. Artifacts are retained for 7 days; publishing a
+GitHub release is an explicit owner-gated input and requires a signed build and
+tag.
+
+Updater signing uses `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets. The current public key
+is a development key; rotate it before a public release. OS code signing remains
+deferred until Apple Developer Program and SignPath approvals.
 
 ## Updates and signing
 
 The updater is enabled with Tauri's Ed25519 (minisign-compatible) signatures.
 The public key is committed in `src-tauri/tauri.conf.json`. The private key is
-**not** in this repository.
+**not** in this repository. `requireSignedVersion` binds each update signature
+to the app version, preventing manifest downgrade substitution.
 
 The current public key belongs to the development key generated for the v0.1.0
 shell. Before the first public release:
@@ -157,7 +193,8 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
 ## Known limitations (v0.3.0)
 
-- The engine binary is resolved from the environment, not bundled.
+- Local `cargo`/Vite development still resolves the engine from the
+  environment; only packaged builds include the sidecar.
 - Pause stops the agent. If an agent was started outside the desktop, Pause
   asks it to shut down through the local API; if it refuses, the shell reports
   an error instead of pretending it is paused.
@@ -172,7 +209,10 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
   `brain.yaml`; use the engine CLI or edit the file.
 - Provider config labels/help come from the engine descriptors and are English;
   the desktop chrome is fully localized.
-- Full packaging/CI (NSIS per-user, DMG + zip, AppImage + deb/rpm) is WP5.4.
+- The release matrix currently builds Windows x64, Linux x64, and macOS
+  arm64/x64. Windows arm64 and Linux arm64 installers are not in the initial
+  matrix.
+- OS code signing/notarization remains deferred to Apple/SignPath approvals.
 
 ## License
 

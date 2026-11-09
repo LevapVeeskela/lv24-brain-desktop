@@ -31,6 +31,7 @@ export interface AutostartStatus {
 export interface ShellStatus {
   engine: EngineStatus;
   paused: boolean;
+  updating: boolean;
   autostart: AutostartStatus;
   desktopVersion: string;
   deepLinkScheme: string;

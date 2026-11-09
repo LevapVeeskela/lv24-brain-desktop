@@ -77,6 +77,7 @@ struct Inner {
     child: AsyncMutex<Option<Child>>,
     lifecycle: AsyncMutex<()>,
     paused: AtomicBool,
+    updating: AtomicBool,
     quitting: AtomicBool,
     restarts: AtomicU32,
     wake: Notify,
@@ -128,6 +129,7 @@ impl Supervisor {
                 child: AsyncMutex::new(None),
                 lifecycle: AsyncMutex::new(()),
                 paused: AtomicBool::new(paused),
+                updating: AtomicBool::new(false),
                 quitting: AtomicBool::new(false),
                 restarts: AtomicU32::new(0),
                 wake: Notify::new(),
@@ -146,6 +148,10 @@ impl Supervisor {
 
     pub fn is_quitting(&self) -> bool {
         self.inner.quitting.load(Ordering::SeqCst)
+    }
+
+    pub fn is_updating(&self) -> bool {
+        self.inner.updating.load(Ordering::SeqCst)
     }
 
     pub fn log_dir(&self) -> &std::path::Path {
@@ -181,6 +187,9 @@ impl Supervisor {
             let lifecycle = self.inner.lifecycle.lock().await;
             if self.inner.quitting.load(Ordering::SeqCst) {
                 break;
+            }
+            if self.inner.updating.load(Ordering::SeqCst) {
+                continue;
             }
             if self.inner.paused.load(Ordering::SeqCst) {
                 self.set_paused().await;
@@ -252,6 +261,11 @@ impl Supervisor {
     pub async fn resume(&self) -> AppResult<EngineStatus> {
         {
             let _lifecycle = self.inner.lifecycle.lock().await;
+            if self.inner.updating.load(Ordering::SeqCst) {
+                return Err(AppError::Message(
+                    "a desktop update is in progress".to_string(),
+                ));
+            }
             self.inner.paused.store(false, Ordering::SeqCst);
             self.inner.settings.set_paused(false)?;
         }
@@ -276,7 +290,7 @@ impl Supervisor {
         self.inner.settings.set_paused(true)?;
         self.set_paused().await;
         self.stop_engine().await;
-        if matches!(self.probe().await, Ok(Probe::Running(_))) {
+        if self.agent_process_alive().await {
             self.inner.paused.store(false, Ordering::SeqCst);
             self.inner.settings.set_paused(false)?;
             let message =
@@ -286,6 +300,56 @@ impl Supervisor {
         }
         self.set_paused().await;
         Ok(self.status())
+    }
+
+    /// Stop the agent before a desktop update without persisting the pause.
+    /// Windows installers replace files while the app exits, so the sidecar
+    /// must not keep `brain.exe` open. The update guard also blocks
+    /// Resume/Sync from restarting the agent while the installer runs.
+    pub async fn suspend_for_update(&self) -> AppResult<bool> {
+        if self.inner.updating.swap(true, Ordering::SeqCst) {
+            return Err(AppError::Message(
+                "a desktop update is already in progress".to_string(),
+            ));
+        }
+
+        let _lifecycle = self.inner.lifecycle.lock().await;
+        let was_paused =
+            self.inner.paused.load(Ordering::SeqCst) || self.inner.settings.get().paused;
+        self.inner.paused.store(true, Ordering::SeqCst);
+        self.set_paused().await;
+        self.stop_engine().await;
+
+        if self.agent_process_alive().await {
+            self.inner.updating.store(false, Ordering::SeqCst);
+            if !was_paused {
+                self.inner.paused.store(false, Ordering::SeqCst);
+                self.inner.wake.notify_waiters();
+            }
+            return Err(AppError::Message(
+                "the brain agent did not stop before the update".to_string(),
+            ));
+        }
+        Ok(was_paused)
+    }
+
+    pub async fn resume_after_update_failure(&self, was_paused: bool) {
+        self.inner.updating.store(false, Ordering::SeqCst);
+        if was_paused || self.inner.settings.get().paused {
+            return;
+        }
+        {
+            let _lifecycle = self.inner.lifecycle.lock().await;
+            self.inner.paused.store(false, Ordering::SeqCst);
+        }
+        self.inner.wake.notify_waiters();
+    }
+
+    async fn agent_process_alive(&self) -> bool {
+        let Ok(Some(record)) = self.current_runtime().await else {
+            return false;
+        };
+        pid_alive(record.pid)
     }
 
     pub async fn client(&self) -> AppResult<ApiClient> {
@@ -658,5 +722,49 @@ fn exit_message(exit: ExitStatus) -> String {
     match exit.code() {
         Some(code) => format!("brain agent exited with code {code}"),
         None => "brain agent was terminated by a signal".to_string(),
+    }
+}
+
+#[cfg(unix)]
+fn pid_alive(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    // Signal 0 checks existence without delivering a signal.
+    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
+    result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
+}
+
+#[cfg(windows)]
+fn pid_alive(pid: u32) -> bool {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    const STILL_ACTIVE: u32 = 259;
+    if pid == 0 {
+        return false;
+    }
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        return false;
+    }
+    let mut code = 0_u32;
+    let ok = unsafe { GetExitCodeProcess(handle, &mut code) };
+    unsafe {
+        CloseHandle(handle);
+    }
+    ok != 0 && code == STILL_ACTIVE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn current_process_is_alive() {
+        assert!(pid_alive(std::process::id()));
+        assert!(!pid_alive(0));
     }
 }

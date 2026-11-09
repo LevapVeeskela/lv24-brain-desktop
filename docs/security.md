@@ -41,6 +41,14 @@ This document records the boundary and the accepted residual risks.
   command lists names only, never values. OAuth output is streamed as bounded
   text and the process times out after five minutes. The bridge shares the
   desktop's filesystem permissions and is not a privilege boundary.
+- **Bundled engine.** Packaging downloads the engine release asset and verifies
+  its SHA-256 against the release `checksums.txt` and the reviewed pin in
+  `scripts/engine-checksums.json` before Tauri embeds it as a sidecar. GitHub
+  release transport is HTTPS; engine upgrades require updating the pin.
+- **Update while running.** Before installing a desktop update, the supervisor
+  stops the agent (without persisting a pause), waits for shutdown and aborts
+  the install if an external agent is still running. The app exits and the
+  installer can replace the sidecar without a file lock.
 - **Updater verification.** Tauri's updater checks an Ed25519 signature against
   the public key compiled into the app before installing. HTTPS endpoints are
   required in production.

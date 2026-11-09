@@ -338,6 +338,7 @@ mod tests {
         let resolved = parse_config(&config).unwrap();
         assert_eq!(resolved.data_dir, normalize(data));
         assert_eq!(resolved.mode, "git");
+        assert_eq!(resolved.update_channel, "stable");
     }
 
     #[test]

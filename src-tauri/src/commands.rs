@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
@@ -14,6 +15,7 @@ use crate::engine::{EngineStatus, Supervisor};
 pub struct ShellStatus {
     pub engine: EngineStatus,
     pub paused: bool,
+    pub updating: bool,
     pub autostart: AutostartStatus,
     pub desktop_version: String,
     pub deep_link_scheme: String,
@@ -53,6 +55,7 @@ fn make_status(app: &AppHandle) -> ShellStatus {
     ShellStatus {
         engine: supervisor.status(),
         paused: supervisor.is_paused(),
+        updating: supervisor.is_updating(),
         autostart: autostart::status(app),
         desktop_version: env!("CARGO_PKG_VERSION").to_string(),
         deep_link_scheme: deep_link::SCHEME.to_string(),
@@ -139,7 +142,7 @@ pub fn autostart_set(app: AppHandle, enabled: bool) -> Result<ShellStatus, Strin
 
 #[tauri::command]
 pub async fn update_check(app: AppHandle) -> Result<UpdateInfo, String> {
-    let updater = app.updater().map_err(|err| err.to_string())?;
+    let updater = updater(&app, Duration::from_secs(120))?;
     let update = updater.check().await.map_err(|err| err.to_string())?;
     Ok(match update {
         Some(update) => UpdateInfo {
@@ -159,14 +162,17 @@ pub async fn update_check(app: AppHandle) -> Result<UpdateInfo, String> {
 
 #[tauri::command]
 pub async fn update_install(app: AppHandle) -> Result<(), String> {
-    let updater = app.updater().map_err(|err| err.to_string())?;
+    let updater = updater(&app, Duration::from_secs(15 * 60))?;
     let Some(update) = updater.check().await.map_err(|err| err.to_string())? else {
         return Ok(());
     };
+
+    // Download and verify first: the agent keeps running during the network
+    // transfer. It is stopped only immediately before the installer runs.
     let handle = app.clone();
     let mut downloaded = 0_u64;
-    update
-        .download_and_install(
+    let bytes = update
+        .download(
             move |chunk, total| {
                 downloaded = downloaded.saturating_add(chunk as u64);
                 let _ = handle.emit("update-progress", UpdateProgress { downloaded, total });
@@ -175,7 +181,24 @@ pub async fn update_install(app: AppHandle) -> Result<(), String> {
         )
         .await
         .map_err(|err| err.to_string())?;
+
+    let supervisor = supervisor(&app);
+    let was_paused = supervisor
+        .suspend_for_update()
+        .await
+        .map_err(|err| err.to_string())?;
+    if let Err(err) = update.install(&bytes) {
+        supervisor.resume_after_update_failure(was_paused).await;
+        return Err(err.to_string());
+    }
     app.restart();
+}
+
+fn updater(app: &AppHandle, timeout: Duration) -> Result<tauri_plugin_updater::Updater, String> {
+    app.updater_builder()
+        .timeout(timeout)
+        .build()
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]

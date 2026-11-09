@@ -61,6 +61,9 @@ export class SettingsStore {
     } catch (cause) {
       runInAction(() => {
         this.error = errorMessage(cause);
+      });
+    } finally {
+      runInAction(() => {
         this.installingUpdate = false;
       });
     }

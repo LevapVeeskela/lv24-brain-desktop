@@ -49,6 +49,19 @@ adapters validate response shapes and strip unknown fields; the token never
 enters this layer. JSON request bodies are marked `additionalProperties: true`
 to mirror the engine's open decode shapes.
 
+### Packaging (WP5.4)
+
+Packaged builds fetch the matching engine release binary with
+`scripts/fetch-engine.mjs`, verify its checksum against both the release
+`checksums.txt` and the reviewed `scripts/engine-checksums.json` pin, and place
+it at `src-tauri/binaries/brain-<target>[.exe]`. Engine upgrades require updating
+the pin. `tauri.bundle.conf.json` adds it as `externalBin`; the supervisor finds
+it next to the desktop executable. Unsigned CI jobs add
+`tauri.unsigned.conf.json` to disable updater artifacts. Signed jobs use the
+committed updater public key and repository signing secrets;
+`scripts/build-latest-json.mjs` creates the updater manifest for a release.
+See [release.md](release.md).
+
 ### Engine CLI bridge
 
 Three Tauri commands call the engine executable without exposing a token:

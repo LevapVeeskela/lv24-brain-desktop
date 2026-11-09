@@ -1,0 +1,383 @@
+name: desktop
+
+# Manual only. Builds may run at any time, but a GitHub release is published
+# only when the owner explicitly sets publish_release=true. Publishing also
+# requires signed=true (updater artifacts + latest.json) and a tag.
+on:
+  workflow_dispatch:
+    inputs:
+      engine_version:
+        description: "LV24 Brain engine version to bundle (for example 0.12.0)"
+        required: false
+        type: string
+        default: "0.12.0"
+      signed:
+        description: "Create updater artifacts and signatures (requires TAURI_SIGNING_PRIVATE_KEY)"
+        required: false
+        type: boolean
+        default: false
+      publish_release:
+        description: "Publish a GitHub release (requires signed=true and a tag)"
+        required: false
+        type: boolean
+        default: false
+      tag:
+        description: "Release tag, for example v0.3.0 (required only when publishing)"
+        required: false
+        type: string
+        default: ""
+      prerelease:
+        description: "Mark the published release as a prerelease"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            bundles: nsis
+            platform: windows-x86_64
+          - os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb,rpm
+            platform: linux-x86_64
+          - os: macos-latest
+            rust_target: aarch64-apple-darwin
+            bundles: app,dmg
+            platform: darwin-aarch64
+          - os: macos-latest
+            rust_target: x86_64-apple-darwin
+            bundles: app,dmg
+            platform: darwin-x86_64
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Rust target
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          workspaces: "./src-tauri -> target"
+          key: ${{ matrix.rust_target }}
+
+      - name: Install Linux bundle dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential curl file libayatana-appindicator3-dev \
+            librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev \
+            patchelf wget
+
+      - name: Fetch engine sidecar
+        shell: bash
+        env:
+          ENGINE_VERSION: ${{ inputs.engine_version }}
+        run: |
+          node scripts/fetch-engine.mjs \
+            --version "$ENGINE_VERSION" \
+            --target "${{ matrix.rust_target }}" \
+            --out src-tauri/binaries
+
+      - name: Require updater signing secrets
+        if: inputs.signed
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::signed=true requires the TAURI_SIGNING_PRIVATE_KEY repository secret"
+            exit 1
+          fi
+
+      - name: Build desktop bundles
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ inputs.signed && secrets.TAURI_SIGNING_PRIVATE_KEY || '' }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ inputs.signed && secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          BUILD_LOG="$(mktemp)"
+          npm run tauri build -- \
+            --target "${{ matrix.rust_target }}" \
+            --config src-tauri/tauri.bundle.conf.json \
+            ${{ inputs.signed == false && '--config src-tauri/tauri.unsigned.conf.json' || '' }} \
+            --bundles "${{ matrix.bundles }}" 2>&1 | tee "$BUILD_LOG"
+          if grep -Fq "does not match the public key" "$BUILD_LOG"; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY does not match plugins.updater.pubkey"
+            exit 1
+          fi
+          rm -f "$BUILD_LOG"
+
+      - name: Verify bundled engine sidecar
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.rust_target }}"
+          case "${{ runner.os }}" in
+            Windows) SIDECAR="src-tauri/target/$TARGET/release/brain.exe" ;;
+            macOS) SIDECAR="src-tauri/target/$TARGET/release/bundle/macos/LV24 Brain.app/Contents/MacOS/brain" ;;
+            *) SIDECAR="src-tauri/target/$TARGET/release/brain" ;;
+          esac
+          if [ ! -f "$SIDECAR" ]; then
+            echo "::error::engine sidecar missing from the bundle: $SIDECAR"
+            find "src-tauri/target/$TARGET/release" -maxdepth 4 -name 'brain*' -print || true
+            exit 1
+          fi
+          echo "Found bundled engine: $SIDECAR"
+
+      # Tauri names the macOS updater archive without an architecture, which is
+      # ambiguous once both macOS matrix jobs are merged. Keep the signed bytes
+      # untouched and add version+arch to the filename instead.
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          SIGNED: ${{ inputs.signed }}
+          TARGET: ${{ matrix.rust_target }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          case "$PLATFORM" in
+            darwin-aarch64) ARCH="aarch64" ;;
+            darwin-x86_64) ARCH="x64" ;;
+            *)
+              echo "::error::unexpected macOS platform: $PLATFORM"
+              exit 1
+              ;;
+          esac
+
+          BUNDLE_DIR="src-tauri/target/$TARGET/release/bundle"
+          APP_DIR="$BUNDLE_DIR/macos"
+          DMG_DIR="$BUNDLE_DIR/dmg"
+
+          # Shell globs avoid relying on GNU find extensions on macOS.
+          APP_PATH=""
+          for candidate in "$APP_DIR"/*.app; do
+            if [ -d "$candidate" ]; then
+              APP_PATH="$candidate"
+              break
+            fi
+          done
+
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::no .app bundle found under $APP_DIR"
+            find "$BUNDLE_DIR" -type f -print || true
+            exit 1
+          fi
+
+          mkdir -p "$DMG_DIR"
+          APP_ZIP="$DMG_DIR/LV24 Brain_${VERSION}_${ARCH}.app.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+          echo "Created $APP_ZIP"
+
+          if [ "$SIGNED" = "true" ]; then
+            UPDATER_ARCHIVE=""
+            for candidate in "$APP_DIR"/*.app.tar.gz; do
+              if [ -f "$candidate" ]; then
+                UPDATER_ARCHIVE="$candidate"
+                break
+              fi
+            done
+            if [ -z "$UPDATER_ARCHIVE" ]; then
+              echo "::error::signed build did not produce a macOS .app.tar.gz updater archive"
+              find "$BUNDLE_DIR" -type f -print || true
+              exit 1
+            fi
+            if [ ! -f "$UPDATER_ARCHIVE.sig" ]; then
+              echo "::error::missing updater signature: $UPDATER_ARCHIVE.sig"
+              exit 1
+            fi
+
+            ARCHIVE_TAGGED="$APP_DIR/LV24 Brain_${VERSION}_${ARCH}.app.tar.gz"
+            if [ "$UPDATER_ARCHIVE" != "$ARCHIVE_TAGGED" ]; then
+              mv "$UPDATER_ARCHIVE" "$ARCHIVE_TAGGED"
+              mv "$UPDATER_ARCHIVE.sig" "$ARCHIVE_TAGGED.sig"
+            fi
+            echo "Signed updater archive: $ARCHIVE_TAGGED"
+          fi
+
+      - name: Upload desktop bundles
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            src-tauri/target/${{ matrix.rust_target }}/release/bundle/**
+            !src-tauri/target/${{ matrix.rust_target }}/release/bundle/**/*.app/**
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: publish release
+    needs: build
+    if: inputs.publish_release && github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Validate release inputs
+        shell: bash
+        env:
+          SIGNED: ${{ inputs.signed }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$SIGNED" != "true" ]; then
+            echo "::error::publish_release=true requires signed=true: the updater release needs signed artifacts and latest.json"
+            exit 1
+          fi
+          if [ -z "$TAG_INPUT" ]; then
+            echo "::error::publish_release=true requires a non-empty tag (for example v0.3.0)"
+            exit 1
+          fi
+          if [[ ! "$TAG_INPUT" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::invalid release tag '$TAG_INPUT'; expected v<major>.<minor>.<patch>"
+            exit 1
+          fi
+          VERSION="$(node -p "require('./package.json').version")"
+          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          CARGO_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          if [ "$VERSION" != "$TAURI_VERSION" ] || [ "$VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::version mismatch: package.json=$VERSION tauri.conf.json=$TAURI_VERSION Cargo.toml=$CARGO_VERSION"
+            exit 1
+          fi
+          if [ "$TAG_INPUT" != "v$VERSION" ]; then
+            echo "::error::tag $TAG_INPUT does not match v$VERSION from package.json"
+            exit 1
+          fi
+          git fetch --tags --force origin >/dev/null 2>&1 || true
+          if git rev-parse --verify --quiet "$TAG_INPUT^{commit}" >/dev/null; then
+            TAG_COMMIT="$(git rev-parse "$TAG_INPUT^{commit}")"
+            if [ "$TAG_COMMIT" != "$GITHUB_SHA" ]; then
+              echo "::error::tag $TAG_INPUT points at $TAG_COMMIT, not the built commit $GITHUB_SHA"
+              exit 1
+            fi
+          else
+            echo "Tag $TAG_INPUT does not exist yet; the release will be created at $GITHUB_SHA."
+          fi
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: release
+          merge-multiple: true
+
+      # upload-artifact preserves paths under bundle/ (nsis/, dmg/, macos/, ...).
+      # Flatten real files to release/ so gh can upload them as release assets.
+      # The .app directory itself is packaging input, not a release asset; its
+      # DMG and .app.tar.gz/.app.zip companions are uploaded instead.
+      - name: Flatten downloaded artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            target="release/$(basename "$file")"
+            if [ "$file" != "$target" ]; then
+              if [ -e "$target" ]; then
+                echo "::error::duplicate release asset name: $(basename "$file")"
+                exit 1
+              fi
+              mv "$file" "$target"
+            fi
+          done < <(find release -type f ! -path '*.app/*' -print0)
+          find release -depth -mindepth 1 -type d -exec rm -rf {} +
+          ls -la release
+
+      - name: Compose release notes
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+          ENGINE_VERSION: ${{ inputs.engine_version }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          cat > release-notes.md <<EOF
+          LV24 Brain desktop $TAG (version $VERSION).
+
+          - Bundled LV24 Brain engine: $ENGINE_VERSION
+          - Windows and macOS installers are unsigned; SmartScreen and Gatekeeper warnings are expected.
+          - Updater artifacts are Ed25519-signed; latest.json embeds those signatures.
+          EOF
+
+      - name: Build latest.json
+        shell: bash
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          node scripts/build-latest-json.mjs \
+            --dir release \
+            --tag "$TAG" \
+            --version "$VERSION" \
+            --repo "${{ github.repository }}" \
+            --notes "$(cat release-notes.md)" \
+            --out release/latest.json
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists; refusing to overwrite installers, signatures or latest.json"
+            exit 1
+          fi
+
+          gh release create "$TAG" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "LV24 Brain $TAG" \
+            --notes-file release-notes.md
+
+          find release -maxdepth 1 -type f ! -name latest.json -print0 |
+            xargs -0 -r gh release upload "$TAG" --clobber
+
+          # Upload latest.json last so clients never see a manifest whose
+          # referenced assets are still missing.
+          gh release upload "$TAG" release/latest.json --clobber
+
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --draft=false --prerelease
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
