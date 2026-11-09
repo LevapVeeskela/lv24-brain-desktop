@@ -1,0 +1,28 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Frontend
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+
+# Update signing keys must never be committed. The public key lives in
+# src-tauri/tauri.conf.json; the private key is a CI secret.
+*.key
+*.key.pub
+*.password

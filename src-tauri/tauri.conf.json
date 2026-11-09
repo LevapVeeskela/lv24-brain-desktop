@@ -1,0 +1,71 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LV24 Brain",
+  "version": "0.1.0",
+  "identifier": "by.lv24.brain.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "LV24 Brain",
+        "width": 980,
+        "height": 720,
+        "minWidth": 760,
+        "minHeight": 540,
+        "visible": false,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src ipc: http://ipc.localhost",
+      "devCsp": "default-src 'self' http://localhost:1420; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' asset: http://asset.localhost data:; style-src 'self' 'unsafe-inline' http://localhost:1420; script-src 'self' 'unsafe-inline' http://localhost:1420; font-src 'self' data:; connect-src ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "Local memory engine for agents",
+    "longDescription": "LV24 Brain desktop shell: tray control, agent supervision, signed updates and the local control API proxy.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg1MDE1RjJDMTRBQkFDMDEKUldRQnJLc1VMRjhCaFE3cHBBTVZLZ3JzUzArRUhzY01qZ3JqeFUvSXlIakRaSmszMWJjTC9uN3cK",
+      "endpoints": [
+        "https://github.com/LevapVeeskela/lv24-brain-desktop/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["lv24brain"]
+      }
+    }
+  }
+}
