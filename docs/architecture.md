@@ -1,6 +1,6 @@
 # Shell architecture (WP5.1–WP5.5)
 
-This document describes the v1.0.0 desktop shell. WP5.2 added the UI foundation,
+This document describes the v1.0.1 desktop shell. WP5.2 added the UI foundation,
 WP5.3 the screens, WP5.4 packaging and WP5.5 the UX/accessibility pass.
 
 ## Frontend layers (FSD)
