@@ -71,6 +71,17 @@ function hasAny(value, needles) {
 }
 
 /**
+ * GitHub replaces spaces with dots in uploaded release asset names. The
+ * manifest URL must use the stored name, not the local filename.
+ *
+ * @param {string} filename
+ * @returns {string}
+ */
+export function githubAssetName(filename) {
+  return path.basename(filename).replaceAll(" ", ".");
+}
+
+/**
  * Map an updater artifact filename to a Tauri updater platform key.
  * Returns null for files that are not supported updater artifacts.
  *
@@ -271,7 +282,7 @@ export function buildLatestJson({
 
     platforms[platform] = {
       signature,
-      url: `${GITHUB_DOWNLOAD_BASE}/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(artifactName)}`,
+      url: `${GITHUB_DOWNLOAD_BASE}/${repo}/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(githubAssetName(artifactName))}`,
     };
     platformSources.set(platform, signaturePath);
   }

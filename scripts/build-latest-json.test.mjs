@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   DEFAULT_REQUIRED_PLATFORMS,
   buildLatestJson,
+  githubAssetName,
   platformForArtifact,
 } from "./build-latest-json.mjs";
 
@@ -30,6 +31,13 @@ test("maps every supported updater artifact", () => {
   assert.equal(platformForArtifact("notes.txt.sig"), null);
 });
 
+test("uses GitHub's dot-normalized asset names in URLs", () => {
+  assert.equal(
+    githubAssetName("LV24 Brain_0.3.0_x64-setup.exe"),
+    "LV24.Brain_0.3.0_x64-setup.exe",
+  );
+});
+
 test("builds the six-platform updater manifest and rejects missing platforms", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "lv24-latest-"));
   try {
@@ -49,7 +57,11 @@ test("builds the six-platform updater manifest and rejects missing platforms", (
     ].sort());
     assert.match(
       manifest.platforms["linux-x86_64-deb"].url,
-      /LV24%20Brain_0\.3\.0_amd64\.deb$/,
+      /LV24\.Brain_0\.3\.0_amd64\.deb$/,
+    );
+    assert.doesNotMatch(
+      manifest.platforms["linux-x86_64-deb"].url,
+      /%20/,
     );
 
     rmSync(path.join(dir, "LV24 Brain_0.3.0_amd64.deb.sig"));

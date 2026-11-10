@@ -317,6 +317,9 @@ jobs:
           }
           while IFS= read -r -d '' file; do
             name="$(basename "$file")"
+            # GitHub stores release assets with spaces replaced by dots; rename
+            # locally so latest.json URLs match the uploaded asset names.
+            name="${name// /.}"
             if ! is_release_asset "$name"; then
               rm -f "$file"
               continue
@@ -361,6 +364,10 @@ jobs:
             --repo "${{ github.repository }}" \
             --notes "$(cat release-notes.md)" \
             --out release/latest.json
+          if grep -q '%20' release/latest.json; then
+            echo "::error::latest.json contains space-encoded URLs; GitHub stores release assets with dots"
+            exit 1
+          fi
 
       - name: Publish GitHub release
         shell: bash
@@ -387,6 +394,27 @@ jobs:
           # Upload latest.json last so clients never see a manifest whose
           # referenced assets are still missing.
           gh release upload "$TAG" release/latest.json --clobber
+
+          # Refuse to publish a draft whose manifest points at asset names that
+          # GitHub did not store (for example spaces normalized to dots).
+          gh release view "$TAG" --json assets --jq '.assets[].name' > release-assets.txt
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("release/latest.json", "utf8"));
+          const assets = new Set(
+            fs.readFileSync("release-assets.txt", "utf8").trim().split("\n"),
+          );
+          let failed = false;
+          for (const [platform, entry] of Object.entries(manifest.platforms)) {
+            const name = decodeURIComponent(entry.url.split("/").pop());
+            if (!assets.has(name)) {
+              console.error(`::error::${platform} points at missing release asset: ${name}`);
+              failed = true;
+            }
+          }
+          if (failed) process.exit(1);
+          console.log(`verified ${Object.keys(manifest.platforms).length} updater assets in the draft release`);
+          NODE
 
           if [ "$PRERELEASE" = "true" ]; then
             gh release edit "$TAG" --draft=false --prerelease
