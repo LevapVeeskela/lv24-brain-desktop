@@ -3,6 +3,7 @@ import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
 import { Button } from "@/shared/ui/Button";
 import { useI18n } from "@/shared/i18n";
+import { enginePrimaryAction } from "../model/enginePrimaryAction";
 
 export const EngineControls = observer(function EngineControls({
   engine,
@@ -12,28 +13,56 @@ export const EngineControls = observer(function EngineControls({
   sync: SyncStore;
 }) {
   const { t } = useI18n();
-  const paused = engine.isPaused;
+  const action = enginePrimaryAction(engine.phase);
+  const engineBusy = engine.busy === "start" || engine.busy === "pause";
+  const primaryBusy =
+    engine.busy !== null ||
+    engine.isUpdating ||
+    engine.phase === "starting" ||
+    engine.phase === "initializing";
   const busy = engine.busy !== null || sync.busy || engine.isUpdating;
+  const primaryDisabled = busy || action === "wait";
+
+  const primaryLabel = engineBusy
+    ? t("actions.working")
+    : action === "pause"
+      ? t("actions.pause")
+      : action === "wait"
+        ? t("actions.startingAgent")
+        : engine.phase === "paused"
+          ? t("actions.resume")
+          : t("actions.startAgent");
+
+  const runPrimary = (): void => {
+    if (primaryDisabled) {
+      return;
+    }
+    if (action === "pause") {
+      void engine.pauseEngine();
+    } else if (action === "start") {
+      void engine.startEngine();
+    }
+  };
 
   return (
     <div className="hero-actions">
       <Button
         variant="primary"
-        disabled={busy}
-        onClick={() =>
-          void (paused ? engine.startEngine() : engine.pauseEngine())
-        }
+        aria-disabled={primaryDisabled}
+        aria-busy={primaryBusy}
+        onClick={runPrimary}
       >
-        {engine.busy === "start" || engine.busy === "pause"
-          ? t("actions.working")
-          : paused
-            ? t("actions.resume")
-            : t("actions.pause")}
+        {primaryLabel}
       </Button>
       <Button
         variant="secondary"
-        disabled={busy}
-        onClick={() => void sync.runAll()}
+        aria-disabled={busy}
+        aria-busy={sync.busy}
+        onClick={() => {
+          if (!busy) {
+            void sync.runAll();
+          }
+        }}
       >
         {sync.busy ? t("actions.syncing") : t("actions.syncAll")}
       </Button>

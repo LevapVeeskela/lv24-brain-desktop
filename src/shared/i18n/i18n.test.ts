@@ -17,6 +17,19 @@ describe("i18n", () => {
     expect(Object.keys(zh).sort()).toEqual(expected);
   });
 
+  it("keeps placeholders in sync across locales", () => {
+    const placeholders = (template: string): string[] =>
+      [...template.matchAll(/\{(\w+)\}/g)]
+        .map((match) => match[1])
+        .sort();
+
+    for (const key of Object.keys(en) as Array<keyof typeof en>) {
+      const expected = placeholders(en[key]);
+      expect(placeholders(ru[key]), `ru ${key}`).toEqual(expected);
+      expect(placeholders(zh[key]), `zh ${key}`).toEqual(expected);
+    }
+  });
+
   it("interpolates parameters", () => {
     expect(
       translate("en", "hero.engineOnPort", { version: "0.12.0", port: 49152 }),

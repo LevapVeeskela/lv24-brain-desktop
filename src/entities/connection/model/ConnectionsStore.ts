@@ -15,6 +15,11 @@ export class ConnectionsStore {
   items: Connection[] = [];
   loading = false;
   loaded = false;
+  /**
+   * The last known list is still shown but the engine stopped, so it may be
+   * outdated. Unlike `reset`, this keeps the data for read-only viewing.
+   */
+  stale = false;
   error: string | null = null;
 
   private readonly api: ConnectionsApi;
@@ -37,9 +42,10 @@ export class ConnectionsStore {
       () => this.engine.isRunning,
       (running) => {
         if (running) {
-          void this.load();
+          this.stale = false;
+          void this.load(true);
         } else {
-          this.reset();
+          this.markStale();
         }
       },
       { fireImmediately: true },
@@ -51,6 +57,11 @@ export class ConnectionsStore {
   }
 
   load(force = false): Promise<void> {
+    if (!this.engine.isRunning) {
+      // Starting the engine reacts on its own; asking the local API while it
+      // is down only produces a misleading transport error.
+      return Promise.resolve();
+    }
     if (this.inFlight) {
       return this.inFlight;
     }
@@ -78,6 +89,7 @@ export class ConnectionsStore {
         runInAction(() => {
           this.items = items;
           this.loaded = true;
+          this.stale = false;
         });
       }
     } catch (cause) {
@@ -99,12 +111,26 @@ export class ConnectionsStore {
     return this.api.run(id);
   }
 
+  /**
+   * Keep the last known connections for read-only viewing when the engine
+   * stops, but mark them stale so the UI never claims they are current.
+   */
+  markStale(): void {
+    this.loadToken += 1;
+    this.inFlight = null;
+    this.loaded = false;
+    this.loading = false;
+    this.stale = true;
+    this.error = null;
+  }
+
   reset(): void {
     this.loadToken += 1;
     this.inFlight = null;
     this.items = [];
     this.loaded = false;
     this.loading = false;
+    this.stale = false;
     this.error = null;
   }
 

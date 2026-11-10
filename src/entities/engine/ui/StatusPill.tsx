@@ -1,20 +1,18 @@
-import { useI18n, type MessageKey } from "@/shared/i18n";
-import type { EnginePhase } from "../model/types";
+import { useI18n } from "@/shared/i18n";
+import { enginePhaseMessageKey, enginePhaseTone } from "../model/labels";
+import type { EngineViewPhase } from "../model/types";
 
-const statusKeys: Record<EnginePhase, MessageKey> = {
-  starting: "status.starting",
-  running: "status.running",
-  paused: "status.paused",
-  error: "status.error",
-  stopped: "status.stopped",
-};
-
-export function StatusPill({ phase }: { phase: EnginePhase }) {
+export function StatusPill({ phase }: { phase: EngineViewPhase }) {
   const { t } = useI18n();
   return (
-    <div className={`status-pill status-${phase}`}>
+    <div
+      className={`status-pill status-${enginePhaseTone(phase)}`}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <span className="status-dot" aria-hidden="true" />
-      {t(statusKeys[phase])}
+      {t(enginePhaseMessageKey(phase))}
     </div>
   );
 }

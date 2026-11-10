@@ -1,4 +1,5 @@
 import { observer } from "mobx-react-lite";
+import { Link } from "react-router-dom";
 import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import { Button } from "@/shared/ui/Button";
@@ -48,6 +49,9 @@ export const ConnectionsCard = observer(function ConnectionsCard({
         <div className="empty-state">
           <strong>{t("connections.empty")}</strong>
           <span>{t("connections.emptyHint")}</span>
+          <Link className="btn btn-primary" to="/connections/new">
+            {t("connections.add")}
+          </Link>
         </div>
       ) : null}
 

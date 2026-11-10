@@ -26,6 +26,9 @@ export const SettingsPage = observer(function SettingsPage({
   const [loaded, setLoaded] = useState(false);
 
   const loadSecrets = async (): Promise<void> => {
+    if (secretsLoading) {
+      return;
+    }
     setSecretsLoading(true);
     setSecretsError(null);
     try {
@@ -99,8 +102,13 @@ export const SettingsPage = observer(function SettingsPage({
           </div>
           <Button
             variant="secondary"
-            disabled={secretsLoading}
-            onClick={() => void loadSecrets()}
+            aria-disabled={secretsLoading}
+            aria-busy={secretsLoading}
+            onClick={() => {
+              if (!secretsLoading) {
+                void loadSecrets();
+              }
+            }}
           >
             {secretsLoading
               ? t("settings.secretsLoading")

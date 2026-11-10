@@ -15,28 +15,28 @@ export const EngineOverview = observer(function EngineOverview({
   const { t } = useI18n();
   const status = engine.status;
 
+  // The hero must agree with the status pill and EngineCard. A missing status
+  // after a failed refresh is unavailable, not starting, so derive the title
+  // from the same UI-facing phase they use.
   let title = t("hero.starting");
-  if (engine.isPaused) {
-    title = t("hero.paused");
-  } else if (status) {
-    switch (status.engine.phase) {
-      case "running":
-        title = status.engine.owned
-          ? t("hero.runningOwned")
-          : t("hero.runningExternal");
-        break;
-      case "starting":
-        title = t("hero.starting");
-        break;
-      case "error":
-        title = t("hero.error");
-        break;
-      case "paused":
-        title = t("hero.paused");
-        break;
-      default:
-        title = t("hero.idle");
-    }
+  switch (engine.phase) {
+    case "running":
+      title = status?.engine.owned
+        ? t("hero.runningOwned")
+        : t("hero.runningExternal");
+      break;
+    case "paused":
+      title = t("hero.paused");
+      break;
+    case "error":
+    case "unavailable":
+      title = t("hero.error");
+      break;
+    case "stopped":
+      title = t("hero.idle");
+      break;
+    default:
+      title = t("hero.starting");
   }
 
   const detail =

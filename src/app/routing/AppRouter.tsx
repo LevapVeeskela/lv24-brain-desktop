@@ -6,6 +6,7 @@ import { ConnectionDetailPage } from "@/pages/connection-detail";
 import { ConnectionWizardPage } from "@/pages/connection-wizard";
 import { ConnectionsPage } from "@/pages/connections";
 import { DashboardPage } from "@/pages/dashboard";
+import { NotFoundPage } from "@/pages/not-found";
 import { ProjectsPage } from "@/pages/projects";
 import { SettingsPage } from "@/pages/settings";
 
@@ -74,6 +75,7 @@ export function AppRouter({ store }: { store: RootStore }) {
               />
             }
           />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
     </HashRouter>

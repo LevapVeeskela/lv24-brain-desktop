@@ -9,6 +9,7 @@
   --bg-raised: #0d1524;
   --bg-soft: #111c2e;
   --border: rgba(148, 163, 184, 0.16);
+  --border-strong: #64748b;
   --text: #e5edf8;
   --muted: #8fa2bb;
   --accent: #34d399;
@@ -47,9 +48,42 @@ button {
   cursor: pointer;
 }
 
-button:disabled {
+button:disabled,
+button[aria-disabled="true"] {
   cursor: default;
   opacity: 0.55;
+}
+
+/* Busy controls stay focusable on purpose; they still look unavailable. */
+.btn[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.content:focus-visible {
+  outline: none;
+}
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  z-index: 100;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #062e22;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 12px;
 }
 
 .shell {
@@ -108,6 +142,11 @@ button:disabled {
 }
 
 .locale-option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   border: 0;
   border-radius: 999px;
   padding: 5px 9px;
@@ -256,27 +295,43 @@ button:disabled {
   color: #062e22;
 }
 
-.btn-primary:hover:not(:disabled) {
+.btn-primary:hover:not(:disabled):not([aria-disabled="true"]) {
   background: #6ee7b7;
   transform: translateY(-1px);
 }
 
 .btn-secondary {
   background: rgba(148, 163, 184, 0.08);
-  border-color: var(--border);
+  border-color: var(--border-strong);
   color: var(--text);
 }
 
-.btn-secondary:hover:not(:disabled) {
+.btn-secondary:hover:not(:disabled):not([aria-disabled="true"]) {
   background: rgba(148, 163, 184, 0.14);
 }
 
 .btn-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
   border: 0;
   background: none;
   color: var(--accent);
   padding: 0;
   font-weight: 600;
+}
+
+.btn-danger {
+  background: var(--red);
+  border-color: var(--red);
+  color: #2b0a0a;
+}
+
+.btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: #fca5a5;
+  border-color: #fca5a5;
 }
 
 .notice {
@@ -535,6 +590,51 @@ button:disabled {
   padding-top: 2px;
 }
 
+.dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: min(80vh, 640px);
+  margin: auto;
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+}
+
+.dialog::backdrop {
+  background: rgba(2, 6, 12, 0.72);
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.dialog-content {
+  color: var(--muted);
+}
+
+.dialog-content p {
+  margin: 0;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .app-nav {
   display: flex;
   gap: 4px;
@@ -605,17 +705,31 @@ button:disabled {
 
 .input {
   width: 100%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
   padding: 8px 10px;
   color: var(--text);
   background: rgba(2, 6, 12, 0.45);
-  outline: none;
 }
 
-.input:focus {
+.input:focus-visible {
   border-color: rgba(52, 211, 153, 0.55);
   box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.12);
+}
+
+.input[aria-invalid="true"],
+input[aria-invalid="true"] {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(248, 113, 113, 0.09);
+  box-shadow: inset 3px 0 0 rgba(248, 113, 113, 0.55);
+}
+
+.input[aria-invalid="true"]:focus-visible,
+input[aria-invalid="true"]:focus-visible {
+  border-color: var(--red);
+  box-shadow:
+    inset 3px 0 0 rgba(248, 113, 113, 0.55),
+    0 0 0 2px rgba(248, 113, 113, 0.22);
 }
 
 .toolbar {
@@ -921,6 +1035,11 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.log-line {
+  display: block;
+  min-height: 1.55em;
+}
+
 .secret-list {
   display: flex;
   flex-direction: column;
@@ -1001,5 +1120,20 @@ button:disabled {
 
   .notice strong {
     white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .btn:hover,
+  .btn-primary:hover:not(:disabled) {
+    transform: none;
   }
 }

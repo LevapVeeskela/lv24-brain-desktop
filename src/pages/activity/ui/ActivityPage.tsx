@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { InlineError } from "@/shared/ui/InlineError";
 import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { useI18n } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
@@ -36,16 +37,18 @@ export const ActivityPage = observer(function ActivityPage({
         </Button>
       </div>
 
-      {runs.error ? (
-        <p className="inline-error">{runs.error}</p>
-      ) : null}
+      {runs.error ? <InlineError>{runs.error}</InlineError> : null}
 
       <Card>
-        {runs.items.length === 0 ? (
+        {!runs.loaded && !runs.error ? (
+          <p className="muted" role="status">
+            {t("common.loading")}
+          </p>
+        ) : runs.loaded && runs.items.length === 0 ? (
           <div className="empty-state">
             <strong>{t("activity.empty")}</strong>
           </div>
-        ) : (
+        ) : runs.items.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -89,6 +92,7 @@ export const ActivityPage = observer(function ActivityPage({
                       <Button
                         variant="secondary"
                         className="btn-small"
+                        aria-label={`${t("activity.log")}: ${run.id}`}
                         onClick={() => void runs.openLog(run.id)}
                       >
                         {t("activity.log")}
@@ -99,7 +103,7 @@ export const ActivityPage = observer(function ActivityPage({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
         {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
       </Card>
     </div>

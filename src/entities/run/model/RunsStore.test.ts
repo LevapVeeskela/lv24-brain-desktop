@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Run } from "@/entities/connection/model/types";
 import {
+  RUN_LIST_LIMIT,
   RunsStore,
   type RunLogApi,
   type RunsSource,
@@ -45,6 +46,7 @@ describe("RunsStore", () => {
     store.start();
     await vi.waitFor(() => expect(listeners.log).toBeDefined());
     await store.load();
+    expect(source.listRuns).toHaveBeenCalledWith(RUN_LIST_LIMIT);
     expect(store.forConnection("github-main")).toEqual([run]);
     expect(store.forConnection("other")).toEqual([]);
 
@@ -54,7 +56,7 @@ describe("RunsStore", () => {
       event: "log",
       data: "hello",
     });
-    expect(store.logs).toEqual([{ event: "log", data: "hello" }]);
+    expect(store.logs).toEqual([{ id: 0, event: "log", data: "hello" }]);
     listeners.end?.({ streamId: "stream-1" });
     expect(store.streaming).toBe(false);
     store.dispose();
@@ -83,7 +85,37 @@ describe("RunsStore", () => {
     });
     resolveOpen?.("early-stream");
     await opening;
-    expect(store.logs).toEqual([{ event: "log", data: "early" }]);
+    expect(store.logs).toEqual([{ id: 0, event: "log", data: "early" }]);
+    store.dispose();
+  });
+
+  it("keeps stable line ids when the oldest lines fall off the cap", async () => {
+    const source: RunsSource = { listRuns: vi.fn(async () => []) };
+    const { api, listeners } = fakeLogApi();
+    const store = new RunsStore(source, api);
+    store.start();
+    await vi.waitFor(() => expect(listeners.log).toBeDefined());
+    await store.openLog(run.id);
+
+    for (let index = 0; index < 1002; index += 1) {
+      listeners.log?.({
+        streamId: "stream-1",
+        event: "log",
+        data: `line ${index}`,
+      });
+    }
+
+    expect(store.logs).toHaveLength(1000);
+    expect(store.logs[0]).toEqual({
+      id: 2,
+      event: "log",
+      data: "line 2",
+    });
+    expect(store.logs[999]).toEqual({
+      id: 1001,
+      event: "log",
+      data: "line 1001",
+    });
     store.dispose();
   });
 });

@@ -12,6 +12,7 @@ const connections: SyncConnections = {
 
 const engine: SyncEngine = {
   isRunning: true,
+  isUpdating: false,
   startEngine: vi.fn(async () => true),
 };
 
@@ -38,6 +39,7 @@ describe("SyncStore", () => {
   it("does not claim success when the agent cannot start", async () => {
     const failingEngine: SyncEngine = {
       isRunning: false,
+      isUpdating: false,
       startEngine: vi.fn(async () => false),
     };
     const store = new SyncStore({ run: vi.fn() }, failingEngine, connections);
@@ -45,5 +47,23 @@ describe("SyncStore", () => {
     expect(store.error).toContain("did not start");
     expect(store.summary).toBeNull();
     expect(store.busy).toBe(false);
+  });
+
+  it("refuses to start a sync while the agent is being updated", async () => {
+    const updatingEngine: SyncEngine = {
+      isRunning: false,
+      isUpdating: true,
+      startEngine: vi.fn(async () => true),
+    };
+    const run = vi.fn();
+    const store = new SyncStore({ run }, updatingEngine, connections);
+
+    await store.runAll();
+
+    expect(updatingEngine.startEngine).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+    expect(store.busy).toBe(false);
+    expect(store.error).toContain("updating");
+    expect(store.summary).toBeNull();
   });
 });

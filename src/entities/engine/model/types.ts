@@ -5,6 +5,15 @@ export type EnginePhase =
   | "error"
   | "stopped";
 
+/**
+ * UI-facing phase. The shell has no status yet while the first `shell_status`
+ * call is in flight, and that call can fail before any status is known.
+ */
+export type EngineViewPhase =
+  | EnginePhase
+  | "initializing"
+  | "unavailable";
+
 export interface EngineStatus {
   phase: EnginePhase;
   running: boolean;

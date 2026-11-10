@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
+import { Link } from "react-router-dom";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { InlineError } from "@/shared/ui/InlineError";
 import { useI18n } from "@/shared/i18n";
 
 export const ProjectsPage = observer(function ProjectsPage({
@@ -32,14 +34,22 @@ export const ProjectsPage = observer(function ProjectsPage({
         </Button>
       </div>
 
-      {projects.error ? <p className="inline-error">{projects.error}</p> : null}
+      {projects.error ? <InlineError>{projects.error}</InlineError> : null}
 
       <Card>
-        {projects.items.length === 0 ? (
+        {!projects.loaded && !projects.error ? (
+          <p className="muted" role="status">
+            {t("common.loading")}
+          </p>
+        ) : projects.loaded && projects.items.length === 0 ? (
           <div className="empty-state">
             <strong>{t("projects.empty")}</strong>
+            <span>{t("projects.subtitle")}</span>
+            <Link className="btn btn-secondary" to="/connections/new">
+              {t("connections.add")}
+            </Link>
           </div>
-        ) : (
+        ) : projects.items.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -60,7 +70,7 @@ export const ProjectsPage = observer(function ProjectsPage({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
       </Card>
     </div>
   );

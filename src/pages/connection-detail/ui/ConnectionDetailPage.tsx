@@ -1,60 +1,102 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { connectionAuthApi } from "@/entities/connection/api/connectionAuthApi";
+import { engineAvailability } from "@/entities/connection/model/engineAvailability";
 import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import type { Connection } from "@/entities/connection/model/types";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import type { ProvidersStore } from "@/entities/provider/model/ProvidersStore";
-import type { RunsStore } from "@/entities/run/model/RunsStore";
+import { RUN_LIST_LIMIT, type RunsStore } from "@/entities/run/model/RunsStore";
+import { settingsApi } from "@/entities/settings/api/settingsApi";
+import {
+  credentialSecretName,
+  isCredentialStored,
+  normalizeSecretName,
+} from "../model/secrets";
+import { boundOAuthLines, oauthOutputHints } from "../model/oauthOutput";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { InlineError } from "@/shared/ui/InlineError";
 import { Notice } from "@/shared/ui/Notice";
 import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type MessageKey } from "@/shared/i18n";
 import { errorMessage } from "@/shared/lib/errors";
 import { formatDateTime } from "@/shared/lib/format";
 
 type ScheduleChoice = "manual" | "@hourly" | "@daily" | "custom";
+type DetailError = { key?: MessageKey; detail?: string };
+type OAuthResult = { ok: boolean; code: string | number };
 
-export const ConnectionDetailPage = observer(function ConnectionDetailPage({
-  connections,
-  runs,
-  providers,
-  projects,
-  engine,
-}: {
+type ConnectionDetailProps = {
   connections: ConnectionsStore;
   runs: RunsStore;
   providers: ProvidersStore;
   projects: ProjectsStore;
   engine: EngineStore;
-}) {
+};
+
+export function ConnectionDetailPage(props: ConnectionDetailProps) {
+  const { id } = useParams();
+  // React Router reuses the same element for /connections/A -> /connections/B.
+  // Keying the view by id remounts it so per-connection state (deleted, error,
+  // confirm dialog, credential drafts, OAuth output) starts clean and an
+  // in-flight request for the previous id cannot write into the new one.
+  return <ConnectionDetailView key={id ?? ""} id={id ?? ""} {...props} />;
+}
+
+const ConnectionDetailView = observer(function ConnectionDetailView({
+  id,
+  connections,
+  runs,
+  providers,
+  projects,
+  engine,
+}: ConnectionDetailProps & { id: string }) {
   const { t, locale } = useI18n();
-  const { id: rawId } = useParams();
-  const id = rawId ?? "";
-  const navigate = useNavigate();
   const api = useMemo(() => new ConnectionApi(), []);
+  const formId = useId();
+  const scheduleSelectId = `${formId}-schedule`;
+  const customScheduleId = `${formId}-custom-schedule`;
+  const scheduleErrorId = `${formId}-schedule-error`;
+  const oauthClientId = `${formId}-oauth-client`;
+  const oauthOutputId = `${formId}-oauth-output`;
+  const credentialFieldId = (field: string) => `${formId}-credential-${field}`;
 
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<DetailError | null>(null);
+  const [error, setError] = useState<DetailError | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [secretsVersion, setSecretsVersion] = useState(0);
 
   const [scheduleChoice, setScheduleChoice] = useState<ScheduleChoice>("manual");
   const [customSchedule, setCustomSchedule] = useState("");
+  const [scheduleInvalid, setScheduleInvalid] = useState(false);
   const [credentialValues, setCredentialValues] = useState<
     Record<string, string>
   >({});
+  const [storedSecrets, setStoredSecrets] = useState<Set<string> | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleted, setDeleted] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState("");
   const [oauthRunning, setOauthRunning] = useState(false);
   const [oauthLines, setOauthLines] = useState<string[]>([]);
-  const [oauthResult, setOauthResult] = useState<string | null>(null);
+  const [oauthResult, setOauthResult] = useState<OAuthResult | null>(null);
+
+  const customScheduleRef = useRef<HTMLInputElement>(null);
+  const deletedBackRef = useRef<HTMLAnchorElement>(null);
+  const oauthHintsRef = useRef<HTMLDivElement>(null);
+  const oauthOutputRef = useRef<HTMLPreElement>(null);
+  const errorTextRef = useRef<HTMLSpanElement>(null);
 
   const descriptor = connection
     ? providers.find(connection.provider)
@@ -63,18 +105,34 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
     descriptor?.capabilities.authModes.filter(
       (mode) => mode === "oauth-device" || mode === "oauth-pkce",
     ) ?? [];
+  const oauthEnabled = oauthModes.length > 0;
   const connectionRuns = id ? runs.forConnection(id) : [];
+  const availability = engineAvailability(engine.phase);
+  const engineReady = availability === "ready" && engine.isRunning;
+  const engineActionBusy = engine.busy !== null || engine.isUpdating;
+  // The installer replaces the agent binaries; connection mutations would race
+  // it, so they stay locked until the update window closes.
+  const mutationLocked = busy !== null || oauthRunning || engine.isUpdating;
+  const oauthHints = useMemo(() => oauthOutputHints(oauthLines), [oauthLines]);
 
   useEffect(() => {
     if (!id) {
-      setError(t("detail.notFound"));
+      setLoadError({ key: "detail.notFound" });
       setLoading(false);
+      return;
+    }
+    if (!engineReady) {
+      // The local API is served by the agent. Keep whatever was already
+      // loaded and wait for the engine effect to retry once it is running.
+      setLoading(false);
+      setConfirmDelete(false);
+      setDeleteError(null);
       return;
     }
     let cancelled = false;
     void (async () => {
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       try {
         const loaded = await api.get(id);
         if (cancelled) {
@@ -95,7 +153,10 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
         }
       } catch (cause) {
         if (!cancelled) {
-          setError(errorMessage(cause));
+          setLoadError({
+            key: "detail.loadError",
+            detail: errorMessage(cause),
+          });
         }
       } finally {
         if (!cancelled) {
@@ -111,31 +172,120 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
       cancelled = true;
       void runs.resetLog();
     };
-  }, [api, id, providers, projects, runs, t]);
+  }, [
+    api,
+    id,
+    providers,
+    projects,
+    runs,
+    engineReady,
+    engine.isRunning,
+    reloadNonce,
+  ]);
 
-  const act = async (name: string, action: () => Promise<void>): Promise<void> => {
+  const connectionId = connection?.id;
+
+  useEffect(() => {
+    if (!connectionId || !engine.isRunning) {
+      setStoredSecrets(null);
+      return;
+    }
+    let cancelled = false;
+    setStoredSecrets(null);
+    void settingsApi
+      .secretNames()
+      .then((names) => {
+        if (!cancelled) {
+          setStoredSecrets(
+            new Set(names.map((name) => normalizeSecretName(name))),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setStoredSecrets(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connectionId, engine.isRunning, secretsVersion]);
+
+  useEffect(() => {
+    if (deleted) {
+      deletedBackRef.current?.focus();
+    }
+  }, [deleted]);
+
+  useEffect(() => {
+    if (engineReady) {
+      setStartError(null);
+    }
+  }, [engineReady]);
+
+  useEffect(() => {
+    if (oauthHints.url || oauthHints.deviceCode) {
+      oauthHintsRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [oauthHints.url, oauthHints.deviceCode]);
+
+  useEffect(() => {
+    const node = oauthOutputRef.current;
+    if (node) {
+      node.scrollTop = node.scrollHeight;
+    }
+  }, [oauthLines]);
+
+  useEffect(() => {
+    if (error) {
+      // Make a mutation failure visible even when it was triggered from the
+      // bottom of a long page.
+      errorTextRef.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [error]);
+
+  const act = async (
+    name: string,
+    action: () => Promise<void>,
+  ): Promise<void> => {
+    if (mutationLocked) {
+      return;
+    }
     setBusy(name);
     setMessage(null);
     setError(null);
     try {
       await action();
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError({ detail: errorMessage(cause) });
     } finally {
       setBusy(null);
     }
   };
 
+  const startEngine = async (): Promise<void> => {
+    if (engineActionBusy) {
+      return;
+    }
+    setStartError(null);
+    const started = await engine.startEngine();
+    if (!started) {
+      setStartError(engine.error ?? t("errors.generic"));
+    }
+  };
+
   const saveSchedule = (): void => {
-    if (!connection) {
+    if (!connection || !engineReady || mutationLocked) {
       return;
     }
     const expression =
       scheduleChoice === "custom" ? customSchedule.trim() : scheduleChoice;
     if (!expression) {
-      setError(t("schedule.customPlaceholder"));
+      setScheduleInvalid(true);
+      customScheduleRef.current?.focus();
       return;
     }
+    setScheduleInvalid(false);
     void act("schedule", async () => {
       await api.setSchedule(connection.id, expression);
       setConnection({ ...connection, schedule: expression });
@@ -145,18 +295,26 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
 
   const setCredential = (field: string): void => {
     const value = credentialValues[field]?.trim();
-    if (!connection || !value) {
+    if (!connection || !value || !engineReady || mutationLocked) {
       return;
     }
     void act(`credential:${field}`, async () => {
       await api.setCredential(connection.id, field, value);
       setCredentialValues((current) => ({ ...current, [field]: "" }));
+      setStoredSecrets((current) => {
+        if (!current) {
+          return current;
+        }
+        const next = new Set(current);
+        next.add(credentialSecretName(connection.id, field));
+        return next;
+      });
       setMessage(t("detail.credentialSaved"));
     });
   };
 
   const startOAuth = async (): Promise<void> => {
-    if (!connection) {
+    if (!connection || !engineReady || mutationLocked) {
       return;
     }
     setOauthRunning(true);
@@ -168,48 +326,167 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
       unlisten = await connectionAuthApi.onLine((line) => {
         if (line.connectionId === connection.id) {
           setOauthLines((current) =>
-            [...current, `${line.stream}: ${line.line}`].slice(-500),
+            boundOAuthLines([...current, `${line.stream}: ${line.line}`]),
           );
         }
       });
       const outcome = await connectionAuthApi.start(connection.id, clientId);
-      setOauthResult(
-        t(
-          outcome.exitCode === 0
-            ? "detail.oauthSuccess"
-            : "detail.oauthFailed",
-          { code: outcome.exitCode ?? "?" },
-        ),
-      );
+      setOauthResult({
+        ok: outcome.exitCode === 0,
+        code: outcome.exitCode ?? "?",
+      });
       if (outcome.exitCode === 0) {
+        // The engine wrote conn/<id>/oauth, so the token field is now stored.
+        setSecretsVersion((current) => current + 1);
         try {
           await api.test(connection.id);
           setMessage(t("connections.testOk"));
         } catch (cause) {
-          setError(`${t("connections.testFailed")} ${errorMessage(cause)}`);
+          setError({
+            detail: `${t("connections.testFailed")} ${errorMessage(cause)}`,
+          });
         }
       }
     } catch (cause) {
-      setError(errorMessage(cause));
+      setError({ detail: errorMessage(cause) });
     } finally {
       unlisten?.();
       setOauthRunning(false);
     }
   };
 
+  const deleteConnection = (): void => {
+    if (!connection || !engineReady || mutationLocked) {
+      return;
+    }
+    void (async () => {
+      setBusy("delete");
+      setDeleteError(null);
+      setMessage(null);
+      try {
+        await api.remove(connection.id);
+        setConfirmDelete(false);
+        setDeleted(true);
+        void runs.resetLog();
+        void connections.load(true);
+      } catch (cause) {
+        // Keep the dialog open and put the failure where the user clicked;
+        // closing it would hide the message behind the page.
+        setDeleteError(errorMessage(cause));
+      } finally {
+        setBusy(null);
+      }
+    })();
+  };
+
+  const loadErrorText = loadError
+    ? [loadError.key ? t(loadError.key) : null, loadError.detail]
+        .filter(Boolean)
+        .join(" ")
+    : "";
+  const errorText = error
+    ? [error.key ? t(error.key) : null, error.detail].filter(Boolean).join(" ")
+    : "";
+  const engineActionLabel =
+    engine.busy === "start"
+      ? t("actions.working")
+      : availability === "paused"
+        ? t("actions.resume")
+        : t("actions.startAgent");
+  // `engine.error` is otherwise only shown in the unavailable phase, so a
+  // failed resume/start in the paused phase would be silent. `startError`
+  // keeps that outcome on screen and is cleared once the engine is ready.
+  const engineFailure =
+    startError ?? (availability === "unavailable" ? engine.error : null);
+  const engineNotice =
+    availability !== "ready" ? (
+      <Notice
+        variant={
+          availability === "unavailable" || startError ? "error" : "info"
+        }
+        action={
+          availability === "starting" ? undefined : (
+            <Button
+              variant="link"
+              disabled={engineActionBusy}
+              onClick={() => void startEngine()}
+            >
+              {startError ? t("actions.retry") : engineActionLabel}
+            </Button>
+          )
+        }
+      >
+        <span>
+          {availability === "paused"
+            ? t("connections.enginePaused")
+            : availability === "starting"
+              ? `${t("connections.waiting")} · ${t("footer.engineStarting")}`
+              : t("detail.engineUnavailable")}
+          {engineFailure ? ` ${engineFailure}` : ""}
+        </span>
+      </Notice>
+    ) : null;
+
   if (loading) {
-    return <p className="muted">{t("common.loading")}</p>;
+    return (
+      <p className="muted" role="status">
+        {t("common.loading")}
+      </p>
+    );
+  }
+
+  if (deleted) {
+    return (
+      <div className="page">
+        <h2>{connection?.id ?? id}</h2>
+        <Notice variant="info">
+          <span>{t("detail.deletedStatus")}</span>
+        </Notice>
+        <div className="page-actions">
+          <Link
+            ref={deletedBackRef}
+            className="btn btn-secondary"
+            to="/connections"
+          >
+            {t("detail.back")}
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   if (!connection) {
     return (
       <div className="page">
-        <Notice variant="error">
-          <span>{error ?? t("detail.notFound")}</span>
-        </Notice>
-        <Link className="btn btn-secondary" to="/connections">
-          {t("detail.back")}
-        </Link>
+        <h2>{id || t("detail.notFound")}</h2>
+        {engineNotice}
+        {loadError ? (
+          <Notice
+            variant="error"
+            action={
+              id && engineReady ? (
+                <Button
+                  variant="link"
+                  disabled={loading}
+                  onClick={() => setReloadNonce((current) => current + 1)}
+                >
+                  {t("actions.retry")}
+                </Button>
+              ) : undefined
+            }
+          >
+            <span>{loadErrorText}</span>
+          </Notice>
+        ) : engineReady ? (
+          <Notice variant="error">
+            <span>{t("detail.notFound")}</span>
+          </Notice>
+        ) : null}
+        <div className="page-actions">
+          <Link className="btn btn-secondary" to="/connections">
+            {t("detail.back")}
+          </Link>
+        </div>
       </div>
     );
   }
@@ -233,7 +510,7 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
           </Link>
           <Button
             variant="secondary"
-            disabled={busy !== null || !engine.isRunning}
+            disabled={mutationLocked || !engineReady}
             onClick={() =>
               void act("test", async () => {
                 await api.test(connection.id);
@@ -245,7 +522,7 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
           </Button>
           <Button
             variant="primary"
-            disabled={busy !== null || !engine.isRunning}
+            disabled={mutationLocked || !engineReady}
             onClick={() =>
               void act("run", async () => {
                 const result = await api.run(connection.id);
@@ -261,6 +538,31 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
         </div>
       </div>
 
+      {engineNotice}
+      {engine.isUpdating ? (
+        <Notice variant="info">
+          <span>{t("update.installingStatus")}</span>
+        </Notice>
+      ) : null}
+
+      {loadError ? (
+        <Notice
+          variant="error"
+          action={
+            id && engineReady ? (
+              <Button
+                variant="link"
+                disabled={loading}
+                onClick={() => setReloadNonce((current) => current + 1)}
+              >
+                {t("actions.retry")}
+              </Button>
+            ) : undefined
+          }
+        >
+          <span>{loadErrorText}</span>
+        </Notice>
+      ) : null}
       {error ? (
         <Notice
           variant="error"
@@ -270,7 +572,7 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
             </Button>
           }
         >
-          <span>{error}</span>
+          <span ref={errorTextRef}>{errorText}</span>
         </Notice>
       ) : null}
       {providers.loaded && !descriptor ? (
@@ -332,34 +634,62 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
         <Card>
           <h3>{t("detail.schedule")}</h3>
           <div className="form-grid">
-            <label className="field">
-              <span>{t("detail.schedule")}</span>
+            <div className="field">
+              <label className="muted small" htmlFor={scheduleSelectId}>
+                {t("detail.schedule")}
+              </label>
               <select
+                id={scheduleSelectId}
                 className="input"
                 value={scheduleChoice}
-                onChange={(event) =>
-                  setScheduleChoice(event.target.value as ScheduleChoice)
-                }
+                onChange={(event) => {
+                  const choice = event.target.value as ScheduleChoice;
+                  setScheduleChoice(choice);
+                  if (choice !== "custom") {
+                    setScheduleInvalid(false);
+                  }
+                }}
               >
                 <option value="manual">{t("schedule.manual")}</option>
                 <option value="@hourly">{t("schedule.hourly")}</option>
                 <option value="@daily">{t("schedule.daily")}</option>
                 <option value="custom">{t("schedule.custom")}</option>
               </select>
-              {scheduleChoice === "custom" ? (
+            </div>
+            {scheduleChoice === "custom" ? (
+              <div className="field">
+                <label className="muted small" htmlFor={customScheduleId}>
+                  {t("schedule.custom")}
+                </label>
                 <input
+                  ref={customScheduleRef}
+                  id={customScheduleId}
                   className="input"
                   value={customSchedule}
                   placeholder={t("schedule.customPlaceholder")}
-                  onChange={(event) => setCustomSchedule(event.target.value)}
+                  required
+                  aria-required="true"
+                  aria-invalid={scheduleInvalid || undefined}
+                  aria-describedby={
+                    scheduleInvalid ? scheduleErrorId : undefined
+                  }
+                  onChange={(event) => {
+                    setCustomSchedule(event.target.value);
+                    setScheduleInvalid(false);
+                  }}
                 />
-              ) : null}
-            </label>
+                {scheduleInvalid ? (
+                  <InlineError id={scheduleErrorId}>
+                    {t("detail.scheduleErrorCustom")}
+                  </InlineError>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="form-actions">
             <Button
               variant="primary"
-              disabled={busy !== null}
+              disabled={mutationLocked || !engineReady}
               onClick={saveSchedule}
             >
               {busy === "schedule" ? t("actions.working") : t("detail.saveSchedule")}
@@ -373,10 +703,13 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
           <h3>{t("detail.oauth")}</h3>
           <p className="muted small">{t("detail.oauthHint")}</p>
           <div className="form-grid">
-            <label className="field">
+            <label className="field" htmlFor={oauthClientId}>
               <span>{t("detail.oauthClientId")}</span>
               <input
+                id={oauthClientId}
+                name="oauth-client-id"
                 className="input"
+                autoComplete="off"
                 value={clientId}
                 onChange={(event) => setClientId(event.target.value)}
               />
@@ -385,17 +718,66 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
           <div className="form-actions">
             <Button
               variant="primary"
-              disabled={oauthRunning}
+              disabled={mutationLocked || !engineReady}
               onClick={() => void startOAuth()}
             >
               {oauthRunning ? t("detail.oauthRunning") : t("detail.oauthStart")}
             </Button>
           </div>
-          {oauthResult ? <p className="muted small">{oauthResult}</p> : null}
+          {oauthResult ? (
+            <Notice variant={oauthResult.ok ? "info" : "error"}>
+              <span>
+                {t(
+                  oauthResult.ok
+                    ? "detail.oauthSuccess"
+                    : "detail.oauthFailed",
+                  { code: oauthResult.code },
+                )}
+              </span>
+              {!oauthResult.ok ? (
+                <span className="muted small">{t("detail.oauthFailedHint")}</span>
+              ) : null}
+            </Notice>
+          ) : null}
+          {oauthHints.url || oauthHints.deviceCode ? (
+            <div ref={oauthHintsRef} role="status" aria-live="polite">
+              {oauthHints.url ? (
+                <p>
+                  <a
+                    className="table-link"
+                    href={oauthHints.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    {t("detail.oauthOpenUrl")}
+                  </a>
+                </p>
+              ) : null}
+              {oauthHints.deviceCode ? (
+                <p>
+                  <strong>
+                    {t("detail.oauthDeviceCode", {
+                      code: oauthHints.deviceCode,
+                    })}
+                  </strong>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {oauthLines.length > 0 ? (
-            <pre className="log-output">
-              {oauthLines.join("\n")}
-            </pre>
+            <section className="form-section" aria-labelledby={oauthOutputId}>
+              <h4 id={oauthOutputId}>{t("detail.oauthOutput")}</h4>
+              <pre
+                ref={oauthOutputRef}
+                className="log-output"
+                role="log"
+                aria-live="polite"
+                aria-relevant="additions"
+                tabIndex={0}
+              >
+                {oauthLines.join("\n")}
+              </pre>
+            </section>
           ) : null}
         </Card>
       ) : null}
@@ -407,45 +789,87 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
           <div className="form-grid">
             {descriptor.configFields
               .filter((field) => field.secret)
-              .map((field) => (
-                <label className="field" key={field.key}>
-                  <span>{field.label}</span>
-                  <div className="inline-field">
-                    <input
-                      className="input"
-                      type="password"
-                      autoComplete="off"
-                      value={credentialValues[field.key] ?? ""}
-                      placeholder={t("detail.credentialPlaceholder")}
-                      onChange={(event) =>
-                        setCredentialValues((current) => ({
-                          ...current,
-                          [field.key]: event.target.value,
-                        }))
-                      }
-                    />
-                    <Button
-                      variant="secondary"
-                      disabled={
-                        busy !== null || !credentialValues[field.key]?.trim()
-                      }
-                      onClick={() => setCredential(field.key)}
-                    >
-                      {busy === `credential:${field.key}`
-                        ? t("actions.working")
-                        : t("detail.setCredential")}
-                    </Button>
+              .map((field) => {
+                const fieldId = credentialFieldId(field.key);
+                const helpId = `${fieldId}-help`;
+                const stateId = `${fieldId}-state`;
+                const describedBy =
+                  [
+                    field.help ? helpId : null,
+                    storedSecrets ? stateId : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined;
+                const stored = storedSecrets
+                  ? isCredentialStored(
+                      storedSecrets,
+                      connection.id,
+                      field.key,
+                      oauthEnabled,
+                    )
+                  : null;
+                return (
+                  <div className="field" key={field.key}>
+                    <label className="muted small" htmlFor={fieldId}>
+                      {field.label}
+                    </label>
+                    <div className="inline-field">
+                      <input
+                        id={fieldId}
+                        name={`credential-${field.key}`}
+                        className="input"
+                        type="password"
+                        autoComplete="off"
+                        value={credentialValues[field.key] ?? ""}
+                        placeholder={t("detail.credentialPlaceholder")}
+                        aria-describedby={describedBy}
+                        onChange={(event) =>
+                          setCredentialValues((current) => ({
+                            ...current,
+                            [field.key]: event.target.value,
+                          }))
+                        }
+                      />
+                      <Button
+                        variant="secondary"
+                        aria-label={`${t("detail.setCredential")}: ${field.label}`}
+                        disabled={
+                          mutationLocked ||
+                          !engineReady ||
+                          !credentialValues[field.key]?.trim()
+                        }
+                        onClick={() => setCredential(field.key)}
+                      >
+                        {busy === `credential:${field.key}`
+                          ? t("actions.working")
+                          : t("detail.setCredential")}
+                      </Button>
+                    </div>
+                    {field.help ? <small id={helpId}>{field.help}</small> : null}
+                    {stored !== null ? (
+                      <small id={stateId}>
+                        {stored
+                          ? t("detail.secretStored")
+                          : t("detail.secretNotSet")}
+                      </small>
+                    ) : null}
                   </div>
-                  {field.help ? <small>{field.help}</small> : null}
-                </label>
-              ))}
+                );
+              })}
           </div>
         </Card>
       ) : null}
 
       <Card>
         <div className="card-header">
-          <h3>{t("detail.runs")}</h3>
+          <div>
+            <h3>{t("detail.runs")}</h3>
+            {runs.loaded && runs.items.length >= RUN_LIST_LIMIT ? (
+              <p className="muted small">
+                {t("activity.subtitle")} · {runs.items.length}
+              </p>
+            ) : null}
+          </div>
           <Button
             variant="secondary"
             disabled={runs.loading}
@@ -454,10 +878,14 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
             {runs.loading ? t("common.loading") : t("actions.refresh")}
           </Button>
         </div>
-        {runs.error ? <p className="inline-error">{runs.error}</p> : null}
-        {connectionRuns.length === 0 ? (
+        {runs.error ? <InlineError>{runs.error}</InlineError> : null}
+        {!runs.loaded && !runs.error ? (
+          <p className="muted" role="status">
+            {t("common.loading")}
+          </p>
+        ) : runs.loaded && connectionRuns.length === 0 ? (
           <p className="muted">{t("detail.noRuns")}</p>
-        ) : (
+        ) : runs.loaded && connectionRuns.length > 0 ? (
           <div className="table-wrap">
             <table className="data-table">
               <thead>
@@ -486,6 +914,7 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
                       <Button
                         variant="secondary"
                         className="btn-small"
+                        aria-label={`${t("detail.openLog")}: ${run.id}`}
                         onClick={() => void runs.openLog(run.id)}
                       >
                         {t("detail.openLog")}
@@ -496,38 +925,46 @@ export const ConnectionDetailPage = observer(function ConnectionDetailPage({
               </tbody>
             </table>
           </div>
-        )}
+        ) : null}
         {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
       </Card>
 
       <Card>
         <h3>{t("detail.delete")}</h3>
-        {confirmDelete ? (
-          <div className="page-actions">
-            <span className="muted small">{t("detail.deleteConfirm")}</span>
-            <Button
-              variant="primary"
-              disabled={busy !== null}
-              onClick={() =>
-                void act("delete", async () => {
-                  await api.remove(connection.id);
-                  await connections.load(true);
-                  navigate("/connections");
-                })
-              }
-            >
-              {busy === "delete" ? t("actions.working") : t("detail.confirmDelete")}
-            </Button>
-            <Button variant="secondary" onClick={() => setConfirmDelete(false)}>
-              {t("common.cancel")}
-            </Button>
-          </div>
-        ) : (
-          <Button variant="secondary" onClick={() => setConfirmDelete(true)}>
-            {t("detail.delete")}
-          </Button>
-        )}
+        <p className="muted small">{t("detail.deleteConfirm")}</p>
+        <Button
+          variant="secondary"
+          className="btn-danger"
+          disabled={mutationLocked || !engineReady}
+          onClick={() => {
+            setDeleteError(null);
+            setConfirmDelete(true);
+          }}
+        >
+          {t("detail.delete")}
+        </Button>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title={t("detail.delete")}
+        confirmLabel={
+          busy === "delete" ? t("actions.working") : t("detail.confirmDelete")
+        }
+        cancelLabel={t("common.cancel")}
+        danger
+        busy={busy === "delete"}
+        onConfirm={deleteConnection}
+        onCancel={() => {
+          if (busy === null && !oauthRunning) {
+            setDeleteError(null);
+            setConfirmDelete(false);
+          }
+        }}
+      >
+        {deleteError ? <InlineError>{deleteError}</InlineError> : null}
+        <p>{t("detail.deleteDanger")}</p>
+      </ConfirmDialog>
     </div>
   );
 });

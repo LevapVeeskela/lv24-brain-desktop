@@ -4,6 +4,7 @@ import type { Run } from "@/entities/connection/model/types";
 import { runApi, type RunLogEnd, type RunLogEvent } from "../api/runApi";
 
 const MAX_LOG_LINES = 1000;
+export const RUN_LIST_LIMIT = 100;
 
 export interface RunsSource {
   listRuns(limit?: number): Promise<Run[]>;
@@ -17,6 +18,8 @@ export interface RunLogApi {
 }
 
 export interface LogLine {
+  /** Stable monotonic id used as the React key for this line. */
+  id: number;
   event: string;
   data: string;
 }
@@ -41,6 +44,7 @@ export class RunsStore {
   private earlyLogs = new Map<string, LogLine[]>();
   private earlyEnd = new Map<string, string | undefined>();
   private inFlight: Promise<void> | null = null;
+  private nextLogId = 0;
 
   constructor(api: RunsSource, logApi: RunLogApi = runApi) {
     this.api = api;
@@ -158,7 +162,7 @@ export class RunsStore {
       this.error = null;
     });
     try {
-      const items = await this.api.listRuns(100);
+      const items = await this.api.listRuns(RUN_LIST_LIMIT);
       runInAction(() => {
         this.items = items;
         this.loaded = true;
@@ -195,7 +199,11 @@ export class RunsStore {
   }
 
   private handleLog(event: RunLogEvent): void {
-    const line = { event: event.event, data: event.data };
+    const line = {
+      id: this.nextLogId++,
+      event: event.event,
+      data: event.data,
+    };
     if (this.streamId === event.streamId) {
       runInAction(() => {
         this.logs.push(line);

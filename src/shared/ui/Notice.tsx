@@ -6,7 +6,7 @@ export function Notice({
   action,
 }: PropsWithChildren<{ variant: "info" | "error"; action?: ReactNode }>) {
   return (
-    <div className={`notice ${variant}`} role={variant === "error" ? "alert" : undefined}>
+    <div className={`notice ${variant}`} role={variant === "error" ? "alert" : "status"}>
       {children}
       {action}
     </div>

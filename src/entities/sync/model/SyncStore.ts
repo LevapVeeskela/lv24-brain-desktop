@@ -19,6 +19,7 @@ export interface SyncRunApi {
 
 export interface SyncEngine {
   readonly isRunning: boolean;
+  readonly isUpdating: boolean;
   startEngine(): Promise<boolean>;
 }
 
@@ -50,6 +51,13 @@ export class SyncStore {
 
   async runAll(): Promise<void> {
     if (this.busy) {
+      return;
+    }
+    if (this.engine.isUpdating) {
+      // A bulk sync may need to start the agent. Doing that while the
+      // installer replaces its files would race the update.
+      this.error =
+        "The brain agent is updating. Sync again after the update finishes.";
       return;
     }
     this.busy = true;
