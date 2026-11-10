@@ -308,11 +308,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          is_release_asset() {
+            case "$1" in
+              *-setup.exe|*.exe.sig|*.dmg|*.app.zip|*.app.tar.gz|*.app.tar.gz.sig|\
+              *.AppImage|*.AppImage.sig|*.deb|*.deb.sig|*.rpm|*.rpm.sig) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
           while IFS= read -r -d '' file; do
-            target="release/$(basename "$file")"
+            name="$(basename "$file")"
+            if ! is_release_asset "$name"; then
+              rm -f "$file"
+              continue
+            fi
+            target="release/$name"
             if [ "$file" != "$target" ]; then
               if [ -e "$target" ]; then
-                echo "::error::duplicate release asset name: $(basename "$file")"
+                echo "::error::duplicate release asset name: $name"
                 exit 1
               fi
               mv "$file" "$target"
