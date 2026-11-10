@@ -18,7 +18,10 @@ pub fn create(app: &AppHandle, supervisor: Arc<Supervisor>) -> tauri::Result<()>
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main_window(app),
-            "quit" => crate::commands::request_quit(app.clone()),
+            "quit" => {
+                crate::lifecycle::record(app, crate::lifecycle::Event::TrayQuit, None);
+                crate::commands::request_quit(app.clone());
+            }
             "sync" => {
                 let app = app.clone();
                 tauri::async_runtime::spawn(async move {

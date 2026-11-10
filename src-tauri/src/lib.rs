@@ -4,6 +4,7 @@ mod commands;
 mod deep_link;
 mod engine;
 mod error;
+mod lifecycle;
 mod settings;
 mod tray;
 
@@ -54,6 +55,10 @@ pub fn run() {
         ])
         .setup(|app| {
             let paths = engine::paths::AppPaths::resolve(app.handle())?;
+            app.manage(lifecycle::SessionTracker::start(
+                &paths.config_dir,
+                &paths.log_dir,
+            ));
             let settings = settings::SettingsStore::load(paths.config_dir.join("settings.json"))?;
             let supervisor = Arc::new(Supervisor::new(app.handle().clone(), paths, settings)?);
             app.manage(supervisor.clone());
@@ -81,6 +86,7 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let app = window.app_handle();
+                lifecycle::record(app, lifecycle::Event::CloseRequested, None);
                 let supervisor = commands::supervisor(app);
                 if !supervisor.is_quitting() {
                     api.prevent_close();
@@ -93,16 +99,18 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building LV24 Brain desktop");
     app.run(|app_handle, event| match event {
-        RunEvent::ExitRequested { api, code, .. } if code.is_none() => {
+        RunEvent::ExitRequested { api, code, .. } => {
+            lifecycle::record(app_handle, lifecycle::Event::ExitRequested, code);
             // An explicit app.exit(code) (for example from the updater) is
             // allowed through. An OS-initiated quit is routed through the
             // graceful agent shutdown first.
             let supervisor = commands::supervisor(app_handle);
-            if !supervisor.is_quitting() {
+            if code.is_none() && !supervisor.is_quitting() {
                 api.prevent_exit();
                 commands::request_quit(app_handle.clone());
             }
         }
+        RunEvent::Exit => lifecycle::record(app_handle, lifecycle::Event::Exit, None),
         #[cfg(target_os = "macos")]
         RunEvent::Reopen {
             has_visible_windows: false,

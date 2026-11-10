@@ -9,8 +9,20 @@ export interface SyncFailure {
 
 export interface SyncSummary {
   total: number;
+  attempted: number;
   queued: number;
   failures: SyncFailure[];
+  remaining: number;
+  canceled: boolean;
+}
+
+/** Counts queue requests, not completed ingestion jobs or provider items. */
+export interface SyncProgress {
+  total: number;
+  attempted: number;
+  queued: number;
+  failed: number;
+  currentConnectionId: string | null;
 }
 
 export interface SyncRunApi {
@@ -33,6 +45,8 @@ export class SyncStore {
   summary: SyncSummary | null = null;
   busy = false;
   error: string | null = null;
+  progress: SyncProgress | null = null;
+  cancelRequested = false;
 
   private readonly api: SyncRunApi;
   private readonly engine: SyncEngine;
@@ -63,6 +77,8 @@ export class SyncStore {
     this.busy = true;
     this.error = null;
     this.summary = null;
+    this.progress = null;
+    this.cancelRequested = false;
     try {
       if (!this.engine.isRunning) {
         const started = await this.engine.startEngine();
@@ -74,22 +90,51 @@ export class SyncStore {
       if (this.connections.error) {
         throw new Error(this.connections.error);
       }
-      const targets = this.connections.items;
+      // Keep this request set stable if polling replaces or mutates catalogue
+      // entries while the queue is being submitted.
+      const targets = this.connections.items.map((connection) => connection.id);
+      let attempted = 0;
       let queued = 0;
       const failures: SyncFailure[] = [];
-      for (const connection of targets) {
+      const updateProgress = (currentConnectionId: string | null): void => {
+        runInAction(() => {
+          this.progress = {
+            total: targets.length,
+            attempted,
+            queued,
+            failed: failures.length,
+            currentConnectionId,
+          };
+        });
+      };
+      updateProgress(null);
+      for (const connectionId of targets) {
+        if (this.cancelRequested) break;
+        updateProgress(connectionId);
         try {
-          await this.api.run(connection.id);
+          // Do not abort this request: an accepted job outlives its request,
+          // so its outcome must still be counted after Cancel remaining queue.
+          await this.api.run(connectionId);
           queued += 1;
         } catch (cause) {
           failures.push({
-            connectionId: connection.id,
+            connectionId,
             error: errorMessage(cause),
           });
         }
+        attempted += 1;
+        updateProgress(null);
       }
       runInAction(() => {
-        this.summary = { total: targets.length, queued, failures };
+        const remaining = targets.length - attempted;
+        this.summary = {
+          total: targets.length,
+          attempted,
+          queued,
+          failures,
+          remaining,
+          canceled: this.cancelRequested && remaining > 0,
+        };
       });
     } catch (cause) {
       runInAction(() => {
@@ -100,6 +145,20 @@ export class SyncStore {
         this.busy = false;
       });
     }
+  }
+
+  get canCancelRemaining(): boolean {
+    if (!this.busy || this.cancelRequested) return false;
+    if (!this.progress) return true;
+    const inFlight = this.progress.currentConnectionId === null ? 0 : 1;
+    return this.progress.total > this.progress.attempted + inFlight;
+  }
+
+  /** Only prevents future enqueue requests. Accepted jobs continue running. */
+  cancelRemaining(): boolean {
+    if (!this.canCancelRemaining) return false;
+    this.cancelRequested = true;
+    return true;
   }
 
   dismissError(): void {

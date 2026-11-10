@@ -9,6 +9,7 @@ use crate::autostart::{self, AutostartStatus};
 use crate::deep_link;
 use crate::engine::cli::AuthOutcome;
 use crate::engine::{EngineStatus, Supervisor};
+use crate::lifecycle::{self, Event};
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +21,8 @@ pub struct ShellStatus {
     pub desktop_version: String,
     pub deep_link_scheme: String,
     pub log_dir: String,
+    pub previous_session_unclean: bool,
+    pub session_diagnostics_available: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -52,6 +55,7 @@ pub fn report_error(app: &AppHandle, message: String) {
 
 fn make_status(app: &AppHandle) -> ShellStatus {
     let supervisor = supervisor(app);
+    let recovery = lifecycle::recovery(app);
     ShellStatus {
         engine: supervisor.status(),
         paused: supervisor.is_paused(),
@@ -60,6 +64,8 @@ fn make_status(app: &AppHandle) -> ShellStatus {
         desktop_version: env!("CARGO_PKG_VERSION").to_string(),
         deep_link_scheme: deep_link::SCHEME.to_string(),
         log_dir: supervisor.log_dir().display().to_string(),
+        previous_session_unclean: recovery.previous_unclean,
+        session_diagnostics_available: recovery.diagnostics_available,
     }
 }
 
@@ -187,10 +193,13 @@ pub async fn update_install(app: AppHandle) -> Result<(), String> {
         .suspend_for_update()
         .await
         .map_err(|err| err.to_string())?;
+    lifecycle::expect_updater_restart(&app, Event::UpdaterInstall);
     if let Err(err) = update.install(&bytes) {
+        lifecycle::record(&app, Event::UpdaterInstallFailed, None);
         supervisor.resume_after_update_failure(was_paused).await;
         return Err(err.to_string());
     }
+    lifecycle::expect_updater_restart(&app, Event::UpdaterRestart);
     app.restart();
 }
 
@@ -203,13 +212,16 @@ fn updater(app: &AppHandle, timeout: Duration) -> Result<tauri_plugin_updater::U
 
 #[tauri::command]
 pub fn app_quit(app: AppHandle) {
+    lifecycle::record(&app, Event::AppQuit, None);
     request_quit(app);
 }
 
 pub fn request_quit(app: AppHandle) {
+    lifecycle::record(&app, Event::ShutdownRequested, None);
     let supervisor = supervisor(&app);
     tauri::async_runtime::spawn(async move {
         if supervisor.shutdown().await {
+            lifecycle::record(&app, Event::ShutdownCompleted, None);
             app.exit(0);
         }
     });

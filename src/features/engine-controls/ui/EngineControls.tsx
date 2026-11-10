@@ -46,6 +46,7 @@ export const EngineControls = observer(function EngineControls({
   };
 
   return (
+    <div className="engine-controls">
     <div className="hero-actions">
       <Tooltip label={t("startup.pauseNote")}><Button
         variant={action === "pause" ? "secondary" : "primary"}
@@ -65,8 +66,29 @@ export const EngineControls = observer(function EngineControls({
           }
         }}
       >
-        {sync.busy ? t("actions.syncing") : t("actions.syncAll")}
+        {sync.busy ? t("sync.queueing") : t("actions.syncAll")}
       </Button>
+    </div>
+    {sync.busy ? <div className="sync-progress">
+      <p role="status" aria-live="polite">
+        {sync.cancelRequested ? t("sync.cancelRequested") : sync.progress ? t("sync.progress", {
+          attempted: sync.progress.attempted,
+          total: sync.progress.total,
+          queued: sync.progress.queued,
+          failed: sync.progress.failed,
+        }) : t("sync.preparing")}
+      </p>
+      <progress
+        aria-label={t("sync.queueing")}
+        max={Math.max(1, sync.progress?.total ?? 1)}
+        value={sync.progress?.attempted}
+      />
+      {sync.progress?.currentConnectionId ? <p className="muted small">{t("sync.currentConnection", { id: sync.progress.currentConnectionId })}</p> : null}
+      <p className="muted small">{t("sync.acceptedContinue")}</p>
+      <Button variant="secondary" disabled={!sync.canCancelRemaining} onClick={() => sync.cancelRemaining()}>
+        {t("sync.cancelRemaining")}
+      </Button>
+    </div> : null}
     </div>
   );
 });
