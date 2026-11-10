@@ -1,7 +1,7 @@
 {
   "name": "lv24-brain-desktop",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "type": "module",
   "description": "LV24 Brain — local memory, connections and agent control",
   "scripts": {

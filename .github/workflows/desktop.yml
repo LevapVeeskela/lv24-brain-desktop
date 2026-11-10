@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       engine_version:
-        description: "LV24 Brain engine version to bundle (for example 0.13.1)"
+        description: "LV24 Brain engine version to bundle (for example 0.14.0)"
         required: false
         type: string
-        default: "0.13.1"
+        default: "0.14.0"
       signed:
         description: "Create updater artifacts and signatures (requires TAURI_SIGNING_PRIVATE_KEY)"
         required: false

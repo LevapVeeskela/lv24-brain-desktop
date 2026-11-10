@@ -6,7 +6,7 @@ The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/l
 built with Tauri v2. See connection results, investigate failed runs and manage
 the background agent, schedules and credentials from one offline-first interface.
 
-**Status: v1.0.1, WP5.5 UX/a11y.** The dashboard, connections list, add
+**Status: v1.1.0, design refresh + recovery/cancel hardening.** The dashboard, connections list, add
 connection wizard, connection detail (schedule, credentials, runs, received logs),
 activity, projects and settings screens are implemented. Packaging bundles a
 checksum-pinned engine sidecar; the WP5.5 pass added accessible dialogs, phase-
@@ -96,7 +96,7 @@ See [docs/architecture.md](docs/architecture.md) and
 - Node.js 22+ (CI uses 24) and npm.
 - Rust 1.90+ with the platform toolchain (MSVC on Windows).
 - Tauri v2 system prerequisites for your OS.
-- The LV24 Brain engine `0.13.1` or newer, initialized with `brain init` and
+- The LV24 Brain engine `0.14.0` or newer, initialized with `brain init` and
   selected with `brain config use <path>` (or `BRAIN_CONFIG`).
 
 The engine sidecar is fetched per target during packaging CI; see
@@ -204,7 +204,7 @@ Signing status: macOS signing/notarization waits for Apple Developer Program
 approval; Windows signing waits for SignPath Foundation approval. Until then,
 release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
-## Known limitations (v1.0.1)
+## Known limitations (v1.1.0)
 
 - Local `cargo`/Vite development still resolves the engine from the
   environment; only packaged builds include the sidecar.

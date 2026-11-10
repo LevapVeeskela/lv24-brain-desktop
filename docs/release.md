@@ -1,4 +1,4 @@
-# Packaging and release (v1.0.1)
+# Packaging and release (v1.1.0)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -13,10 +13,10 @@ Inputs:
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `engine_version` | `0.13.1` | LV24 Brain engine release to bundle. |
+| `engine_version` | `0.14.0` | LV24 Brain engine release to bundle. |
 | `signed` | `false` | Create updater artifacts and signatures. Requires repo secrets. |
 | `publish_release` | `false` | Publish a GitHub release and `latest.json`. Requires `signed=true` and a tag. |
-| `tag` | empty | Release tag, for example `v1.0.1`. Required only for publishing. |
+| `tag` | empty | Release tag, for example `v1.1.0`. Required only for publishing. |
 | `prerelease` | `true` | Mark the published release as a prerelease. |
 
 Matrix:
@@ -93,7 +93,7 @@ OS code signing is separate from updater signing:
 Windows example (derive the target triple with `rustc -vV` on other hosts):
 
 ```bash
-node scripts/fetch-engine.mjs --version 0.13.1 --target x86_64-pc-windows-msvc
+node scripts/fetch-engine.mjs --version 0.14.0 --target x86_64-pc-windows-msvc
 npm run tauri build -- --debug --bundles nsis \
   --config src-tauri/tauri.bundle.conf.json \
   --config src-tauri/tauri.unsigned.conf.json
