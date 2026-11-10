@@ -40,8 +40,7 @@ export const AutostartToggle = observer(function AutostartToggle({
         <input
           type="checkbox"
           checked={autostart?.enabled ?? false}
-          disabled={disabled}
-          aria-disabled={disabled || busy}
+          disabled={disabled || busy}
           aria-busy={busy}
           onChange={(event) => {
             if (disabled || busy) {
@@ -64,7 +63,7 @@ export const AutostartToggle = observer(function AutostartToggle({
           <span>{engine.autostartError}</span>{" "}
           <Button
             variant="link"
-            aria-disabled={busy}
+            disabled={busy}
             aria-busy={engine.busy === "autostart"}
             onClick={() => {
               if (!busy) {

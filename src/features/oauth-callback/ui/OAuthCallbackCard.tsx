@@ -56,7 +56,7 @@ export const OAuthCallbackCard = observer(function OAuthCallbackCard({
       ) : null}
       <div className="page-actions">
         <Link
-          className="btn btn-secondary"
+          className="text-link"
           to={
             callback.connectionId
               ? `/connections/${encodeURIComponent(callback.connectionId)}`

@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { AppRouter } from "./routing/AppRouter";
 import { I18nProvider } from "@/shared/i18n/I18nProvider";
+import { FeedbackProvider } from "@/shared/ui/Feedback";
 import {
   RootStoreProvider,
   useRootStore,
@@ -13,7 +14,7 @@ const AppShell = observer(function AppShell() {
       locale={store.settings.locale}
       onLocaleChange={store.settings.setLocale}
     >
-      <AppRouter store={store} />
+      <FeedbackProvider><AppRouter store={store} /></FeedbackProvider>
     </I18nProvider>
   );
 });

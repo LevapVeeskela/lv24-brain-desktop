@@ -60,7 +60,9 @@ export const AppLayout = observer(function AppLayout({
       return;
     }
     previousPathname.current = location.pathname;
-    mainRef.current?.focus();
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    mainRef.current?.focus({ preventScroll: true });
   }, [location.pathname]);
 
   return (
@@ -89,12 +91,8 @@ export const AppLayout = observer(function AppLayout({
       </main>
       <footer className="footer">
         <span aria-live="polite">
-          {t("footer.desktop", { version: engine.desktopVersion })} ·{" "}
-          {engine.version
-            ? t("footer.engine", { version: engine.version })
-            : engine.phase === "starting"
-              ? t("footer.engineStarting")
-              : t("footer.engineOffline")}
+          {t("footer.desktop", { version: engine.desktopVersion })}
+          {engine.version && <> · {t("footer.engine", { version: engine.version })}</>}
         </span>
         <Button
           variant="link"

@@ -1,0 +1,23 @@
+{
+  "viewBox": 32,
+  "strokeWidth": 2,
+  "nodeRadius": 2.5,
+  "paths": [
+    [[9, 9], [9, 23]],
+    [[23, 9], [23, 23]],
+    [[9, 9], [16, 5], [23, 9]],
+    [[9, 16], [23, 16]],
+    [[9, 23], [16, 27], [23, 23]]
+  ],
+  "nodes": [[9, 9], [23, 9], [9, 23], [23, 23]],
+  "palette": {
+    "canvas": "#101d2b",
+    "accent": "#65ddb0",
+    "trayMark": "#e6edf5",
+    "running": "#65ddb0",
+    "starting": "#f5c96a",
+    "paused": "#b2c2d4",
+    "error": "#ff969c",
+    "stopped": "#9aaabd"
+  }
+}

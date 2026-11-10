@@ -49,7 +49,7 @@ export const ConnectionsCard = observer(function ConnectionsCard({
         <div className="empty-state">
           <strong>{t("connections.empty")}</strong>
           <span>{t("connections.emptyHint")}</span>
-          <Link className="btn btn-primary" to="/connections/new">
+          <Link className="text-link" to="/connections/new">
             {t("connections.add")}
           </Link>
         </div>

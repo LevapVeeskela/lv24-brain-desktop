@@ -2,6 +2,7 @@ import { observer } from "mobx-react-lite";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
 import { Button } from "@/shared/ui/Button";
+import { Tooltip } from "@/shared/ui/Tooltip";
 import { useI18n } from "@/shared/i18n";
 import { enginePrimaryAction } from "../model/enginePrimaryAction";
 
@@ -46,17 +47,17 @@ export const EngineControls = observer(function EngineControls({
 
   return (
     <div className="hero-actions">
-      <Button
-        variant="primary"
-        aria-disabled={primaryDisabled}
+      <Tooltip label={t("startup.pauseNote")}><Button
+        variant={action === "pause" ? "secondary" : "primary"}
+        disabled={primaryDisabled}
         aria-busy={primaryBusy}
         onClick={runPrimary}
       >
         {primaryLabel}
-      </Button>
+      </Button></Tooltip>
       <Button
-        variant="secondary"
-        aria-disabled={busy}
+        variant={action === "pause" ? "primary" : "secondary"}
+        disabled={busy}
         aria-busy={sync.busy}
         onClick={() => {
           if (!busy) {

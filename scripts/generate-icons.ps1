@@ -1,117 +1,203 @@
-# Generates the committed app and tray icons with System.Drawing (Windows).
-# The generated PNGs are checked in, so this script is only needed when the
-# visual identity changes.
+# Rebuilds every committed brand/icon asset from src/shared/brand/mark.json.
+# Windows PowerShell 5.1+ / PowerShell on Windows; System.Drawing is OS-provided.
+# Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-icons.ps1
+# No network, native icon tools, fonts or additional dependencies are required.
+$ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
-$icons = Join-Path $root "src-tauri/icons"
-New-Item -ItemType Directory -Force -Path $icons | Out-Null
+$icons = Join-Path $root 'src-tauri/icons'
+$brand = Join-Path $root 'public/brand'
+$mark = Get-Content -LiteralPath (Join-Path $root 'src/shared/brand/mark.json') -Raw | ConvertFrom-Json
+New-Item -ItemType Directory -Force -Path $icons, $brand | Out-Null
 
-function New-RoundedRectanglePath {
-    param(
-        [System.Drawing.RectangleF]$Rect,
-        [float]$Radius
-    )
+function Get-BrandColor([string]$Name) {
+    return [System.Drawing.ColorTranslator]::FromHtml($mark.palette.$Name)
+}
+
+function New-RoundedRectanglePath([float]$Size, [float]$Radius) {
     $path = New-Object System.Drawing.Drawing2D.GraphicsPath
     $diameter = $Radius * 2
-    $arc = New-Object System.Drawing.RectangleF($Rect.X, $Rect.Y, $diameter, $diameter)
+    $arc = New-Object System.Drawing.RectangleF(0, 0, $diameter, $diameter)
     $path.AddArc($arc, 180, 90)
-    $arc.X = $Rect.Right - $diameter
+    $arc.X = $Size - $diameter
     $path.AddArc($arc, 270, 90)
-    $arc.Y = $Rect.Bottom - $diameter
+    $arc.Y = $Size - $diameter
     $path.AddArc($arc, 0, 90)
-    $arc.X = $Rect.X
+    $arc.X = 0
     $path.AddArc($arc, 90, 90)
     $path.CloseFigure()
     return $path
 }
 
-function New-AppIcon {
-    param([int]$Size, [string]$Path)
-    $bitmap = New-Object System.Drawing.Bitmap($Size, $Size)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+function Draw-Mark([System.Drawing.Graphics]$Graphics, [System.Drawing.Color]$Color) {
+    $pen = New-Object System.Drawing.Pen($Color, [float]$mark.strokeWidth)
+    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+    foreach ($points in $mark.paths) {
+        for ($index = 1; $index -lt $points.Count; $index++) {
+            $a = $points[$index - 1]
+            $b = $points[$index]
+            $Graphics.DrawLine($pen, [float]$a[0], [float]$a[1], [float]$b[0], [float]$b[1])
+        }
+    }
+    $brush = New-Object System.Drawing.SolidBrush($Color)
+    $radius = [float]$mark.nodeRadius
+    foreach ($point in $mark.nodes) {
+        $Graphics.FillEllipse($brush, [float]($point[0] - $radius), [float]($point[1] - $radius), [float]($radius * 2), [float]($radius * 2))
+    }
+    $pen.Dispose()
+    $brush.Dispose()
+}
+
+function New-IconBitmap([int]$Size, [string]$State = '') {
+    # Render at 4x for smooth small-size edges; the source uses a 32-unit grid.
+    $renderSize = $Size * 4
+    $render = New-Object System.Drawing.Bitmap($renderSize, $renderSize)
+    $graphics = [System.Drawing.Graphics]::FromImage($render)
     $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $graphics.Clear([System.Drawing.Color]::Transparent)
-
-    $rect = New-Object System.Drawing.RectangleF(0, 0, $Size, $Size)
-    $shape = New-RoundedRectanglePath $rect ($Size * 0.19)
-    $background = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-        $rect,
-        [System.Drawing.Color]::FromArgb(255, 13, 26, 48),
-        [System.Drawing.Color]::FromArgb(255, 4, 10, 20),
-        42.0
-    )
+    $graphics.ScaleTransform([float]($renderSize / 32.0), [float]($renderSize / 32.0))
+    $background = New-Object System.Drawing.SolidBrush((Get-BrandColor 'canvas'))
+    $shape = New-RoundedRectanglePath 32 7
     $graphics.FillPath($background, $shape)
-
-    $nodes = @(
-        @(0.50, 0.20), @(0.50, 0.80), @(0.23, 0.34), @(0.77, 0.34),
-        @(0.23, 0.66), @(0.77, 0.66), @(0.50, 0.50)
-    )
-    $linkPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(115, 52, 211, 153), [Math]::Max(2.0, $Size * 0.011))
-    foreach ($node in $nodes) {
-        $graphics.DrawLine(
-            $linkPen,
-            [float]($Size * 0.5),
-            [float]($Size * 0.5),
-            [float]($Size * $node[0]),
-            [float]($Size * $node[1])
-        )
+    if ($State) {
+        # Leave space for the dot without changing the source mark proportions.
+        $graphics.ScaleTransform(0.82, 0.82)
+        Draw-Mark $graphics (Get-BrandColor 'trayMark')
+        $graphics.ResetTransform()
+        $graphics.ScaleTransform([float]($renderSize / 32.0), [float]($renderSize / 32.0))
+        $rim = New-Object System.Drawing.SolidBrush((Get-BrandColor 'canvas'))
+        $dot = New-Object System.Drawing.SolidBrush((Get-BrandColor $State))
+        $glyph = New-Object System.Drawing.Pen((Get-BrandColor 'canvas'), 1.4)
+        $glyph.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $glyph.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $glyphBrush = New-Object System.Drawing.SolidBrush((Get-BrandColor 'canvas'))
+        $graphics.FillEllipse($rim, 18, 18, 14, 14)
+        $graphics.FillEllipse($dot, 20, 20, 10, 10)
+        switch ($State) {
+            'running' {
+                $graphics.DrawLine($glyph, 22.1, 25.1, 24.2, 27)
+                $graphics.DrawLine($glyph, 24.2, 27, 27.9, 23)
+            }
+            'starting' {
+                $graphics.DrawLine($glyph, 25, 22, 25, 25)
+                $graphics.DrawLine($glyph, 25, 25, 27, 25)
+            }
+            'paused' {
+                $graphics.FillRectangle($glyphBrush, 22.5, 22.5, 1.8, 5)
+                $graphics.FillRectangle($glyphBrush, 25.7, 22.5, 1.8, 5)
+            }
+            'error' {
+                $graphics.DrawLine($glyph, 25, 22, 25, 25.5)
+                $graphics.FillEllipse($glyphBrush, 24.25, 27, 1.5, 1.5)
+            }
+            'stopped' { $graphics.FillRectangle($glyphBrush, 22.7, 22.7, 4.6, 4.6) }
+        }
+        $rim.Dispose()
+        $dot.Dispose()
+        $glyph.Dispose()
+        $glyphBrush.Dispose()
+    } else {
+        Draw-Mark $graphics (Get-BrandColor 'accent')
     }
-    $linkPen.Dispose()
-
-    $accent = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 52, 211, 153))
-    foreach ($node in $nodes) {
-        $radius = if ($node[0] -eq 0.50 -and $node[1] -eq 0.50) { $Size * 0.085 } else { $Size * 0.054 }
-        $graphics.FillEllipse(
-            $accent,
-            [float]($Size * $node[0] - $radius),
-            [float]($Size * $node[1] - $radius),
-            [float]($radius * 2),
-            [float]($radius * 2)
-        )
-    }
-
-    $hole = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 8, 15, 26))
-    $holeRadius = $Size * 0.034
-    $graphics.FillEllipse($hole, [float]($Size * 0.5 - $holeRadius), [float]($Size * 0.5 - $holeRadius), [float]($holeRadius * 2), [float]($holeRadius * 2))
-
-    $hole.Dispose()
-    $accent.Dispose()
-    $background.Dispose()
     $shape.Dispose()
+    $background.Dispose()
     $graphics.Dispose()
-    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
-    $bitmap.Dispose()
+    $bitmap = New-Object System.Drawing.Bitmap($Size, $Size)
+    $resample = [System.Drawing.Graphics]::FromImage($bitmap)
+    $resample.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $resample.DrawImage($render, 0, 0, $Size, $Size)
+    $resample.Dispose()
+    $render.Dispose()
+    return $bitmap
 }
 
-function New-TrayIcon {
-    param([string]$Name, [System.Drawing.Color]$Color, [string]$Path)
-    $size = 32
-    $bitmap = New-Object System.Drawing.Bitmap($size, $size)
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $graphics.Clear([System.Drawing.Color]::Transparent)
-
-    $rim = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(150, 2, 6, 12))
-    $graphics.FillEllipse($rim, 1, 1, 30, 30)
-    $dot = New-Object System.Drawing.SolidBrush($Color)
-    $graphics.FillEllipse($dot, 5, 5, 22, 22)
-    $shine = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(150, 255, 255, 255))
-    $graphics.FillEllipse($shine, 9, 8, 7, 5)
-
-    $shine.Dispose()
-    $dot.Dispose()
-    $rim.Dispose()
-    $graphics.Dispose()
-    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+function Get-PngBytes([int]$Size, [string]$State = '') {
+    $bitmap = New-IconBitmap $Size $State
+    $stream = New-Object System.IO.MemoryStream
+    $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
+    $bytes = $stream.ToArray()
+    $stream.Dispose()
+    return ,$bytes
 }
 
-New-AppIcon -Size 1024 -Path (Join-Path $icons "app-icon.png")
-New-TrayIcon -Name "running" -Color ([System.Drawing.Color]::FromArgb(255, 52, 211, 153)) -Path (Join-Path $icons "tray-running.png")
-New-TrayIcon -Name "starting" -Color ([System.Drawing.Color]::FromArgb(255, 251, 191, 36)) -Path (Join-Path $icons "tray-starting.png")
-New-TrayIcon -Name "paused" -Color ([System.Drawing.Color]::FromArgb(255, 148, 163, 184)) -Path (Join-Path $icons "tray-paused.png")
-New-TrayIcon -Name "error" -Color ([System.Drawing.Color]::FromArgb(255, 248, 113, 113)) -Path (Join-Path $icons "tray-error.png")
-New-TrayIcon -Name "stopped" -Color ([System.Drawing.Color]::FromArgb(255, 100, 116, 139)) -Path (Join-Path $icons "tray-stopped.png")
+function Write-BigEndian([System.IO.BinaryWriter]$Writer, [uint32]$Value) {
+    $bytes = [System.BitConverter]::GetBytes($Value)
+    [Array]::Reverse($bytes)
+    $Writer.Write($bytes)
+}
 
-Write-Host "icons written to $icons"
+# Explicit desktop outputs: no accidental mobile/Windows Store icon proliferation.
+$pngFiles = @{
+    'app-icon.png' = 1024
+    'icon.png' = 512
+    '32x32.png' = 32
+    '64x64.png' = 64
+    '128x128.png' = 128
+    '128x128@2x.png' = 256
+}
+foreach ($entry in $pngFiles.GetEnumerator()) {
+    [System.IO.File]::WriteAllBytes((Join-Path $icons $entry.Key), (Get-PngBytes $entry.Value))
+}
+foreach ($state in @('running', 'starting', 'paused', 'error', 'stopped')) {
+    [System.IO.File]::WriteAllBytes((Join-Path $icons "tray-$state.png"), (Get-PngBytes 32 $state))
+}
+
+# ICO: PNG-compressed frames supported by Windows Vista+; all useful sizes.
+$icoSizes = @(16, 24, 32, 48, 64, 128, 256)
+$icoFrames = @($icoSizes | ForEach-Object { ,(Get-PngBytes $_) })
+$icoStream = [System.IO.File]::Create((Join-Path $icons 'icon.ico'))
+$icoWriter = New-Object System.IO.BinaryWriter($icoStream)
+$icoWriter.Write([uint16]0)
+$icoWriter.Write([uint16]1)
+$icoWriter.Write([uint16]$icoSizes.Count)
+$offset = 6 + 16 * $icoSizes.Count
+for ($index = 0; $index -lt $icoSizes.Count; $index++) {
+    $dimension = if ($icoSizes[$index] -eq 256) { 0 } else { $icoSizes[$index] }
+    $icoWriter.Write([byte]$dimension)
+    $icoWriter.Write([byte]$dimension)
+    $icoWriter.Write([byte]0)
+    $icoWriter.Write([byte]0)
+    $icoWriter.Write([uint16]1)
+    $icoWriter.Write([uint16]32)
+    $icoWriter.Write([uint32]$icoFrames[$index].Length)
+    $icoWriter.Write([uint32]$offset)
+    $offset += $icoFrames[$index].Length
+}
+foreach ($frame in $icoFrames) { $icoWriter.Write([byte[]]$frame) }
+$icoWriter.Dispose()
+
+# ICNS: standard PNG-backed types, including Retina and 1024px representations.
+$icnsTypes = @('icp4', 'icp5', 'icp6', 'ic07', 'ic08', 'ic09', 'ic10')
+$icnsSizes = @(16, 32, 64, 128, 256, 512, 1024)
+$icnsFrames = @($icnsSizes | ForEach-Object { ,(Get-PngBytes $_) })
+$length = 8
+foreach ($frame in $icnsFrames) { $length += 8 + $frame.Length }
+$icnsStream = [System.IO.File]::Create((Join-Path $icons 'icon.icns'))
+$icnsWriter = New-Object System.IO.BinaryWriter($icnsStream)
+$icnsWriter.Write([System.Text.Encoding]::ASCII.GetBytes('icns'))
+Write-BigEndian $icnsWriter $length
+for ($index = 0; $index -lt $icnsTypes.Count; $index++) {
+    $icnsWriter.Write([System.Text.Encoding]::ASCII.GetBytes($icnsTypes[$index]))
+    Write-BigEndian $icnsWriter ($icnsFrames[$index].Length + 8)
+    $icnsWriter.Write([byte[]]$icnsFrames[$index])
+}
+$icnsWriter.Dispose()
+
+# Readable source-derived SVGs: header/forced-color mark and colored app master.
+$paths = @($mark.paths | ForEach-Object {
+    $points = @($_ | ForEach-Object { $_ -join ',' }) -join ' '
+    "<polyline points=`"$points`"/>"
+}) -join ''
+$nodes = @($mark.nodes | ForEach-Object {
+    "<circle cx=`"$($_[0])`" cy=`"$($_[1])`" r=`"$($mark.nodeRadius)`"/>"
+}) -join ''
+$geometry = "<g fill=`"none`" stroke=`"currentColor`" stroke-width=`"$($mark.strokeWidth)`" stroke-linecap=`"round`" stroke-linejoin=`"round`">$paths</g><g fill=`"currentColor`">$nodes</g>"
+$svgMark = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`">$geometry</svg>`n"
+$svgApp = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`" color=`"$($mark.palette.accent)`"><rect width=`"32`" height=`"32`" rx=`"7`" fill=`"$($mark.palette.canvas)`"/>$geometry</svg>`n"
+[System.IO.File]::WriteAllText((Join-Path $brand 'mark-monochrome.svg'), $svgMark, (New-Object System.Text.UTF8Encoding($false)))
+[System.IO.File]::WriteAllText((Join-Path $brand 'mark.svg'), $svgApp, (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Rebuilt desktop icons and SVGs from src/shared/brand/mark.json"

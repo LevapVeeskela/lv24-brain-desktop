@@ -118,13 +118,13 @@ fn build_menu(app: &AppHandle, status: &EngineStatus) -> tauri::Result<Menu<taur
 fn status_line(status: &EngineStatus) -> String {
     match status.phase {
         EnginePhase::Running => match status.pid {
-            Some(pid) => format!("Agent: running (pid {pid})"),
-            None => "Agent: running".to_string(),
+            Some(pid) => format!("LV24 Brain: running (pid {pid})"),
+            None => "LV24 Brain: running".to_string(),
         },
-        EnginePhase::Starting => "Agent: starting…".to_string(),
-        EnginePhase::Paused => "Agent: paused".to_string(),
-        EnginePhase::Error => "Agent: needs attention".to_string(),
-        EnginePhase::Stopped => "Agent: stopped".to_string(),
+        EnginePhase::Starting => "LV24 Brain: starting…".to_string(),
+        EnginePhase::Paused => "LV24 Brain: paused".to_string(),
+        EnginePhase::Error => "LV24 Brain: needs attention".to_string(),
+        EnginePhase::Stopped => "LV24 Brain: stopped".to_string(),
     }
 }
 

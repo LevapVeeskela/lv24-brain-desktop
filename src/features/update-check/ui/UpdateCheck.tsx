@@ -80,7 +80,7 @@ export const UpdateCheck = observer(function UpdateCheck({
           </p>
           <Button
             variant="primary"
-            aria-disabled={busy}
+            disabled={busy}
             aria-busy={settings.installingUpdate}
             onClick={() => {
               if (!busy) {
@@ -94,7 +94,7 @@ export const UpdateCheck = observer(function UpdateCheck({
       ) : (
         <Button
           variant="secondary"
-          aria-disabled={busy}
+          disabled={busy}
           aria-busy={settings.checkingUpdate}
           onClick={() => {
             if (!busy) {
