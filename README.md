@@ -7,11 +7,11 @@ It keeps the local brain agent running, exposes it through a token-safe proxy,
 and provides the tray, autostart, updater and OAuth deep-link plumbing the
 desktop UI is built on.
 
-**Status: v0.3.0, WP5.3 screens.** The dashboard, connections list, add
+**Status: v1.0.0, WP5.5 UX/a11y.** The dashboard, connections list, add
 connection wizard, connection detail (schedule, credentials, runs, live log),
-activity, projects and settings screens are implemented. Signed packaging
-(WP5.4) is next; the engine is still resolved from the environment, not
-bundled.
+activity, projects and settings screens are implemented. Packaging bundles a
+checksum-pinned engine sidecar; the WP5.5 pass added accessible dialogs, phase-
+based engine recovery, truthful offline/paused states and update progress.
 
 ## What works
 
@@ -50,6 +50,12 @@ bundled.
   owner-gated signed release path. Updater manifests include all six
   platform entries (including deb/rpm) and `requireSignedVersion` is enabled.
   See [docs/release.md](docs/release.md).
+- **UX and accessibility (WP5.5)**: phase-based Start/Pause/Resume, truthful
+  unavailable/paused/loading/stale states, localized errors, skip link and
+  per-route focus/title, accessible confirm dialogs, form labels/validation,
+  OAuth success/failure/callback hardening, live log follow and stable ids,
+  update confirmation/progress/locks, autostart retry, dashboard sync retry,
+  and contrast/focus/reduced-motion fixes across ru/en/zh.
 - **Read-only engine CLI bridge (v0.3.0)**: `engine_providers`,
   `engine_secrets` and streaming `engine_connection_auth` commands reuse the
   engine binary/config; the webview never receives a secret value.
@@ -83,7 +89,7 @@ See [docs/architecture.md](docs/architecture.md) and
 - Node.js 22+ (CI uses 24) and npm.
 - Rust 1.90+ with the platform toolchain (MSVC on Windows).
 - Tauri v2 system prerequisites for your OS.
-- The LV24 Brain engine `0.12.0` or newer, initialized with `brain init` and
+- The LV24 Brain engine `0.12.1` or newer, initialized with `brain init` and
   selected with `brain config use <path>` (or `BRAIN_CONFIG`).
 
 The engine sidecar is fetched per target during packaging CI; see
@@ -191,7 +197,7 @@ Signing status: macOS signing/notarization waits for Apple Developer Program
 approval; Windows signing waits for SignPath Foundation approval. Until then,
 release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
-## Known limitations (v0.3.0)
+## Known limitations (v1.0.0)
 
 - Local `cargo`/Vite development still resolves the engine from the
   environment; only packaged builds include the sidecar.

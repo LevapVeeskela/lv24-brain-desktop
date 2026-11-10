@@ -1,4 +1,4 @@
-# Packaging and release (WP5.4)
+# Packaging and release (v1.0.0)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -13,10 +13,10 @@ Inputs:
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `engine_version` | `0.12.0` | LV24 Brain engine release to bundle. |
+| `engine_version` | `0.12.1` | LV24 Brain engine release to bundle. |
 | `signed` | `false` | Create updater artifacts and signatures. Requires repo secrets. |
 | `publish_release` | `false` | Publish a GitHub release and `latest.json`. Requires `signed=true` and a tag. |
-| `tag` | empty | Release tag, for example `v0.3.0`. Required only for publishing. |
+| `tag` | empty | Release tag, for example `v1.0.0`. Required only for publishing. |
 | `prerelease` | `true` | Mark the published release as a prerelease. |
 
 Matrix:
@@ -57,12 +57,14 @@ Repo secrets:
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: key password, if set.
 
 The public key is committed in `src-tauri/tauri.conf.json`. The current key is
-a development key; rotate it before a public release by generating a new key,
-replacing the public key, updating the repository secret, and keeping the old
-public key for one migration release. The build fails if Tauri reports that the
-private key does not match the committed public key. `requireSignedVersion` is
-enabled, so the updater verifies the version bound into the signature's trusted
-comment.
+the v1.0.0 production updater key; rotate it only together with a migration
+release (generate a new key, replace the public key, update the repository
+secret, and keep the old public key for one release). The build fails if Tauri
+reports that the private key does not match the committed public key.
+`requireSignedVersion` is enabled, so the updater verifies the version bound
+into the signature's trusted comment. The earlier v0.3.0 prerelease was not
+served by `releases/latest`, so rotating before v1.0.0 does not strand updater
+clients.
 
 OS code signing is separate from updater signing:
 
@@ -91,7 +93,7 @@ OS code signing is separate from updater signing:
 Windows example (derive the target triple with `rustc -vV` on other hosts):
 
 ```bash
-node scripts/fetch-engine.mjs --version 0.12.0 --target x86_64-pc-windows-msvc
+node scripts/fetch-engine.mjs --version 0.12.1 --target x86_64-pc-windows-msvc
 npm run tauri build -- --debug --bundles nsis \
   --config src-tauri/tauri.bundle.conf.json \
   --config src-tauri/tauri.unsigned.conf.json

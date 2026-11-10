@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "LV24 Brain",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "identifier": "by.lv24.brain.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -54,7 +54,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg1MDE1RjJDMTRBQkFDMDEKUldRQnJLc1VMRjhCaFE3cHBBTVZLZ3JzUzArRUhzY01qZ3JqeFUvSXlIakRaSmszMWJjTC9uN3cK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5ODBBOTRFMDhBQTEzQTUKUldTbEU2b0lUcW1BV1RhQWhscG9laGZyN1R2VlVnNVRsTWpaY0I3Qzg4RU44emh2QVFUMlRSQW8K",
       "requireSignedVersion": true,
       "endpoints": [
         "https://github.com/LevapVeeskela/lv24-brain-desktop/releases/latest/download/latest.json"

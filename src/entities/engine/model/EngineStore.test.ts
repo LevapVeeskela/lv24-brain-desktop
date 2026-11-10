@@ -31,7 +31,7 @@ function shellStatus(phase: EnginePhase, updating = false): ShellStatus {
     paused: phase === "paused",
     updating,
     autostart: { enabled: false, supported: true },
-    desktopVersion: "0.3.0",
+    desktopVersion: "1.0.0",
     deepLinkScheme: "lv24brain",
     logDir: "C:/logs",
   };

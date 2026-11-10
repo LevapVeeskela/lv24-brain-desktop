@@ -1,6 +1,6 @@
 [package]
 name = "lv24-brain-desktop"
-version = "0.3.0"
+version = "1.0.0"
 description = "LV24 Brain desktop shell"
 authors = ["LV24"]
 edition = "2021"

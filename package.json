@@ -1,7 +1,7 @@
 {
   "name": "lv24-brain-desktop",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "LV24 Brain desktop shell (Tauri v2)",
   "scripts": {
