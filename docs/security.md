@@ -55,6 +55,15 @@ This document records the boundary and the accepted residual risks.
 - **Single instance.** One shell per user session; agent duplication is also
   prevented by the engine's per-data-dir OS lock.
 
+## Process cleanup on Windows
+
+When a restart needs a clean slate, stop only the exact `lv24-brain-desktop.exe`
+and its exact `brain.exe` sidecar child, preferably by PID or full path. Never
+use wildcard cleanup such as `Get-Process *lv24* | Stop-Process` or
+`taskkill /IM lv24*`: several LV24 apps (the brain engine, LV24 WiFi Explorer,
+and others) can run at the same time and would be killed too. If the target is
+unclear, list processes first and stop only the intended one.
+
 ## Residual risks (accepted for the local-first MVP)
 
 - Same-user malware can read `agent/runtime.json` and control the agent. The
