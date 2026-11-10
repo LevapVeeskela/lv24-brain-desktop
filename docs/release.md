@@ -102,6 +102,8 @@ npm run tauri build -- --debug --bundles nsis \
 Then run the built app without `LV24_BRAIN_BIN` and confirm it starts the
 bundled `brain.exe` next to the desktop executable.
 
+For native Windows crash dumps, see [operations.md](operations.md).
+
 ## Rebuilding the visual identity
 
 On Windows, regenerate all committed icons without network access:
