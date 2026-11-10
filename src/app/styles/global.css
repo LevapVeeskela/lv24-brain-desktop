@@ -60,7 +60,7 @@
   --motion-progress: 700ms;
   --layer-feedback: 20;
   --layer-skip: 100;
-  --control-check: 20px;
+  --control-check: 24px;
   --control-min: 32px;
 }
 
@@ -1225,6 +1225,7 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 @keyframes progress-turn { to { transform: rotate(360deg); } }
 .input { min-height: 40px; padding: var(--space-2) var(--space-3); }
 .input:disabled { opacity: .65; }
+.input::placeholder { color: var(--muted); opacity: 1; }
 .field > label { color: var(--text); font-size: var(--text-sm); font-weight: 600; }
 .field .inline-error { margin: 0; }
 .inline-field, .toolbar { flex-wrap: wrap; }
@@ -1251,7 +1252,7 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 .data-table th, .data-table td { overflow-wrap: anywhere; }
 .data-table th { font-size: var(--text-xs); text-transform: none; letter-spacing: 0; }
 .data-table tbody tr:hover { background: var(--surface-hover); }
-.table-link { text-decoration: underline; }
+.table-link { display: inline-flex; align-items: center; min-height: var(--control-min); max-width: 100%; text-decoration: underline; }
 .row-actions { align-items: flex-start; }
 .run-status { white-space: normal; }
 .connection-result { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }

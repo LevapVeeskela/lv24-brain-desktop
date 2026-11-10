@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { connectionAuthApi } from "@/entities/connection/api/connectionAuthApi";
 import { engineAvailability } from "@/entities/connection/model/engineAvailability";
@@ -60,7 +60,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
 }: ConnectionDetailProps & { id: string }) {
   const { t, locale } = useI18n();
   const { notify } = useFeedback();
-  const location = useLocation();
   const api = useMemo(() => new ConnectionApi(), []);
   const formId = useId();
   const scheduleSelectId = `${formId}-schedule`;
@@ -577,10 +576,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
       ) : null}
       <nav className="detail-sections" aria-label={t("detail.sections")}>
         {sections.map((section) => (
-          <a key={section.suffix} className="table-link" href={`#${location.pathname}#${formId}-${section.suffix}`} onClick={(event) => {
-            event.preventDefault();
-            jumpTo(section.suffix);
-          }}>{section.label}</a>
+          <Button key={section.suffix} variant="ghost" onClick={() => jumpTo(section.suffix)}>{section.label}</Button>
         ))}
       </nav>
       <Card className="connection-health">
@@ -970,6 +966,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
       >
         {deleteError ? <InlineError>{deleteError}</InlineError> : null}
         <p><strong>{connection.id}</strong></p>
+        <p>{t("detail.deleteConfirm")}</p>
         <p>{t("detail.deleteDanger")}</p>
       </ConfirmDialog>
     </div>

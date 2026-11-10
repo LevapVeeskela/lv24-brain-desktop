@@ -1,4 +1,4 @@
-# Rebuilds every committed brand/icon asset from src/shared/brand/mark.json.
+# Rebuilds brand/icon geometry from mark.json and colors from global.css :root.
 # Windows PowerShell 5.1+ / PowerShell on Windows; System.Drawing is OS-provided.
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-icons.ps1
 # No network, native icon tools, fonts or additional dependencies are required.
@@ -9,10 +9,30 @@ $root = Split-Path -Parent $PSScriptRoot
 $icons = Join-Path $root 'src-tauri/icons'
 $brand = Join-Path $root 'public/brand'
 $mark = Get-Content -LiteralPath (Join-Path $root 'src/shared/brand/mark.json') -Raw | ConvertFrom-Json
+$stylesheet = Get-Content -LiteralPath (Join-Path $root 'src/app/styles/global.css') -Raw
+$tokenBlock = [regex]::Match($stylesheet, '(?s):root\s*\{(?<tokens>.*?)\}')
+if (-not $tokenBlock.Success) {
+    throw 'Cannot generate icons: global.css has no :root token block.'
+}
+$hexTokens = @{}
+foreach ($token in [regex]::Matches($tokenBlock.Groups['tokens'].Value, '(?m)^\s*(?<name>--[a-zA-Z0-9-]+)\s*:\s*(?<hex>#[a-fA-F0-9]{6})\s*;')) {
+    $hexTokens[$token.Groups['name'].Value] = $token.Groups['hex'].Value
+}
+$palette = @{}
+foreach ($entry in $mark.palette.PSObject.Properties) {
+    $tokenName = [string]$entry.Value
+    if (-not $hexTokens.ContainsKey($tokenName)) {
+        throw "Cannot generate icons: palette '$($entry.Name)' requires a direct six-digit HEX :root token '$tokenName'."
+    }
+    $palette[$entry.Name] = $hexTokens[$tokenName]
+}
 New-Item -ItemType Directory -Force -Path $icons, $brand | Out-Null
 
 function Get-BrandColor([string]$Name) {
-    return [System.Drawing.ColorTranslator]::FromHtml($mark.palette.$Name)
+    if (-not $palette.ContainsKey($Name)) {
+        throw "Unknown icon palette entry '$Name'."
+    }
+    return [System.Drawing.ColorTranslator]::FromHtml($palette[$Name])
 }
 
 function New-RoundedRectanglePath([float]$Size, [float]$Radius) {
@@ -197,7 +217,7 @@ $nodes = @($mark.nodes | ForEach-Object {
 }) -join ''
 $geometry = "<g fill=`"none`" stroke=`"currentColor`" stroke-width=`"$($mark.strokeWidth)`" stroke-linecap=`"round`" stroke-linejoin=`"round`">$paths</g><g fill=`"currentColor`">$nodes</g>"
 $svgMark = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`">$geometry</svg>`n"
-$svgApp = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`" color=`"$($mark.palette.accent)`"><rect width=`"32`" height=`"32`" rx=`"7`" fill=`"$($mark.palette.canvas)`"/>$geometry</svg>`n"
+$svgApp = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`" color=`"$($palette.accent)`"><rect width=`"32`" height=`"32`" rx=`"7`" fill=`"$($palette.canvas)`"/>$geometry</svg>`n"
 [System.IO.File]::WriteAllText((Join-Path $brand 'mark-monochrome.svg'), $svgMark, (New-Object System.Text.UTF8Encoding($false)))
 [System.IO.File]::WriteAllText((Join-Path $brand 'mark.svg'), $svgApp, (New-Object System.Text.UTF8Encoding($false)))
-Write-Host "Rebuilt desktop icons and SVGs from src/shared/brand/mark.json"
+Write-Host "Rebuilt desktop icons and SVGs from mark.json geometry and global.css theme tokens"

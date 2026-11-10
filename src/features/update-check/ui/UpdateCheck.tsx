@@ -93,7 +93,7 @@ export const UpdateCheck = observer(function UpdateCheck({
         </div>
       ) : (
         <Button
-          variant="secondary"
+          variant="primary"
           disabled={busy}
           aria-busy={settings.checkingUpdate}
           onClick={() => {

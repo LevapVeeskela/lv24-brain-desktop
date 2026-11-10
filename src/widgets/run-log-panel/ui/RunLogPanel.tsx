@@ -16,6 +16,7 @@ export const RunLogPanel = observer(function RunLogPanel({
   const { t } = useI18n();
   const { notify } = useFeedback();
   const preRef = useRef<HTMLPreElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [following, setFollowing] = useState(true);
   const [closed, setClosed] = useState(false);
   const runId = runs.selectedRunId;
@@ -45,6 +46,10 @@ export const RunLogPanel = observer(function RunLogPanel({
   useEffect(() => {
     setFollowing(true);
     setClosed(false);
+    if (runId) {
+      headingRef.current?.focus({ preventScroll: true });
+      headingRef.current?.scrollIntoView({ block: "start" });
+    }
   }, [runId]);
 
   useEffect(() => {
@@ -71,7 +76,7 @@ export const RunLogPanel = observer(function RunLogPanel({
     <Card className="log-panel">
       <div className="card-header">
         <div>
-          <h3>{t("activity.log")}</h3>
+          <h3 ref={headingRef} tabIndex={-1}>{t("activity.log")}</h3>
           <p className="muted small">
             {runId ?? ""} {runs.streaming ? `· ${t("log.streaming")}` : ""}
           </p>

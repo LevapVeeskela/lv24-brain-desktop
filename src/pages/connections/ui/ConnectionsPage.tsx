@@ -106,13 +106,13 @@ export const ConnectionsPage = observer(function ConnectionsPage({
         notify(t("connections.runQueued", { jobId: result.jobId }), "success");
       } else {
         await api.test(connection.id);
-        notify(t("connections.testOk"), "success");
+        notify(`${connection.id}: ${t("connections.testOk")}`, "success");
       }
     } catch (cause) {
       notify(
         action === "test"
-          ? `${t("connections.testFailed")} ${errorMessage(cause)}`
-          : errorMessage(cause),
+            ? `${connection.id}: ${t("connections.testFailed")} ${errorMessage(cause)}`
+            : `${connection.id}: ${errorMessage(cause)}`,
         "error",
       );
     } finally {
