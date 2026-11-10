@@ -113,5 +113,22 @@ and explicitly leave visual verification pending.
 
 ## Implementation and results
 
-Pending. Update this section with changed-file manifest, command results,
-screenshot index and any incomplete verification before delivery.
+Implemented on `design/ux-refresh` in separate audit, design-system, page-UX and
+verification commits. The shared mark palette now resolves CSS token names, so
+the header, raster icons and tray are generated from one geometry/token source.
+Settings uses keyboard tabs; connection detail uses native section-jump buttons
+to avoid introducing a second fragment into HashRouter URLs.
+
+Final local checks: 93 frontend tests, 21 Rust tests, typechecks, production Vite
+build, fmt, Clippy, API drift check and debug Tauri build pass. Token text pairs
+have a minimum checked contrast of 6.90:1. No runtime dependencies were added.
+
+See the [Russian verification report](design-refresh/report.md),
+[complete file manifest](design-refresh/changed-files.md),
+[56 before/after captures and additional state checks](design-refresh/screenshots/README.md),
+and [brand contact sheet](design-refresh/brand-contact.png).
+
+Visual evidence is from a local browser fixture with fictional data. Native
+WebView2/tray smoke, real 200% zoom and OS accessibility emulation remain manual;
+the installed same-identifier application was left running. No release or cloud
+CI is claimed. The report contains the explicit remaining checklist.

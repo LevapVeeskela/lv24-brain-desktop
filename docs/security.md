@@ -78,3 +78,19 @@ This document records the boundary and the accepted residual risks.
 
 Security issues should go through the LV24 Brain repository's security policy
 rather than a public issue.
+
+## Design refresh and local visual fixtures
+
+The refresh keeps CSP, IPC allow-lists, updater key, deep-link scheme and
+credential boundaries unchanged. Notifications are in-memory UI state, not
+telemetry or persisted history. Credential presence still reads names only;
+unknown status is distinguished from an absent credential.
+
+Log Copy and Save export only received lines currently displayed, through an
+explicit user action. They do not fetch more history or send data to a service.
+
+`scripts/design-preview.html` is a development-only entry, excluded from the
+production Vite entry. It restricts execution to a local development server and
+uses existing Tauri mocks, fictional records and fictional secret names. No
+provider, real keychain or engine is contacted. Fixtures must not be described
+as production observations. See [verification](design-refresh/report.md).

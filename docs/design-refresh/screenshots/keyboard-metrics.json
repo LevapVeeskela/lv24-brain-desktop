@@ -1,0 +1,1402 @@
+[
+  {
+    "page": "dashboard",
+    "stops": 21,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 32,
+        "index": 10,
+        "name": "Подключения →",
+        "outline": "solid",
+        "tag": "A",
+        "width": 109.515625
+      },
+      {
+        "height": 36.1875,
+        "index": 11,
+        "name": "Пауза",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 63.1875
+      },
+      {
+        "height": 36.1875,
+        "index": 12,
+        "name": "Синхронизировать всё",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 172.046875
+      },
+      {
+        "height": 32,
+        "index": 13,
+        "name": "Подробности",
+        "outline": "solid",
+        "tag": "SUMMARY",
+        "width": 679
+      },
+      {
+        "height": 36.1875,
+        "index": 14,
+        "name": "Открыть лог",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 105.578125
+      },
+      {
+        "height": 36.1875,
+        "index": 15,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.546875
+      },
+      {
+        "height": 32,
+        "index": 16,
+        "name": "github-design",
+        "outline": "solid",
+        "tag": "A",
+        "width": 152.875
+      },
+      {
+        "height": 32,
+        "index": 17,
+        "name": "gitlab-platform",
+        "outline": "solid",
+        "tag": "A",
+        "width": 150
+      },
+      {
+        "height": 32,
+        "index": 18,
+        "name": "research-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 132.46875
+      },
+      {
+        "height": 32,
+        "index": 19,
+        "name": "local-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 134.546875
+      },
+      {
+        "height": 32,
+        "index": 20,
+        "name": "archive",
+        "outline": "solid",
+        "tag": "A",
+        "width": 57.421875
+      },
+      {
+        "height": 32,
+        "index": 21,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "connections",
+    "stops": 48,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 10,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.546875
+      },
+      {
+        "height": 32,
+        "index": 11,
+        "name": "Добавить подключение",
+        "outline": "solid",
+        "tag": "A",
+        "width": 159.15625
+      },
+      {
+        "height": 40,
+        "index": 12,
+        "name": "search",
+        "outline": "solid",
+        "tag": "INPUT",
+        "width": 327.5
+      },
+      {
+        "height": 40,
+        "index": 13,
+        "name": "Все результатыОшибкаЧастичноВыполняетсяУспехНет запуска в недавней истории",
+        "outline": "solid",
+        "tag": "SELECT",
+        "width": 163.75
+      },
+      {
+        "height": 40,
+        "index": 14,
+        "name": "НазваниеРезультатПоследний запуск",
+        "outline": "solid",
+        "tag": "SELECT",
+        "width": 163.75
+      },
+      {
+        "height": 32,
+        "index": 15,
+        "name": "github-design",
+        "outline": "solid",
+        "tag": "A",
+        "width": 99.03125
+      },
+      {
+        "height": 32,
+        "index": 16,
+        "name": "Открыть лог",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 84.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 17,
+        "name": "Запустить github-design",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 18,
+        "name": "Проверить github-design",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 19,
+        "name": "gitlab-platform",
+        "outline": "solid",
+        "tag": "A",
+        "width": 114.265625
+      },
+      {
+        "height": 32,
+        "index": 20,
+        "name": "Открыть лог",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 84.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 21,
+        "name": "Запустить gitlab-platform",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 22,
+        "name": "Проверить gitlab-platform",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 23,
+        "name": "research-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 106.640625
+      },
+      {
+        "height": 32,
+        "index": 24,
+        "name": "Открыть лог",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 84.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 25,
+        "name": "Запустить research-notes",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 26,
+        "name": "Проверить research-notes",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 27,
+        "name": "local-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 28,
+        "name": "Запустить local-notes",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 29,
+        "name": "Проверить local-notes",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 30,
+        "name": "archive",
+        "outline": "solid",
+        "tag": "A",
+        "width": 53.328125
+      },
+      {
+        "height": 36.1875,
+        "index": 31,
+        "name": "Запустить archive",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 32,
+        "name": "Проверить archive",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 33,
+        "name": "github-new",
+        "outline": "solid",
+        "tag": "A",
+        "width": 76.171875
+      },
+      {
+        "height": 36.1875,
+        "index": 34,
+        "name": "Запустить github-new",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 35,
+        "name": "Проверить github-new",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 36,
+        "name": "github-docs",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 37,
+        "name": "Запустить github-docs",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 38,
+        "name": "Проверить github-docs",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 39,
+        "name": "github-mobile",
+        "outline": "solid",
+        "tag": "A",
+        "width": 99.03125
+      },
+      {
+        "height": 36.1875,
+        "index": 40,
+        "name": "Запустить github-mobile",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 41,
+        "name": "Проверить github-mobile",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 42,
+        "name": "github-team",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 43,
+        "name": "Запустить github-team",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 44,
+        "name": "Проверить github-team",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 45,
+        "name": "gitlab-infra",
+        "outline": "solid",
+        "tag": "A",
+        "width": 91.40625
+      },
+      {
+        "height": 36.1875,
+        "index": 46,
+        "name": "Запустить gitlab-infra",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 47,
+        "name": "Проверить gitlab-infra",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 95.921875
+      },
+      {
+        "height": 32,
+        "index": 48,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "wizard",
+    "stops": 16,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 32,
+        "index": 10,
+        "name": "К подключениям",
+        "outline": "solid",
+        "tag": "A",
+        "width": 114.84375
+      },
+      {
+        "height": 40,
+        "index": 11,
+        "name": "Поиск провайдеров",
+        "outline": "solid",
+        "tag": "INPUT",
+        "width": 679
+      },
+      {
+        "height": 36.1875,
+        "index": 12,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 679
+      },
+      {
+        "height": 252.9375,
+        "index": 13,
+        "name": "GitHubgithubТокенOAuth device flowИмпорт историиОбновленияОтслеживание удаленийП",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 221
+      },
+      {
+        "height": 252.9375,
+        "index": 14,
+        "name": "GitLabgitlabТокенOAuth PKCEИмпорт историиОбновленияОтслеживание удаленийПолитика",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 221
+      },
+      {
+        "height": 252.9375,
+        "index": 15,
+        "name": "Локальные файлыfileБез аутентификацииИмпорт историиОбновленияПолитика публикации",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 221
+      },
+      {
+        "height": 32,
+        "index": 16,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "detail",
+    "stops": 28,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 32,
+        "index": 10,
+        "name": "К подключениям",
+        "outline": "solid",
+        "tag": "A",
+        "width": 114.84375
+      },
+      {
+        "height": 36.1875,
+        "index": 11,
+        "name": "Проверить подключение",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 188.046875
+      },
+      {
+        "height": 36.1875,
+        "index": 12,
+        "name": "Запустить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 13,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 66.03125
+      },
+      {
+        "height": 36.1875,
+        "index": 14,
+        "name": "Расписание",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 99.71875
+      },
+      {
+        "height": 36.1875,
+        "index": 15,
+        "name": "OAuth",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 65.4375
+      },
+      {
+        "height": 36.1875,
+        "index": 16,
+        "name": "Учётные данные",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 132.5
+      },
+      {
+        "height": 36.1875,
+        "index": 17,
+        "name": "Запуски",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 76.875
+      },
+      {
+        "height": 36.1875,
+        "index": 18,
+        "name": "Удалить подключение",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 170.34375
+      },
+      {
+        "height": 36.1875,
+        "index": 19,
+        "name": "Открыть лог",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 105.578125
+      },
+      {
+        "height": 40,
+        "index": 22,
+        "name": "По запросуКаждый часЕжедневноСвоё",
+        "outline": "solid",
+        "tag": "SELECT",
+        "width": 679
+      },
+      {
+        "height": 36.1875,
+        "index": 23,
+        "name": "Сохранить расписание",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 170.96875
+      },
+      {
+        "height": 40,
+        "index": 25,
+        "name": null,
+        "outline": "solid",
+        "tag": "INPUT",
+        "width": 679
+      },
+      {
+        "height": 36.1875,
+        "index": 26,
+        "name": "Запустить OAuth",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 131.71875
+      },
+      {
+        "height": 40,
+        "index": 28,
+        "name": "password",
+        "outline": "solid",
+        "tag": "INPUT",
+        "width": 602.5
+      },
+      {
+        "height": 36.1875,
+        "index": 31,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.546875
+      },
+      {
+        "height": 36.1875,
+        "index": 32,
+        "name": "Открыть лог: github-team-20261110-1",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 105.578125
+      },
+      {
+        "height": 36.1875,
+        "index": 34,
+        "name": "Удалить подключение",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 170.34375
+      },
+      {
+        "height": 32,
+        "index": 37,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "activity",
+    "stops": 27,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 10,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.546875
+      },
+      {
+        "height": 32,
+        "index": 11,
+        "name": "github-team",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 12,
+        "name": "Лог: github-team-20261110-1",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 40.28125,
+        "index": 13,
+        "name": "github-design",
+        "outline": "solid",
+        "tag": "A",
+        "width": 97.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 14,
+        "name": "Лог: github-design-20261110-2",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 40.28125,
+        "index": 15,
+        "name": "gitlab-platform",
+        "outline": "solid",
+        "tag": "A",
+        "width": 97.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 16,
+        "name": "Лог: gitlab-platform-20261110-3",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 32,
+        "index": 17,
+        "name": "local-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 18,
+        "name": "Лог: local-notes-20261110-4",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 40.28125,
+        "index": 19,
+        "name": "github-mobile",
+        "outline": "solid",
+        "tag": "A",
+        "width": 97.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 20,
+        "name": "Лог: github-mobile-20261110-5",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 32,
+        "index": 21,
+        "name": "gitlab-infra",
+        "outline": "solid",
+        "tag": "A",
+        "width": 91.40625
+      },
+      {
+        "height": 36.1875,
+        "index": 22,
+        "name": "Лог: gitlab-infra-20261110-6",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 40.28125,
+        "index": 23,
+        "name": "research-notes",
+        "outline": "solid",
+        "tag": "A",
+        "width": 97.15625
+      },
+      {
+        "height": 36.1875,
+        "index": 24,
+        "name": "Лог: research-notes-20261110-7",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 32,
+        "index": 25,
+        "name": "github-docs",
+        "outline": "solid",
+        "tag": "A",
+        "width": 83.796875
+      },
+      {
+        "height": 36.1875,
+        "index": 26,
+        "name": "Лог: github-docs-20261110-8",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 48.78125
+      },
+      {
+        "height": 32,
+        "index": 27,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "projects",
+    "stops": 11,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 36.1875,
+        "index": 10,
+        "name": "Обновить",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 88.546875
+      },
+      {
+        "height": 32,
+        "index": 11,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  },
+  {
+    "page": "settings",
+    "stops": 17,
+    "missingFocus": [],
+    "tinyTargets": [],
+    "entries": [
+      {
+        "height": 32,
+        "index": 1,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 2,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 3,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 36.140625,
+        "index": 4,
+        "name": "Обзор",
+        "outline": "solid",
+        "tag": "A",
+        "width": 88.03125
+      },
+      {
+        "height": 36.140625,
+        "index": 5,
+        "name": "Подключения",
+        "outline": "solid",
+        "tag": "A",
+        "width": 138.890625
+      },
+      {
+        "height": 36.140625,
+        "index": 6,
+        "name": "Активность",
+        "outline": "solid",
+        "tag": "A",
+        "width": 121.328125
+      },
+      {
+        "height": 36.140625,
+        "index": 7,
+        "name": "Проекты",
+        "outline": "solid",
+        "tag": "A",
+        "width": 104.765625
+      },
+      {
+        "height": 36.140625,
+        "index": 8,
+        "name": "Настройки",
+        "outline": "solid",
+        "tag": "A",
+        "width": 116.703125
+      },
+      {
+        "height": 40,
+        "index": 10,
+        "name": "Общие",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 69.671875
+      },
+      {
+        "height": 448.359375,
+        "index": 12,
+        "name": "ЯзыкENRU中文АвтозапускЗапускать при входеЗарегистрировано в системе.Пауза сохраняе",
+        "outline": "solid",
+        "tag": "DIV",
+        "width": 713
+      },
+      {
+        "height": 32,
+        "index": 13,
+        "name": "EN",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 32.359375
+      },
+      {
+        "height": 32,
+        "index": 14,
+        "name": "RU",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 33
+      },
+      {
+        "height": 32,
+        "index": 15,
+        "name": "中文",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 40.484375
+      },
+      {
+        "height": 24,
+        "index": 16,
+        "name": "checkbox",
+        "outline": "solid",
+        "tag": "INPUT",
+        "width": 24
+      },
+      {
+        "height": 36.1875,
+        "index": 17,
+        "name": "Проверить обновления",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 177.1875
+      },
+      {
+        "height": 32,
+        "index": 22,
+        "name": "Выйти",
+        "outline": "solid",
+        "tag": "BUTTON",
+        "width": 46.9375
+      },
+      {
+        "height": 37.6875,
+        "index": 0,
+        "name": "Перейти к основному содержимому",
+        "outline": "solid",
+        "tag": "A",
+        "width": 276.65625
+      }
+    ]
+  }
+]

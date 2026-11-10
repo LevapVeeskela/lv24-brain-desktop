@@ -1,0 +1,447 @@
+[
+  {
+    "file": "after-activity-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-activity-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-activity-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-activity-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-connections-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-connections-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-connections-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-connections-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-dashboard-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-dashboard-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-dashboard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-dashboard-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-detail-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-detail-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-detail-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-detail-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-log-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "after-projects-en-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "after-projects-en-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "after-projects-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "after-projects-ru-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "after-settings-diagnostics-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-settings-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-settings-en-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "after-settings-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-settings-ru-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "after-wizard-done-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "after-wizard-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-wizard-en-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "after-wizard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "after-wizard-ru-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "before-activity-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-activity-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-activity-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-activity-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-connections-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-connections-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-connections-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-connections-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-dashboard-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-dashboard-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-dashboard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-dashboard-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-detail-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-detail-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-detail-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-detail-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-projects-en-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "before-projects-en-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "before-projects-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "before-projects-ru-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "before-settings-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-settings-en-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-settings-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-settings-ru-980x720.jpg",
+    "bitmapWidth": 965,
+    "bitmapHeight": 709
+  },
+  {
+    "file": "before-wizard-en-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-wizard-en-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "before-wizard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "before-wizard-ru-980x720.jpg",
+    "bitmapWidth": 980,
+    "bitmapHeight": 720
+  },
+  {
+    "file": "empty-activity-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "empty-connections-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "empty-dashboard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "empty-detail-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "empty-projects-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "empty-settings-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "empty-wizard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "error-activity-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "error-connections-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "error-dashboard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "error-detail-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "error-projects-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "error-settings-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "error-wizard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "loading-activity-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "loading-connections-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "loading-dashboard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "loading-detail-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "loading-projects-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 540
+  },
+  {
+    "file": "loading-settings-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "loading-wizard-ru-760x540.jpg",
+    "bitmapWidth": 745,
+    "bitmapHeight": 529
+  },
+  {
+    "file": "overview-after-ru-760x540.jpg",
+    "bitmapWidth": 760,
+    "bitmapHeight": 1176
+  },
+  {
+    "file": "overview-after-ru-980x720.jpg",
+    "bitmapWidth": 1470,
+    "bitmapHeight": 1152
+  },
+  {
+    "file": "reflow-activity-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-connections-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-dashboard-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-detail-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-projects-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-settings-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  },
+  {
+    "file": "reflow-wizard-ru-380x270.jpg",
+    "bitmapWidth": 365,
+    "bitmapHeight": 259
+  }
+]

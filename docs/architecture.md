@@ -19,8 +19,7 @@ src/
 
 - `RootStore` owns the Engine, Connections, Sync, Settings, Runs, Projects and
   Providers stores. It is created once by `RootStoreProvider`; the provider
-  starts polling/event subscriptions and disposes them on unmount
-  (StrictMode-safe).
+  starts polling/event subscriptions and disposes them on unmount.
 - `EngineStore` polls `shell_status` every 4 seconds, listens for
   `engine-status`, `shell-error` and `oauth-callback`, and exposes start, pause,
   autostart and quit actions. An `engine-status` event refreshes the full shell
@@ -37,6 +36,33 @@ src/
 - `SettingsStore` owns the UI locale (persisted in WebView local storage) and
   the desktop update check/install flow.
 - Router: `HashRouter`, so a packaged webview never needs server-side routes.
+
+### UI design system and feedback
+
+`src/app/styles/global.css` owns semantic dark colors, spacing, typography,
+radii and motion. Existing widget aliases resolve to those same tokens. Native
+controls in `shared/ui` provide buttons, fields, inputs/selects, tables,
+loading/empty states, badges, tooltips and keyboard-operable tabs. Confirmation
+dialogs retain native modality and trigger focus restoration.
+
+`FeedbackProvider` sits inside i18n and above the router. It holds up to four
+dismissible messages in memory across route changes, with no persistence or
+network transport. Recoverable surface errors and field validation stay inline.
+Route navigation resets scroll and focuses main content. Settings separates
+preferences from diagnostics using retained tab panels. The wizard separates
+provider/configure/stepper components while its page keeps draft, create and
+post-create retry orchestration.
+
+Connection health presents the latest known run, not a new engine probe. The
+existing history endpoint is bounded to 100 global runs. An absent run is
+unknown, not evidence that a connection never ran. The API has no last-error
+text, so failed/partial results lead to the log. Follow scrolls received output;
+it does not add polling or promise live tailing.
+
+The mark comes from `shared/brand/mark.json`; its palette references CSS tokens.
+The PowerShell generator writes every committed app/tray icon and public SVG.
+The header uses the same geometry and `currentColor`, including forced-color
+mode. See [design-refresh.md](design-refresh.md).
 
 ### Typed client
 

@@ -1,0 +1,149 @@
+[
+  {
+    "state": "empty",
+    "page": "dashboard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "connections",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "wizard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "detail",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "activity",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "projects",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "empty",
+    "page": "settings",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "dashboard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "connections",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "wizard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "detail",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "activity",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "projects",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "error",
+    "page": "settings",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "dashboard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "connections",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "wizard",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "detail",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "activity",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "projects",
+    "height": 540,
+    "scrollWidth": 760,
+    "width": 760
+  },
+  {
+    "state": "loading",
+    "page": "settings",
+    "height": 540,
+    "scrollWidth": 745,
+    "width": 760
+  }
+]

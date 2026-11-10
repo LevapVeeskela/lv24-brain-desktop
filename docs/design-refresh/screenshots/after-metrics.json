@@ -1,0 +1,254 @@
+[
+  {
+    "page": "dashboard",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 965,
+    "title": "Dashboard · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "connections",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 965,
+    "title": "Connections · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "wizard",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 980,
+    "title": "Connections · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "detail",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 965,
+    "title": "Connections · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "activity",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 965,
+    "title": "Activity · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "projects",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 980,
+    "title": "Projects · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "settings",
+    "locale": "en",
+    "height": 720,
+    "lang": "en",
+    "scrollWidth": 980,
+    "title": "Settings · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "dashboard",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Dashboard · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "connections",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Connections · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "wizard",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Connections · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "detail",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Connections · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "activity",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Activity · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "projects",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 760,
+    "title": "Projects · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "settings",
+    "locale": "en",
+    "height": 540,
+    "lang": "en",
+    "scrollWidth": 745,
+    "title": "Settings · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "dashboard",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 965,
+    "title": "Обзор · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "connections",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 965,
+    "title": "Подключения · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "wizard",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 980,
+    "title": "Подключения · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "detail",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 965,
+    "title": "Подключения · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "activity",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 965,
+    "title": "Активность · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "projects",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 980,
+    "title": "Проекты · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "settings",
+    "locale": "ru",
+    "height": 720,
+    "lang": "ru",
+    "scrollWidth": 980,
+    "title": "Настройки · LV24 Brain",
+    "width": 980
+  },
+  {
+    "page": "dashboard",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Обзор · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "connections",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Подключения · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "wizard",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Подключения · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "detail",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Подключения · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "activity",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Активность · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "projects",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 760,
+    "title": "Проекты · LV24 Brain",
+    "width": 760
+  },
+  {
+    "page": "settings",
+    "locale": "ru",
+    "height": 540,
+    "lang": "ru",
+    "scrollWidth": 745,
+    "title": "Настройки · LV24 Brain",
+    "width": 760
+  }
+]

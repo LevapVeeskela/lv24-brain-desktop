@@ -101,3 +101,22 @@ npm run tauri build -- --debug --bundles nsis \
 
 Then run the built app without `LV24_BRAIN_BIN` and confirm it starts the
 bundled `brain.exe` next to the desktop executable.
+
+## Rebuilding the visual identity
+
+On Windows, regenerate all committed icons without network access:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-icons.ps1
+```
+
+Geometry is in `src/shared/brand/mark.json`; palette entries reference direct
+HEX tokens in `src/app/styles/global.css :root`. A missing token fails before
+writing outputs. Re-run the generator after changing geometry or those tokens.
+It writes 1024/512/256/128/64/32px PNGs, seven-frame ICO, seven-representation
+ICNS, five tray states and public color/monochrome SVGs. Commit all outputs.
+Tray glyphs distinguish paused/stopped when their palette colors match.
+
+The design refresh keeps versions, installer names, release overrides, updater
+key and signing requirements. Local verification and the native smoke checklist
+are recorded in [design-refresh/report.md](design-refresh/report.md).

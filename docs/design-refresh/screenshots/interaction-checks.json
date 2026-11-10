@@ -1,0 +1,24 @@
+{
+  "environment": "Local browser fixture; no real engine/provider/keychain used",
+  "locale": "ru",
+  "viewport": "760x540 unless explicitly named",
+  "passed": [
+    "Tab traversal through all seven pages: visible focus and targets >=24px",
+    "Wizard invalid submit: first invalid field focused, 3 invalid fields, summary retained",
+    "Wizard back to provider and resume: ID draft retained",
+    "Wizard mock create reaches terminal Done step without create/back controls",
+    "Schedule success notification survives navigation to Activity; main focus and scroll reset",
+    "Delete dialog Escape restores focus to Delete connection without deleting",
+    "Quit dialog Escape restores focus to Quit without quitting",
+    "Settings ArrowRight selects diagnostics tab and focuses it, exactly one panel visible",
+    "Log open focuses heading; follow-off changes aria-live to off",
+    "Copy log writes received text to clipboard",
+    "Save log downloads exact displayed fixture lines; sample-log.txt retained"
+  ],
+  "notVerified": [
+    "Native WebView2 clipboard/download and real 200% zoom",
+    "Native tray, autostart, updater, close-to-tray smoke after refresh",
+    "macOS/Linux native icon appearance",
+    "Screen reader speech and system forced-color/reduced-motion emulation"
+  ]
+}

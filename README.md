@@ -2,16 +2,23 @@
 
 [![ci](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml)
 
-The Tauri v2 shell for [LV24 Brain](https://github.com/LevapVeeskela/lv24-brain).
-It keeps the local brain agent running, exposes it through a token-safe proxy,
-and provides the tray, autostart, updater and OAuth deep-link plumbing the
-desktop UI is built on.
+The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/lv24-brain),
+built with Tauri v2. See connection results, investigate failed runs and manage
+the background agent, schedules and credentials from one offline-first interface.
 
 **Status: v1.0.1, WP5.5 UX/a11y.** The dashboard, connections list, add
-connection wizard, connection detail (schedule, credentials, runs, live log),
+connection wizard, connection detail (schedule, credentials, runs, received logs),
 activity, projects and settings screens are implemented. Packaging bundles a
 checksum-pinned engine sidecar; the WP5.5 pass added accessible dialogs, phase-
 based engine recovery, truthful offline/paused states and update progress.
+
+The `design/ux-refresh` branch adds a semantic dark theme, a shared memory mark,
+last-known connection results, a clearer setup wizard and persistent feedback.
+Versions and engine/API contracts are unchanged. See the
+[design audit](docs/design-refresh.md), [verification report](docs/design-refresh/report.md)
+and [before/after screenshots](docs/design-refresh/screenshots/README.md).
+
+![Dashboard preview with fictional local fixture data, not a live engine](docs/design-refresh/screenshots/after-dashboard-ru-980x720.jpg)
 
 ## What works
 
@@ -41,7 +48,7 @@ based engine recovery, truthful offline/paused states and update progress.
   set, persisted locale and a header switcher.
 - **Screens (v0.3.0)**: dashboard, connections list, add-connection wizard
   (provider descriptors, auth modes, settings, secrets, save + test),
-  connection detail (schedule, credentials, runs, SSE live log, OAuth, delete),
+  connection detail (schedule, credentials, runs, SSE log output, OAuth, delete),
   activity, projects and settings (paths, autostart, language, desktop update,
   update channel and OS keychain secret names).
 - **Packaging (WP5.4)**: manual `desktop.yml` builds NSIS (Windows),

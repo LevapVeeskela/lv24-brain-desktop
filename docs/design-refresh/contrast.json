@@ -1,0 +1,13 @@
+{
+  "--text on --canvas": 16.8,
+  "--text on --surface": 15.25,
+  "--text-muted on --surface": 8.14,
+  "--text-muted on --surface-hover": 6.9,
+  "--text-code on --inset": 13.05,
+  "--accent on --accent-subtle": 7.84,
+  "--danger on --danger-subtle": 7.81,
+  "--warning on --warning-subtle": 9.0,
+  "--info on --info-subtle": 7.94,
+  "--text-on-accent on --accent": 9.49,
+  "--text-on-danger on --danger": 8.81
+}

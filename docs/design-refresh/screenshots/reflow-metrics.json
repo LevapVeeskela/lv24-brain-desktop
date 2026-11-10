@@ -1,0 +1,44 @@
+[
+  {
+    "page": "dashboard",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "connections",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "wizard",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "detail",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "activity",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "projects",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  },
+  {
+    "page": "settings",
+    "height": 270,
+    "scrollWidth": 365,
+    "width": 380
+  }
+]

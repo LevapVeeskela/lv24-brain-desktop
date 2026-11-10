@@ -1,0 +1,3 @@
+[info] 2026-11-10 09:45:00 · Fixture snapshot · Reading configured source
+[stdout] 42 records scanned, 12 indexed, 30 unchanged
+[stderr] Source unavailable (fictional fixture). Review authentication and retry.
