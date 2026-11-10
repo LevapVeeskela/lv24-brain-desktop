@@ -12,7 +12,7 @@ export function NotFoundPage() {
         </div>
       </div>
       <div>
-        <Link className="btn btn-primary" to="/">
+        <Link className="text-link" to="/">
           {t("nav.dashboard")}
         </Link>
       </div>

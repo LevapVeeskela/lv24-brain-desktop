@@ -23,6 +23,7 @@ export function AppRouter({ store }: { store: RootStore }) {
                 connections={store.connections}
                 sync={store.sync}
                 settings={store.settings}
+                runs={store.runs}
               />
             }
           />
@@ -32,6 +33,7 @@ export function AppRouter({ store }: { store: RootStore }) {
               <ConnectionsPage
                 connections={store.connections}
                 engine={store.engine}
+                runs={store.runs}
               />
             }
           />

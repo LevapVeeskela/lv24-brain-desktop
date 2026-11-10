@@ -15,10 +15,13 @@ import type {
 } from "@/entities/provider/model/types";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
-import { InlineError } from "@/shared/ui/InlineError";
 import { Notice } from "@/shared/ui/Notice";
-import { useI18n, type MessageKey } from "@/shared/i18n";
+import { useI18n } from "@/shared/i18n";
 import { errorMessage } from "@/shared/lib/errors";
+import { ConfigureStep } from "./ConfigureStep";
+import { ProviderStep } from "./ProviderStep";
+import { WizardStepper } from "./WizardStepper";
+import { canReturnToStep, type WizardStep } from "../model/steps";
 import { ProviderDrafts, type WizardDraft } from "../model/draft";
 import {
   validateWizard,
@@ -26,7 +29,7 @@ import {
   type WizardValidation,
 } from "../model/validation";
 
-type Step = "provider" | "configure" | "done";
+type Step = WizardStep;
 
 interface PostCreateOutcome {
   failures: string[];
@@ -51,14 +54,6 @@ function toBackend(
     return undefined;
   }
   return backend as NonNullable<CreateConnectionInput["backend"]>;
-}
-
-function authLabel(mode: AuthMode): MessageKey {
-  return `auth.${mode}` as MessageKey;
-}
-
-function publishLabel(value: ProviderPublishPolicy): MessageKey {
-  return `publish.${value}` as MessageKey;
 }
 
 function pickFields(
@@ -199,16 +194,13 @@ export const ConnectionWizardPage = observer(function ConnectionWizardPage({
       })
     : null;
   const formInvalid = validation !== null && !validation.valid;
-  const showValidation = submitCount > 0 && formInvalid;
-  const idError =
-    validation?.id === "invalid" ||
-    (submitCount > 0 && validation?.id === "empty")
-      ? t("wizard.errorId")
-      : null;
 
   useEffect(() => {
     if (submitCount > 0 && formInvalid) {
-      errorSummaryRef.current?.focus();
+      const form = document.getElementById(`${formId}-form`);
+      const field = form?.querySelector<HTMLElement>('[aria-invalid="true"]');
+      if (field) field.focus();
+      else errorSummaryRef.current?.focus();
     }
     // Focus only follows an explicit submit attempt, not later edits.
   }, [submitCount]);
@@ -455,33 +447,22 @@ export const ConnectionWizardPage = observer(function ConnectionWizardPage({
           <h2>{t("wizard.title")}</h2>
           <p className="muted">{t("wizard.subtitle")}</p>
         </div>
-        <Link
-          className="btn btn-secondary"
-          to="/connections"
-          aria-disabled={busy || undefined}
-          tabIndex={busy ? -1 : undefined}
-          onClick={(event) => {
-            if (busy) {
-              event.preventDefault();
-            }
-          }}
-        >
-          {t("wizard.backToConnections")}
-        </Link>
+        {busy ? <span className="muted">{t("wizard.backToConnections")}</span> : (
+          <Link className="table-link" to="/connections">{t("wizard.backToConnections")}</Link>
+        )}
       </div>
 
-      <ol className="steps">
-        {(["provider", "configure", "done"] as const).map((item, index) => (
-          <li
-            key={item}
-            className={`step ${step === item ? "active" : ""}`}
-            aria-current={step === item ? "step" : undefined}
-          >
-            <span>{index + 1}</span>
-            {t(`wizard.step.${item}` as MessageKey)}
-          </li>
-        ))}
-      </ol>
+      <WizardStepper
+        current={step}
+        hasDraft={provider !== null}
+        created={createdId !== null}
+        busy={busy}
+        onGo={(target) => {
+          if (!canReturnToStep(step, target, provider !== null, createdId !== null, busy)) return;
+          if (target === "provider") backToProviders();
+          else if (target === "configure" && provider) chooseProvider(provider);
+        }}
+      />
 
       {availability !== "ready" ? (
         <Notice
@@ -519,516 +500,52 @@ export const ConnectionWizardPage = observer(function ConnectionWizardPage({
 
       {step === "provider" &&
       (engineReady || providers.loaded || providers.items.length > 0) ? (
-        <Card>
-          <div className="toolbar" role="search">
-            <input
-              ref={providerSearchRef}
-              type="search"
-              className="input"
-              value={query}
-              aria-label={t("wizard.searchLabel")}
-              placeholder={t("wizard.search")}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <Button
-              variant="secondary"
-              disabled={providers.loading || !engineReady}
-              onClick={() => void providers.load(true)}
-            >
-              {providers.loading ? t("common.loading") : t("actions.refresh")}
-            </Button>
-          </div>
-          {providers.error && engineReady ? (
-            <InlineError>{providers.error}</InlineError>
-          ) : null}
-          {providers.loading && !providers.loaded ? (
-            <p className="muted" role="status">
-              {t("common.loading")}
-            </p>
-          ) : filtered.length > 0 ? (
-            <div className="provider-grid">
-              {filtered.map((item) => (
-                <button
-                  key={item.provider}
-                  type="button"
-                  className="provider-card"
-                  onClick={() => chooseProvider(item)}
-                >
-                  <strong>{item.displayName}</strong>
-                  <code>{item.provider}</code>
-                  <span className="badge-row">
-                    {item.capabilities.authModes.map((mode) => (
-                      <span className="badge" key={mode}>
-                        {t(authLabel(mode))}
-                      </span>
-                    ))}
-                    {(
-                      [
-                        ["backfill", item.capabilities.backfill],
-                        ["incremental", item.capabilities.incremental],
-                        ["deletes", item.capabilities.deletes],
-                        ["actions", item.capabilities.actions],
-                      ] as const
-                    )
-                      .filter(([, enabled]) => enabled)
-                      .map(([name]) => (
-                        <span className="badge" key={name}>
-                          {name}
-                        </span>
-                      ))}
-                  </span>
-                  <span className="muted small">
-                    {t("wizard.publish")}:{" "}
-                    {t(publishLabel(item.defaultPublish))}
-                  </span>
-                  {item.backends.length > 1 ? (
-                    <span className="muted small">
-                      {item.backends.join(" / ")}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          ) : providers.loaded ? (
-            <div className="empty-state">
-              <strong>{t("wizard.noProviders")}</strong>
-            </div>
-          ) : engineReady ? (
-            <p className="muted" role="status">
-              {t("common.loading")}
-            </p>
-          ) : null}
-        </Card>
+        <ProviderStep
+          items={filtered}
+          query={query}
+          loading={providers.loading}
+          loaded={providers.loaded}
+          error={providers.error}
+          engineReady={engineReady}
+          searchRef={providerSearchRef}
+          onReload={() => void providers.load(true)}
+          onChoose={chooseProvider}
+          onQueryChange={setQuery}
+        />
       ) : null}
 
-      {step === "configure" && provider ? (
-        <>
-          {draftRestored ? (
-            <Notice
-              variant="info"
-              action={
-                <Button
-                  variant="link"
-                  onClick={() => setDraftRestored(false)}
-                >
-                  {t("actions.dismiss")}
-                </Button>
-              }
-            >
-              <span>{t("wizard.draftRestored")}</span>
-            </Notice>
-          ) : null}
-
-          {/* Keep the focus target mounted after the first submit attempt.
-              Otherwise fixing the last invalid field removes the summary while
-              it holds focus and drops keyboard users back to the document. */}
-          {submitCount > 0 ? (
-            <div
-              ref={errorSummaryRef}
-              id={`${formId}-validation`}
-              tabIndex={-1}
-            >
-              {showValidation ? (
-                <Notice variant="error">
-                  <span>
-                    {t("wizard.errorRequired", {
-                      fields: missingFieldLabels().join(", "),
-                    })}
-                    <br />
-                    {t("wizard.errorFields")}
-                  </span>
-                </Notice>
-              ) : null}
-            </div>
-          ) : null}
-
-          <Card>
-            <div className="card-header">
-              <div>
-                <h3 ref={configureHeadingRef} tabIndex={-1}>
-                  {t("wizard.configureTitle", {
-                    provider: provider.displayName,
-                  })}
-                </h3>
-                <p className="muted small">{provider.provider}</p>
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={busy}
-                onClick={backToProviders}
-              >
-                {t("common.back")}
-              </Button>
-            </div>
-
-            <form
-              noValidate
-              onSubmit={(event) => {
-                event.preventDefault();
-                void submit();
-              }}
-            >
-              <div className="form-grid">
-                <div className="field">
-                  <span>
-                    <label htmlFor={`${formId}-id`}>{t("wizard.id")}</label>
-                    <em className="required">{t("common.required")}</em>
-                  </span>
-                  <input
-                    id={`${formId}-id`}
-                    className="input"
-                    value={id}
-                    placeholder={`${provider.provider}-main`}
-                    required
-                    aria-required="true"
-                    aria-invalid={idError ? true : undefined}
-                    aria-describedby={
-                      idError
-                        ? `${formId}-id-hint ${formId}-id-error`
-                        : `${formId}-id-hint`
-                    }
-                    onChange={(event) => setId(event.target.value)}
-                  />
-                  <small id={`${formId}-id-hint`}>{t("wizard.idHint")}</small>
-                  {idError ? (
-                    <InlineError id={`${formId}-id-error`}>
-                      {idError}
-                    </InlineError>
-                  ) : null}
-                </div>
-
-                <div className="field">
-                  <span>
-                    <label htmlFor={`${formId}-account`}>
-                      {t("wizard.account")}
-                    </label>
-                    <small>{t("common.optional")}</small>
-                  </span>
-                  <input
-                    id={`${formId}-account`}
-                    className="input"
-                    value={account}
-                    onChange={(event) => setAccount(event.target.value)}
-                  />
-                </div>
-
-                <div className="field">
-                  <span>
-                    <label htmlFor={`${formId}-base-url`}>
-                      {t("wizard.baseUrl")}
-                    </label>
-                    <small>{t("common.optional")}</small>
-                  </span>
-                  <input
-                    id={`${formId}-base-url`}
-                    className="input"
-                    value={baseUrl}
-                    onChange={(event) => setBaseUrl(event.target.value)}
-                  />
-                </div>
-
-                <div
-                  className="field"
-                  role="group"
-                  aria-label={t("wizard.authMode")}
-                >
-                  <span>{t("wizard.authMode")}</span>
-                  {provider.capabilities.authModes.length > 1 ? (
-                    <div className="segmented">
-                      {provider.capabilities.authModes.map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={`segment ${authMode === mode ? "active" : ""}`}
-                          aria-pressed={authMode === mode}
-                          onClick={() => setAuthMode(mode)}
-                        >
-                          {t(authLabel(mode))}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="badge">{t(authLabel(authMode))}</span>
-                  )}
-                </div>
-
-                {provider.backends.length > 1 ? (
-                  <div className="field">
-                    <span>
-                      <label htmlFor={`${formId}-backend`}>backend</label>
-                    </span>
-                    <select
-                      id={`${formId}-backend`}
-                      className="input"
-                      value={backend}
-                      onChange={(event) => setBackend(event.target.value)}
-                    >
-                      {provider.backends.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-
-                <div className="field">
-                  <span>
-                    <label htmlFor={`${formId}-schedule`}>
-                      {t("wizard.schedule")}
-                    </label>
-                  </span>
-                  <select
-                    id={`${formId}-schedule`}
-                    className="input"
-                    value={schedule}
-                    onChange={(event) =>
-                      setSchedule(event.target.value as ScheduleChoice)
-                    }
-                  >
-                    <option value="manual">{t("schedule.manual")}</option>
-                    <option value="@hourly">{t("schedule.hourly")}</option>
-                    <option value="@daily">{t("schedule.daily")}</option>
-                    <option value="custom">{t("schedule.custom")}</option>
-                  </select>
-                </div>
-
-                {schedule === "custom" ? (
-                  <div className="field">
-                    <span>
-                      <label htmlFor={`${formId}-custom-schedule`}>
-                        {t("schedule.custom")}
-                      </label>
-                      <em className="required">{t("common.required")}</em>
-                    </span>
-                    <input
-                      id={`${formId}-custom-schedule`}
-                      className="input"
-                      value={customSchedule}
-                      placeholder={t("schedule.customPlaceholder")}
-                      required
-                      aria-required="true"
-                      aria-invalid={
-                        validation?.customScheduleInvalid ? true : undefined
-                      }
-                      aria-describedby={
-                        validation?.customScheduleInvalid
-                          ? `${formId}-custom-schedule-error`
-                          : undefined
-                      }
-                      onChange={(event) =>
-                        setCustomSchedule(event.target.value)
-                      }
-                    />
-                    {validation?.customScheduleInvalid ? (
-                      <InlineError id={`${formId}-custom-schedule-error`}>
-                        {t("detail.scheduleErrorCustom")}
-                      </InlineError>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                <div className="field">
-                  <span>
-                    <label htmlFor={`${formId}-publish`}>
-                      {t("wizard.publish")}
-                    </label>
-                  </span>
-                  <select
-                    id={`${formId}-publish`}
-                    className="input"
-                    value={publish}
-                    onChange={(event) =>
-                      setPublish(event.target.value as ProviderPublishPolicy)
-                    }
-                  >
-                    <option value="local-only">
-                      {t("publish.local-only")}
-                    </option>
-                    <option value="shared">{t("publish.shared")}</option>
-                  </select>
-                </div>
-              </div>
-
-              {provider.configFields.some((field) => !field.secret) ? (
-                <div className="form-section">
-                  <h4>{t("wizard.settings")}</h4>
-                  <div className="form-grid">
-                    {provider.configFields
-                      .filter((field) => !field.secret)
-                      .map((field) => {
-                        const helpId = field.help
-                          ? `${formId}-field-${field.key}-help`
-                          : undefined;
-                        const invalid =
-                          submitCount > 0 &&
-                          (validation?.missingSettings.includes(field.key) ??
-                            false);
-                        return (
-                          <div className="field" key={field.key}>
-                            <span>
-                              <label
-                                htmlFor={`${formId}-field-${field.key}`}
-                              >
-                                {field.label}
-                              </label>
-                              {field.required ? (
-                                <em className="required">
-                                  {t("common.required")}
-                                </em>
-                              ) : (
-                                <small>{t("common.optional")}</small>
-                              )}
-                            </span>
-                            <input
-                              id={`${formId}-field-${field.key}`}
-                              className="input"
-                              value={settings[field.key] ?? ""}
-                              placeholder={field.help}
-                              required={field.required}
-                              aria-required={field.required || undefined}
-                              aria-invalid={invalid || undefined}
-                              aria-describedby={
-                                [
-                                  helpId,
-                                  invalid ? `${formId}-validation` : undefined,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" ") || undefined
-                              }
-                              onChange={(event) =>
-                                setSettings((current) => ({
-                                  ...current,
-                                  [field.key]: event.target.value,
-                                }))
-                              }
-                            />
-                            {field.help ? (
-                              <small id={helpId}>{field.help}</small>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              ) : null}
-
-              {oauth ? (
-                <Notice variant="info">
-                  <span>{t("wizard.oauthNote")}</span>
-                </Notice>
-              ) : provider.configFields.some((field) => field.secret) ? (
-                <div className="form-section">
-                  <h4>{t("wizard.secrets")}</h4>
-                  <p className="muted small">{t("wizard.secretNote")}</p>
-                  <div className="form-grid">
-                    {provider.configFields
-                      .filter((field) => field.secret)
-                      .map((field) => {
-                        const helpId = field.help
-                          ? `${formId}-secret-${field.key}-help`
-                          : undefined;
-                        const invalid =
-                          submitCount > 0 &&
-                          (validation?.missingSecrets.includes(field.key) ??
-                            false);
-                        return (
-                          <div className="field" key={field.key}>
-                            <span>
-                              <label htmlFor={`${formId}-secret-${field.key}`}>
-                                {field.label}
-                              </label>
-                              {field.required ? (
-                                <em className="required">
-                                  {t("common.required")}
-                                </em>
-                              ) : (
-                                <small>{t("common.optional")}</small>
-                              )}
-                            </span>
-                            <input
-                              id={`${formId}-secret-${field.key}`}
-                              className="input"
-                              type="password"
-                              autoComplete="off"
-                              value={secrets[field.key] ?? ""}
-                              placeholder={t("wizard.secretPlaceholder")}
-                              required={field.required}
-                              aria-required={field.required || undefined}
-                              aria-invalid={invalid || undefined}
-                              aria-describedby={
-                                [
-                                  helpId,
-                                  invalid ? `${formId}-validation` : undefined,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" ") || undefined
-                              }
-                              onChange={(event) =>
-                                setSecrets((current) => ({
-                                  ...current,
-                                  [field.key]: event.target.value,
-                                }))
-                              }
-                            />
-                            {field.help ? (
-                              <small id={helpId}>{field.help}</small>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              ) : null}
-
-              {projects.items.length > 0 ? (
-                <div className="form-section">
-                  <h4>
-                    {t("wizard.projects")} <small>{t("common.optional")}</small>
-                  </h4>
-                  <div
-                    className="checkbox-grid"
-                    role="group"
-                    aria-label={t("wizard.projects")}
-                  >
-                    {projects.items.map((project) => (
-                      <label className="checkbox" key={project.id}>
-                        <input
-                          type="checkbox"
-                          checked={selectedProjects.includes(project.id)}
-                          onChange={(event) =>
-                            setSelectedProjects((current) =>
-                              event.target.checked
-                                ? [...current, project.id]
-                                : current.filter(
-                                    (item) => item !== project.id,
-                                  ),
-                            )
-                          }
-                        />
-                        <span>{project.name || project.id}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <p className="muted small">{t("wizard.noProjects")}</p>
-              )}
-
-              <div className="form-actions">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  disabled={busy || !engineReady || engine.isUpdating}
-                  aria-busy={busy}
-                >
-                  {busy ? t("wizard.creating") : t("wizard.create")}
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </>
+      {step === "configure" && provider && validation ? (
+        <ConfigureStep
+          provider={provider}
+          draft={{id, account, baseUrl, authMode, backend, schedule, customSchedule, publish, selectedProjects, settings, secrets}}
+          formId={formId}
+          draftRestored={draftRestored}
+          submitCount={submitCount}
+          validation={validation}
+          missingLabels={missingFieldLabels()}
+          busy={busy}
+          engineReady={engineReady}
+          updating={engine.isUpdating}
+          projects={projects.items}
+          headingRef={configureHeadingRef}
+          summaryRef={errorSummaryRef}
+          onDismissDraft={() => setDraftRestored(false)}
+          onBack={backToProviders}
+          onSubmit={() => void submit()}
+          onChange={(patch) => {
+            if (patch.id !== undefined) setId(patch.id);
+            if (patch.account !== undefined) setAccount(patch.account);
+            if (patch.baseUrl !== undefined) setBaseUrl(patch.baseUrl);
+            if (patch.authMode !== undefined) setAuthMode(patch.authMode);
+            if (patch.backend !== undefined) setBackend(patch.backend);
+            if (patch.schedule !== undefined) setSchedule(patch.schedule);
+            if (patch.customSchedule !== undefined) setCustomSchedule(patch.customSchedule);
+            if (patch.publish !== undefined) setPublish(patch.publish);
+            if (patch.selectedProjects !== undefined) setSelectedProjects(patch.selectedProjects);
+            if (patch.settings !== undefined) setSettings(patch.settings);
+            if (patch.secrets !== undefined) setSecrets(patch.secrets);
+          }}
+        />
       ) : null}
 
       {step === "done" && createdId ? (
@@ -1061,7 +578,7 @@ export const ConnectionWizardPage = observer(function ConnectionWizardPage({
             </h3>
             <div className="page-actions">
               <Link
-                className="btn btn-primary"
+                className="table-link"
                 to={`/connections/${encodeURIComponent(createdId)}`}
               >
                 {t("wizard.open")}

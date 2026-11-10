@@ -4,7 +4,10 @@ import { Link } from "react-router-dom";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
-import { InlineError } from "@/shared/ui/InlineError";
+import { Notice } from "@/shared/ui/Notice";
+import { Loading } from "@/shared/ui/Loading";
+import { EmptyState } from "@/shared/ui/EmptyState";
+import { Table } from "@/shared/ui/Table";
 import { useI18n } from "@/shared/i18n";
 
 export const ProjectsPage = observer(function ProjectsPage({
@@ -26,7 +29,7 @@ export const ProjectsPage = observer(function ProjectsPage({
           <p className="muted">{t("projects.subtitle")}</p>
         </div>
         <Button
-          variant="secondary"
+          variant="primary"
           disabled={projects.loading}
           onClick={() => void projects.load(true)}
         >
@@ -34,42 +37,32 @@ export const ProjectsPage = observer(function ProjectsPage({
         </Button>
       </div>
 
-      {projects.error ? <InlineError>{projects.error}</InlineError> : null}
+      {projects.error ? <Notice variant="error" action={<Button variant="link" disabled={projects.loading} onClick={() => void projects.load(true)}>{t("actions.retry")}</Button>}><span>{projects.error}</span></Notice> : null}
 
       <Card>
         {!projects.loaded && !projects.error ? (
-          <p className="muted" role="status">
-            {t("common.loading")}
-          </p>
+          <Loading label={`${t("common.loading")} ${t("projects.title")}`} />
         ) : projects.loaded && projects.items.length === 0 ? (
-          <div className="empty-state">
-            <strong>{t("projects.empty")}</strong>
-            <span>{t("projects.subtitle")}</span>
-            <Link className="btn btn-secondary" to="/connections/new">
-              {t("connections.add")}
-            </Link>
-          </div>
+          <EmptyState title={t("projects.empty")} hint={t("projects.subtitle")} action={<Link className="text-link" to="/connections">{t("nav.connections")}</Link>} />
         ) : projects.items.length > 0 ? (
-          <div className="table-wrap">
-            <table className="data-table">
+            <Table caption={t("projects.subtitle")}>
               <thead>
                 <tr>
-                  <th>{t("projects.id")}</th>
-                  <th>{t("common.name")}</th>
+                  <th scope="col">{t("projects.id")}</th>
+                  <th scope="col">{t("common.name")}</th>
                 </tr>
               </thead>
               <tbody>
                 {projects.items.map((project) => (
                   <tr key={project.id}>
-                    <td>
+                    <td data-label={t("projects.id")}>
                       <code>{project.id}</code>
                     </td>
-                    <td>{project.name || t("common.none")}</td>
+                    <td data-label={t("common.name")}>{project.name || t("common.none")}</td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+            </Table>
         ) : null}
       </Card>
     </div>

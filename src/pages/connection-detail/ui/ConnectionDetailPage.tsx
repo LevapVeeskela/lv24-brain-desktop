@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { connectionAuthApi } from "@/entities/connection/api/connectionAuthApi";
 import { engineAvailability } from "@/entities/connection/model/engineAvailability";
@@ -22,6 +22,8 @@ import { Card } from "@/shared/ui/Card";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { InlineError } from "@/shared/ui/InlineError";
 import { Notice } from "@/shared/ui/Notice";
+import { Loading } from "@/shared/ui/Loading";
+import { useFeedback } from "@/shared/ui/Feedback";
 import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { errorMessage } from "@/shared/lib/errors";
@@ -57,6 +59,8 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
   engine,
 }: ConnectionDetailProps & { id: string }) {
   const { t, locale } = useI18n();
+  const { notify } = useFeedback();
+  const location = useLocation();
   const api = useMemo(() => new ConnectionApi(), []);
   const formId = useId();
   const scheduleSelectId = `${formId}-schedule`;
@@ -69,8 +73,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
   const [connection, setConnection] = useState<Connection | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<DetailError | null>(null);
-  const [error, setError] = useState<DetailError | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [secretsVersion, setSecretsVersion] = useState(0);
@@ -82,6 +84,8 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     Record<string, string>
   >({});
   const [storedSecrets, setStoredSecrets] = useState<Set<string> | null>(null);
+  const [secretsLoading, setSecretsLoading] = useState(false);
+  const [secretsError, setSecretsError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleted, setDeleted] = useState(false);
@@ -96,7 +100,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
   const deletedBackRef = useRef<HTMLAnchorElement>(null);
   const oauthHintsRef = useRef<HTMLDivElement>(null);
   const oauthOutputRef = useRef<HTMLPreElement>(null);
-  const errorTextRef = useRef<HTMLSpanElement>(null);
 
   const descriptor = connection
     ? providers.find(connection.provider)
@@ -188,10 +191,14 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
   useEffect(() => {
     if (!connectionId || !engine.isRunning) {
       setStoredSecrets(null);
+      setSecretsLoading(false);
+      setSecretsError(null);
       return;
     }
     let cancelled = false;
     setStoredSecrets(null);
+    setSecretsLoading(true);
+    setSecretsError(null);
     void settingsApi
       .secretNames()
       .then((names) => {
@@ -201,10 +208,14 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
           );
         }
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (!cancelled) {
           setStoredSecrets(null);
+          setSecretsError(errorMessage(cause));
         }
+      })
+      .finally(() => {
+        if (!cancelled) setSecretsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -236,14 +247,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     }
   }, [oauthLines]);
 
-  useEffect(() => {
-    if (error) {
-      // Make a mutation failure visible even when it was triggered from the
-      // bottom of a long page.
-      errorTextRef.current?.scrollIntoView({ block: "nearest" });
-    }
-  }, [error]);
-
   const act = async (
     name: string,
     action: () => Promise<void>,
@@ -252,12 +255,10 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
       return;
     }
     setBusy(name);
-    setMessage(null);
-    setError(null);
     try {
       await action();
     } catch (cause) {
-      setError({ detail: errorMessage(cause) });
+      notify(`${id}: ${errorMessage(cause)}`, "error");
     } finally {
       setBusy(null);
     }
@@ -289,7 +290,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     void act("schedule", async () => {
       await api.setSchedule(connection.id, expression);
       setConnection({ ...connection, schedule: expression });
-      setMessage(t("detail.scheduleSaved"));
+      notify(`${id}: ${t("detail.scheduleSaved")}`, "success");
     });
   };
 
@@ -309,7 +310,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         next.add(credentialSecretName(connection.id, field));
         return next;
       });
-      setMessage(t("detail.credentialSaved"));
+      notify(`${id}: ${t("detail.credentialSaved")}`, "success");
     });
   };
 
@@ -320,7 +321,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     setOauthRunning(true);
     setOauthLines([]);
     setOauthResult(null);
-    setError(null);
     let unlisten: (() => void) | null = null;
     try {
       unlisten = await connectionAuthApi.onLine((line) => {
@@ -340,15 +340,13 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         setSecretsVersion((current) => current + 1);
         try {
           await api.test(connection.id);
-          setMessage(t("connections.testOk"));
+          notify(`${id}: ${t("connections.testOk")}`, "success");
         } catch (cause) {
-          setError({
-            detail: `${t("connections.testFailed")} ${errorMessage(cause)}`,
-          });
+          notify(`${t("connections.testFailed")} ${errorMessage(cause)}`, "error");
         }
       }
     } catch (cause) {
-      setError({ detail: errorMessage(cause) });
+      notify(`${id}: ${errorMessage(cause)}`, "error");
     } finally {
       unlisten?.();
       setOauthRunning(false);
@@ -362,7 +360,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     void (async () => {
       setBusy("delete");
       setDeleteError(null);
-      setMessage(null);
       try {
         await api.remove(connection.id);
         setConfirmDelete(false);
@@ -383,9 +380,6 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
     ? [loadError.key ? t(loadError.key) : null, loadError.detail]
         .filter(Boolean)
         .join(" ")
-    : "";
-  const errorText = error
-    ? [error.key ? t(error.key) : null, error.detail].filter(Boolean).join(" ")
     : "";
   const engineActionLabel =
     engine.busy === "start"
@@ -429,9 +423,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
 
   if (loading) {
     return (
-      <p className="muted" role="status">
-        {t("common.loading")}
-      </p>
+      <div className="page"><h2>{id}</h2><Loading label={t("common.loading")} /></div>
     );
   }
 
@@ -445,7 +437,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         <div className="page-actions">
           <Link
             ref={deletedBackRef}
-            className="btn btn-secondary"
+            className="text-link"
             to="/connections"
           >
             {t("detail.back")}
@@ -483,7 +475,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
           </Notice>
         ) : null}
         <div className="page-actions">
-          <Link className="btn btn-secondary" to="/connections">
+          <Link className="table-link" to="/connections">
             {t("detail.back")}
           </Link>
         </div>
@@ -492,6 +484,23 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
   }
 
   const settingsEntries = Object.entries(connection.settings ?? {});
+  const latestRun = connectionRuns.reduce<(typeof connectionRuns)[number] | undefined>((latest, run) =>
+    !latest || Date.parse(run.startedAt) > Date.parse(latest.startedAt) ? run : latest, undefined);
+  const sections = [
+    { suffix: "overview", label: t("detail.overview") },
+    { suffix: "schedule-section", label: t("detail.schedule") },
+    ...(oauthModes.length ? [{ suffix: "oauth-section", label: t("detail.oauth") }] : []),
+    ...(descriptor?.configFields.some((field) => field.secret) ? [{ suffix: "credentials-section", label: t("detail.credentials") }] : []),
+    { suffix: "runs-section", label: t("detail.runs") },
+    { suffix: "danger-section", label: t("detail.delete") },
+  ];
+  const jumpTo = (suffix: string): void => {
+    const heading = document.getElementById(`${formId}-${suffix}`);
+    if (heading instanceof HTMLElement) {
+      heading.focus({ preventScroll: true });
+      heading.scrollIntoView({ block: "start" });
+    }
+  };
 
   return (
     <div className="page">
@@ -505,7 +514,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
           </p>
         </div>
         <div className="page-actions">
-          <Link className="btn btn-secondary" to="/connections">
+          <Link className="table-link" to="/connections">
             {t("detail.back")}
           </Link>
           <Button
@@ -514,7 +523,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
             onClick={() =>
               void act("test", async () => {
                 await api.test(connection.id);
-                setMessage(t("connections.testOk"));
+                notify(`${id}: ${t("connections.testOk")}`, "success");
               })
             }
           >
@@ -526,9 +535,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
             onClick={() =>
               void act("run", async () => {
                 const result = await api.run(connection.id);
-                setMessage(
-                  t("connections.runQueued", { jobId: result.jobId }),
-                );
+                notify(t("connections.runQueued", { jobId: result.jobId }), "success");
                 await runs.load(true);
               })
             }
@@ -563,39 +570,35 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
           <span>{loadErrorText}</span>
         </Notice>
       ) : null}
-      {error ? (
-        <Notice
-          variant="error"
-          action={
-            <Button variant="link" onClick={() => setError(null)}>
-              {t("actions.dismiss")}
-            </Button>
-          }
-        >
-          <span ref={errorTextRef}>{errorText}</span>
-        </Notice>
-      ) : null}
       {providers.loaded && !descriptor ? (
         <Notice variant="info">
           <span>{t("detail.unknownProvider")}</span>
         </Notice>
       ) : null}
-      {message ? (
-        <Notice
-          variant="info"
-          action={
-            <Button variant="link" onClick={() => setMessage(null)}>
-              {t("actions.dismiss")}
-            </Button>
-          }
-        >
-          <span>{message}</span>
-        </Notice>
-      ) : null}
+      <nav className="detail-sections" aria-label={t("detail.sections")}>
+        {sections.map((section) => (
+          <a key={section.suffix} className="table-link" href={`#${location.pathname}#${formId}-${section.suffix}`} onClick={(event) => {
+            event.preventDefault();
+            jumpTo(section.suffix);
+          }}>{section.label}</a>
+        ))}
+      </nav>
+      <Card className="connection-health">
+        <div className="card-header">
+          <div>
+            <h3>{t("detail.lastKnownRun")}</h3>
+            {latestRun ? <p><span className={`run-status run-${latestRun.status}`}>{t(`runStatus.${latestRun.status}`)}</span> <span className="muted">{formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, locale)}</span></p> : <p className="muted">{runs.error ?? (runs.loaded ? t("detail.historyUnknown") : t("common.loading"))}</p>}
+          </div>
+          {latestRun ? <Button variant="secondary" onClick={() => {
+            void runs.openLog(latestRun.id);
+            jumpTo("runs-section");
+          }}>{t("detail.openLog")}</Button> : runs.error ? <Button variant="secondary" disabled={runs.loading || !engineReady} onClick={() => void runs.load(true)}>{t("actions.retry")}</Button> : null}
+        </div>
+      </Card>
 
       <div className="grid">
         <Card>
-          <h3>{t("detail.overview")}</h3>
+          <h3 id={`${formId}-overview`} tabIndex={-1}>{t("detail.overview")}</h3>
           <dl className="details">
             <dt>{t("connections.provider")}</dt>
             <dd>{connection.provider}</dd>
@@ -632,7 +635,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         </Card>
 
         <Card>
-          <h3>{t("detail.schedule")}</h3>
+          <h3 id={`${formId}-schedule-section`} tabIndex={-1}>{t("detail.schedule")}</h3>
           <div className="form-grid">
             <div className="field">
               <label className="muted small" htmlFor={scheduleSelectId}>
@@ -700,7 +703,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
 
       {oauthModes.length > 0 ? (
         <Card>
-          <h3>{t("detail.oauth")}</h3>
+          <h3 id={`${formId}-oauth-section`} tabIndex={-1}>{t("detail.oauth")}</h3>
           <p className="muted small">{t("detail.oauthHint")}</p>
           <div className="form-grid">
             <label className="field" htmlFor={oauthClientId}>
@@ -784,8 +787,14 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
 
       {descriptor?.configFields.some((field) => field.secret) ? (
         <Card>
-          <h3>{t("detail.credentials")}</h3>
+          <h3 id={`${formId}-credentials-section`} tabIndex={-1}>{t("detail.credentials")}</h3>
           <p className="muted small">{t("detail.credentialsNote")}</p>
+          {secretsLoading ? <Loading label={t("detail.credentials")} /> : null}
+          {secretsError ? (
+            <Notice variant="error" action={<Button variant="link" disabled={!engineReady || secretsLoading} onClick={() => setSecretsVersion((version) => version + 1)}>{t("actions.retry")}</Button>}>
+              <span>{t("detail.secretUnknown")} {secretsError}</span>
+            </Notice>
+          ) : null}
           <div className="form-grid">
             {descriptor.configFields
               .filter((field) => field.secret)
@@ -796,7 +805,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
                 const describedBy =
                   [
                     field.help ? helpId : null,
-                    storedSecrets ? stateId : null,
+                    stateId,
                   ]
                     .filter(Boolean)
                     .join(" ") || undefined;
@@ -846,13 +855,11 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
                       </Button>
                     </div>
                     {field.help ? <small id={helpId}>{field.help}</small> : null}
-                    {stored !== null ? (
-                      <small id={stateId}>
-                        {stored
-                          ? t("detail.secretStored")
-                          : t("detail.secretNotSet")}
-                      </small>
-                    ) : null}
+                    <small id={stateId}>
+                      {stored === null
+                        ? secretsLoading ? t("common.loading") : t("detail.secretUnknown")
+                        : stored ? t("detail.secretStored") : t("detail.secretNotSet")}
+                    </small>
                   </div>
                 );
               })}
@@ -863,7 +870,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
       <Card>
         <div className="card-header">
           <div>
-            <h3>{t("detail.runs")}</h3>
+            <h3 id={`${formId}-runs-section`} tabIndex={-1}>{t("detail.runs")}</h3>
             {runs.loaded && runs.items.length >= RUN_LIST_LIMIT ? (
               <p className="muted small">
                 {t("activity.subtitle")} · {runs.items.length}
@@ -899,18 +906,18 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
               <tbody>
                 {connectionRuns.map((run) => (
                   <tr key={run.id}>
-                    <td>{formatDateTime(run.startedAt, locale)}</td>
-                    <td>
+                    <td data-label={t("common.started")}>{formatDateTime(run.startedAt, locale)}</td>
+                    <td data-label={t("common.status")}>
                       <span className={`run-status run-${run.status}`}>
                         {t(`runStatus.${run.status}`)}
                       </span>
                     </td>
-                    <td>
+                    <td data-label={t("activity.counts")}>
                       {run.stats
                         ? `${run.stats.upserted}/${run.stats.seen}`
                         : (run.counts?.items ?? t("common.none"))}
                     </td>
-                    <td>
+                    <td data-label={t("common.actions")}>
                       <Button
                         variant="secondary"
                         className="btn-small"
@@ -929,12 +936,11 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
       </Card>
 
-      <Card>
-        <h3>{t("detail.delete")}</h3>
+      <Card className="danger-zone">
+        <h3 id={`${formId}-danger-section`} tabIndex={-1}>{t("detail.delete")}</h3>
         <p className="muted small">{t("detail.deleteConfirm")}</p>
         <Button
-          variant="secondary"
-          className="btn-danger"
+          variant="danger"
           disabled={mutationLocked || !engineReady}
           onClick={() => {
             setDeleteError(null);
@@ -963,6 +969,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         }}
       >
         {deleteError ? <InlineError>{deleteError}</InlineError> : null}
+        <p><strong>{connection.id}</strong></p>
         <p>{t("detail.deleteDanger")}</p>
       </ConfirmDialog>
     </div>

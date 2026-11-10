@@ -1,32 +1,43 @@
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react-lite";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { engineAvailability } from "@/entities/connection/model/engineAvailability";
 import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import type { Connection } from "@/entities/connection/model/types";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
+import type { RunsStore } from "@/entities/run/model/RunsStore";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
+import { Input } from "@/shared/ui/Input";
+import { Select } from "@/shared/ui/Select";
+import { Loading } from "@/shared/ui/Loading";
+import { EmptyState } from "@/shared/ui/EmptyState";
+import { Table } from "@/shared/ui/Table";
+import { useFeedback } from "@/shared/ui/Feedback";
+import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { useI18n } from "@/shared/i18n";
 import { errorMessage } from "@/shared/lib/errors";
-
-type Feedback = { kind: "info" | "error"; text: string } | null;
+import { formatDateTime } from "@/shared/lib/format";
+import { selectConnections, type ConnectionSort, type HealthFilter } from "../model/health";
 
 export const ConnectionsPage = observer(function ConnectionsPage({
   connections,
   engine,
+  runs,
 }: {
   connections: ConnectionsStore;
   engine: EngineStore;
+  runs: RunsStore;
 }) {
-  const { t } = useI18n();
-  const navigate = useNavigate();
+  const { t, locale } = useI18n();
+  const { notify } = useFeedback();
   const api = useMemo(() => new ConnectionApi(), []);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Feedback>(null);
+  const [filter, setFilter] = useState<HealthFilter>("all");
+  const [sort, setSort] = useState<ConnectionSort>("status");
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +67,11 @@ export const ConnectionsPage = observer(function ConnectionsPage({
     !engineReady || busy !== null || engine.isUpdating;
 
   useEffect(() => {
+    if (engineReady) void runs.load(true);
+    return () => { void runs.resetLog(); };
+  }, [engineReady, runs]);
+
+  useEffect(() => {
     if (engineReady) {
       setStartError(null);
     }
@@ -69,46 +85,36 @@ export const ConnectionsPage = observer(function ConnectionsPage({
     }
   };
 
-  const filtered = connections.items.filter((connection) => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) {
-      return true;
-    }
-    return [connection.id, connection.provider, connection.account ?? ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(needle);
-  });
+  const filtered = selectConnections(connections.items, runs.items, query, filter, sort);
+  const refresh = () => {
+    void connections.load(true);
+    void runs.load(true);
+  };
 
   const act = async (
     connection: Connection,
     action: "run" | "test",
   ): Promise<void> => {
-    if (!engineReady || engine.isUpdating) {
+    if (!engineReady || engine.isUpdating || busy !== null) {
       return;
     }
     const key = `${connection.id}:${action}`;
     setBusy(key);
-    setFeedback(null);
     try {
       if (action === "run") {
         const result = await api.run(connection.id);
-        setFeedback({
-          kind: "info",
-          text: t("connections.runQueued", { jobId: result.jobId }),
-        });
+        notify(t("connections.runQueued", { jobId: result.jobId }), "success");
       } else {
         await api.test(connection.id);
-        setFeedback({ kind: "info", text: t("connections.testOk") });
+        notify(t("connections.testOk"), "success");
       }
     } catch (cause) {
-      setFeedback({
-        kind: "error",
-        text:
-          action === "test"
-            ? `${t("connections.testFailed")} ${errorMessage(cause)}`
-            : errorMessage(cause),
-      });
+      notify(
+        action === "test"
+          ? `${t("connections.testFailed")} ${errorMessage(cause)}`
+          : errorMessage(cause),
+        "error",
+      );
     } finally {
       setBusy(null);
     }
@@ -126,34 +132,30 @@ export const ConnectionsPage = observer(function ConnectionsPage({
       !connections.loaded &&
       connections.items.length === 0
     ) {
-      return (
-        <p className="muted" role="status">
-          {t("common.loading")}
-        </p>
-      );
+      return <Loading label={t("connections.loading")} />;
     }
 
     if (filtered.length > 0) {
       return (
-        <div className="table-wrap" aria-busy={connections.loading || undefined}>
-          <table className="data-table">
+        <div aria-busy={connections.loading || undefined}>
+          <Table className="connections-table" caption={t("connections.subtitle")}>
             <thead>
               <tr>
-                <th>{t("common.id")}</th>
-                <th>{t("connections.provider")}</th>
-                <th>{t("connections.schedule")}</th>
-                <th>{t("common.actions")}</th>
+                <th scope="col">{t("common.name")}</th>
+                <th scope="col">{t("connections.health")}</th>
+                <th scope="col">{t("connections.lastRun")}</th>
+                <th scope="col">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((connection) => {
+              {filtered.map(({ connection, run }) => {
                 const schedule =
                   !connection.schedule || connection.schedule === "manual"
                     ? t("connections.scheduleManual")
                     : connection.schedule;
                 return (
                   <tr key={connection.id}>
-                    <td>
+                    <td data-label={t("common.name")}>
                       <Link
                         className="table-link"
                         to={`/connections/${encodeURIComponent(connection.id)}`}
@@ -163,20 +165,23 @@ export const ConnectionsPage = observer(function ConnectionsPage({
                       {connection.account ? (
                         <span className="table-sub">{connection.account}</span>
                       ) : null}
+                      <span className="table-sub">{connection.provider} · {schedule}</span>
                     </td>
-                    <td>{connection.provider}</td>
-                    <td>
-                      <span className="badge">{schedule}</span>
+                    <td data-label={t("connections.health")}>
+                      {run ? (
+                        <span className={`run-status run-${run.status}`}>{t(`runStatus.${run.status}`)}</span>
+                      ) : <span className="muted small">{runs.loading ? t("common.loading") : t("connections.historyUnknown")}</span>}
+                      {run && (run.status === "failed" || run.status === "partial") ? (
+                        <span className="table-sub connection-result">
+                          <Button variant="link" onClick={() => void runs.openLog(run.id)}>{t("detail.openLog")}</Button>
+                        </span>
+                      ) : null}
                     </td>
-                    <td>
+                    <td data-label={t("connections.lastRun")}>
+                      {run ? <time dateTime={run.startedAt}>{formatDateTime(run.startedAt, locale)}</time> : t("common.none")}
+                    </td>
+                    <td data-label={t("common.actions")}>
                       <div className="row-actions">
-                        <Link
-                          className="btn btn-secondary btn-small"
-                          to={`/connections/${encodeURIComponent(connection.id)}`}
-                          aria-label={`${t("connections.open")} ${connection.id}`}
-                        >
-                          {t("connections.open")}
-                        </Link>
                         <Button
                           variant="secondary"
                           className="btn-small"
@@ -207,33 +212,24 @@ export const ConnectionsPage = observer(function ConnectionsPage({
                 );
               })}
             </tbody>
-          </table>
+          </Table>
         </div>
       );
     }
 
-    if (!connections.loaded && connections.items.length === 0) {
-      return (
-        <p className="muted" role="status">
-          {t("common.loading")}
-        </p>
-      );
+    if (!connections.loaded && connections.items.length === 0 && !connections.error) {
+      return <Loading label={t("connections.loading")} />;
     }
 
-    if (query.trim()) {
+    if (query.trim() || filter !== "all") {
       return (
-        <div className="empty-state">
-          <strong>{t("connections.noMatches")}</strong>
-        </div>
+        <EmptyState title={t("connections.noMatches")} action={<Button variant="link" onClick={() => { setQuery(""); setFilter("all"); }}>{t("connections.clearFilters")}</Button>} />
       );
     }
 
     if (connections.loaded && connections.items.length === 0) {
       return (
-        <div className="empty-state">
-          <strong>{t("connections.empty")}</strong>
-          <span>{t("connections.emptyHint")}</span>
-        </div>
+        <EmptyState title={t("connections.empty")} hint={t("connections.emptyHint")} action={engineReady ? <Link to="/connections/new" className="text-link">{t("connections.add")}</Link> : undefined} />
       );
     }
 
@@ -251,32 +247,15 @@ export const ConnectionsPage = observer(function ConnectionsPage({
           <Button
             variant="secondary"
             disabled={connections.loading || !engineReady}
-            onClick={() => void connections.load(true)}
+            onClick={refresh}
           >
             {connections.loading ? t("common.loading") : t("actions.refresh")}
           </Button>
-          <Button
-            variant="primary"
-            disabled={!engineReady}
-            onClick={() => navigate("/connections/new")}
-          >
+          {engineReady ? <Link to="/connections/new" className="text-link">
             {t("connections.add")}
-          </Button>
+          </Link> : <span className="muted" aria-disabled="true">{t("connections.add")}</span>}
         </div>
       </div>
-
-      {feedback ? (
-        <Notice
-          variant={feedback.kind}
-          action={
-            <Button variant="link" onClick={() => setFeedback(null)}>
-              {t("actions.dismiss")}
-            </Button>
-          }
-        >
-          <span>{feedback.text}</span>
-        </Notice>
-      ) : null}
 
       {connections.error ? (
         <Notice
@@ -285,7 +264,7 @@ export const ConnectionsPage = observer(function ConnectionsPage({
             <Button
               variant="link"
               disabled={!engineReady || connections.loading}
-              onClick={() => void connections.load(true)}
+              onClick={refresh}
             >
               {t("actions.retry")}
             </Button>
@@ -294,6 +273,12 @@ export const ConnectionsPage = observer(function ConnectionsPage({
           <span>
             {t("connections.error")} {connections.error}
           </span>
+        </Notice>
+      ) : null}
+
+      {runs.error && engineReady ? (
+        <Notice variant="error" action={<Button variant="link" disabled={runs.loading} onClick={() => void runs.load(true)}>{t("actions.retry")}</Button>}>
+          <span>{runs.error}</span>
         </Notice>
       ) : null}
 
@@ -320,23 +305,37 @@ export const ConnectionsPage = observer(function ConnectionsPage({
 
       {showCard ? (
         <Card>
-          <div className="toolbar" role="search">
-            <input
-              type="search"
-              className="input"
-              value={query}
-              aria-label={t("connections.searchLabel")}
-              placeholder={t("connections.searchPlaceholder")}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <span className="muted small">
-              {t("connections.count", { count: filtered.length })}
-            </span>
+          <div className="connections-controls">
+            {connections.items.length > 8 || query || filter !== "all" ? <>
+              <label className="field">
+                <span>{t("connections.searchLabel")}</span>
+                <Input type="search" value={query} placeholder={t("connections.searchPlaceholder")} onChange={(event) => setQuery(event.target.value)} />
+              </label>
+              <label className="field">
+                <span>{t("connections.filterStatus")}</span>
+                <Select value={filter} onChange={(event) => setFilter(event.target.value as HealthFilter)}>
+                  <option value="all">{t("connections.allStatuses")}</option>
+                  {(["failed", "partial", "running", "success"] as const).map((status) => <option key={status} value={status}>{t(`runStatus.${status}`)}</option>)}
+                  <option value="unknown">{t("connections.historyUnknown")}</option>
+                </Select>
+              </label>
+            </> : null}
+            {connections.items.length > 1 ? <label className="field">
+              <span>{t("connections.sort")}</span>
+              <Select value={sort} onChange={(event) => setSort(event.target.value as ConnectionSort)}>
+                <option value="name">{t("connections.sortName")}</option>
+                <option value="status">{t("connections.sortStatus")}</option>
+                <option value="recent">{t("connections.sortRecent")}</option>
+              </Select>
+            </label> : null}
           </div>
+          <p className="muted small">{t("connections.count", { count: filtered.length })}</p>
 
           {renderBody()}
+          {connections.items.length > 0 ? <p className="muted small">{t("connections.historyNote")}</p> : null}
         </Card>
       ) : null}
+      {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
     </div>
   );
 });

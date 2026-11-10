@@ -1,3 +1,4 @@
+import { Tabs } from "@/shared/ui/Tabs";
 import { useEffect, useState } from "react";
 import { observer } from "mobx-react-lite";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
@@ -9,6 +10,8 @@ import { UpdateCheck } from "@/features/update-check/ui/UpdateCheck";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
+import { Loading } from "@/shared/ui/Loading";
+import { EmptyState } from "@/shared/ui/EmptyState";
 import { useI18n } from "@/shared/i18n";
 import { errorMessage } from "@/shared/lib/errors";
 
@@ -58,7 +61,16 @@ export const SettingsPage = observer(function SettingsPage({
         </div>
       </div>
 
-      <div className="grid">
+      <Tabs label={t("settings.title")} items={[
+        { id: "preferences", label: t("settings.preferences"), content: <div className="grid">        <Card>
+          <h3>{t("settings.language")}</h3>
+          <LocaleSwitch />
+        </Card>
+
+        <AutostartToggle engine={engine} />
+        <UpdateCheck settings={settings} />
+</div> },
+        { id: "diagnostics", label: t("settings.diagnostics"), content: <div className="page">
         <Card>
           <h3>{t("settings.paths")}</h3>
           <dl className="details paths">
@@ -83,18 +95,7 @@ export const SettingsPage = observer(function SettingsPage({
             <dt>{t("settings.updateChannel")}</dt>
             <dd>{status?.updateChannel ?? t("common.none")}</dd>
           </dl>
-        </Card>
-
-        <Card>
-          <h3>{t("settings.language")}</h3>
-          <LocaleSwitch />
-        </Card>
-
-        <AutostartToggle engine={engine} />
-        <UpdateCheck settings={settings} />
-      </div>
-
-      <Card>
+        </Card>      <Card>
         <div className="card-header">
           <div>
             <h3>{t("settings.keychain")}</h3>
@@ -102,7 +103,7 @@ export const SettingsPage = observer(function SettingsPage({
           </div>
           <Button
             variant="secondary"
-            aria-disabled={secretsLoading}
+            disabled={secretsLoading}
             aria-busy={secretsLoading}
             onClick={() => {
               if (!secretsLoading) {
@@ -116,13 +117,14 @@ export const SettingsPage = observer(function SettingsPage({
           </Button>
         </div>
         {secretsError ? (
-          <Notice variant="error">
+          <Notice variant="error" action={<Button variant="link" disabled={secretsLoading} onClick={() => void loadSecrets()}>{t("actions.retry")}</Button>}>
             <span>{secretsError}</span>
           </Notice>
         ) : null}
         {!secretsError && loaded && secrets.length === 0 ? (
-          <p className="muted small">{t("settings.secretsEmpty")}</p>
+          <EmptyState title={t("settings.secretsEmpty")} hint={t("settings.keychainNote")} />
         ) : null}
+        {secretsLoading && !loaded ? <Loading label={t("settings.secretsLoading")} /> : null}
         {secrets.length > 0 ? (
           <ul className="secret-list">
             {secrets.map((name) => (
@@ -132,7 +134,8 @@ export const SettingsPage = observer(function SettingsPage({
             ))}
           </ul>
         ) : null}
-      </Card>
+      </Card></div> },
+      ]} />
     </div>
   );
 });

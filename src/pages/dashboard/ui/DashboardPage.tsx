@@ -5,31 +5,61 @@ import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsSt
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
-import { AutostartToggle } from "@/features/autostart-toggle/ui/AutostartToggle";
-import { UpdateCheck } from "@/features/update-check/ui/UpdateCheck";
-import { ConnectionsCard } from "@/widgets/connections-card/ui/ConnectionsCard";
-import { EngineCard } from "@/widgets/engine-card/ui/EngineCard";
+import type { RunsStore } from "@/entities/run/model/RunsStore";
+import type { ConnectorStatus } from "@/entities/connection/model/types";
 import { EngineOverview } from "@/widgets/engine-overview/ui/EngineOverview";
-import { PathsCard } from "@/widgets/paths-card/ui/PathsCard";
+import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { Button } from "@/shared/ui/Button";
+import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
 import { useI18n } from "@/shared/i18n";
+import { formatDateTime } from "@/shared/lib/format";
+
+const healthPriority: Record<ConnectorStatus | "unknown", number> = {
+  failed: 0,
+  partial: 1,
+  running: 2,
+  unknown: 3,
+  success: 4,
+};
 
 export interface DashboardPageProps {
   engine: EngineStore;
   connections: ConnectionsStore;
   sync: SyncStore;
   settings: SettingsStore;
+  runs: RunsStore;
 }
 
 export const DashboardPage = observer(function DashboardPage({
   engine,
   connections,
   sync,
-  settings,
+  runs,
 }: DashboardPageProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [retryFailed, setRetryFailed] = useState(false);
+
+  useEffect(() => {
+    if (engine.isRunning) void runs.load(true);
+    return () => { void runs.resetLog(); };
+  }, [engine.isRunning, runs]);
+
+  const latestRuns = connections.items
+    .map((connection) => ({
+      connection,
+      run: runs.items
+        .filter((run) => run.connectionId === connection.id || (!run.connectionId && run.id.startsWith(`${connection.id}-`)))
+        .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0],
+    }))
+    .sort((left, right) =>
+      healthPriority[left.run?.status ?? "unknown"] - healthPriority[right.run?.status ?? "unknown"] ||
+      left.connection.id.localeCompare(right.connection.id),
+    );
+  const lastFailure = runs.items
+    .filter((run) => run.status === "failed" || run.status === "partial")
+    .slice()
+    .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0];
 
   useEffect(() => {
     if (!sync.error) {
@@ -53,7 +83,14 @@ export const DashboardPage = observer(function DashboardPage({
   };
 
   return (
-    <>
+    <div className="page">
+      <div className="page-header">
+        <div>
+          <h2>{t("nav.dashboard")}</h2>
+          <p className="muted">{t("dashboard.subtitle")}</p>
+        </div>
+        <Link to="/connections" className="text-link">{t("nav.connections")} →</Link>
+      </div>
       <EngineOverview engine={engine} sync={sync} />
 
       {engine.error ? (
@@ -156,13 +193,47 @@ export const DashboardPage = observer(function DashboardPage({
         )
       ) : null}
 
-      <div className="grid">
-        <EngineCard engine={engine} connections={connections} />
-        <PathsCard engine={engine} />
-        <ConnectionsCard connections={connections} engine={engine} />
-        <AutostartToggle engine={engine} />
-        <UpdateCheck settings={settings} />
+      <div className="dashboard-grid">
+      <Card className="dashboard-failure">
+        <h3>{t("dashboard.lastFailure")}</h3>
+        {runs.error ? <p className="muted">{runs.error}</p> : !runs.loaded ? <p className="muted" role="status">{engine.isRunning ? t("common.loading") : t("connections.waiting")}</p> : lastFailure ? <div className="connection-row">
+          <div className="connection-main">
+            <span>{lastFailure.connectionId ?? lastFailure.source}</span>
+            <span className="connection-meta">{formatDateTime(lastFailure.startedAt, locale)} · {t(`runStatus.${lastFailure.status}`)}</span>
+          </div>
+          <Button onClick={() => void runs.openLog(lastFailure.id)}>{t("detail.openLog")}</Button>
+        </div> : <p className="muted">{t("dashboard.noFailures")}</p>}
+      </Card>
+      <Card className="dashboard-health">
+        <div className="card-header">
+          <div>
+            <h3>{t("dashboard.recentHealth")}</h3>
+            <p className="muted small">{t("connections.count", { count: connections.count })}</p>
+          </div>
+          <Button disabled={!engine.isRunning || runs.loading || connections.loading} onClick={() => { void runs.load(true); void connections.load(true); }}>
+            {t("actions.refresh")}
+          </Button>
+        </div>
+        {connections.error || runs.error ? <Notice variant="error"><span>{connections.error ?? runs.error}</span></Notice> : null}
+        {!connections.loaded && !connections.error ? <p role="status" className="muted">{engine.isRunning ? t("connections.loading") : t("connections.waiting")}</p> : null}
+        {connections.loaded && connections.items.length === 0 ? <div className="empty-state">
+          <strong>{t("connections.empty")}</strong>
+          <span>{t("connections.emptyHint")}</span>
+          <Link to="/connections/new" className="text-link">{t("connections.add")}</Link>
+        </div> : null}
+        {latestRuns.length > 0 ? <ul className="connection-list">
+          {latestRuns.slice(0, 5).map(({ connection, run }) => <li className="connection-row" key={connection.id}>
+            <div className="connection-main">
+              <Link className="table-link" to={`/connections/${encodeURIComponent(connection.id)}`}>{connection.id}</Link>
+              <span className="connection-meta">{connection.provider}{run ? ` · ${formatDateTime(run.startedAt, locale)}` : ""}</span>
+            </div>
+            {run ? <span className={`run-status run-${run.status}`}>{t(`runStatus.${run.status}`)}</span> : <span className="muted small">{runs.loading ? t("common.loading") : t("connections.historyUnknown")}</span>}
+          </li>)}
+        </ul> : null}
+        {latestRuns.length > 0 ? <p className="muted small">{t("connections.historyNote")}</p> : null}
+      </Card>
       </div>
-    </>
+      {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
+    </div>
   );
 });
