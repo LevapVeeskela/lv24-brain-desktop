@@ -355,6 +355,19 @@ fn unix_ms() -> u64 {
 mod tests {
     use super::*;
 
+    fn recorded_events(dir: &Path) -> Vec<String> {
+        fs::read_to_string(dir.join("desktop-exit.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| {
+                serde_json::from_str::<serde_json::Value>(line).unwrap()["event"]
+                    .as_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect()
+    }
+
     #[test]
     fn first_start_and_clean_exit_do_not_report_a_crash() {
         let dir = tempfile::tempdir().unwrap();
@@ -428,6 +441,130 @@ mod tests {
     }
 
     #[test]
+    fn every_lifecycle_event_is_written_once_with_a_stable_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let session = SessionTracker::start(dir.path(), dir.path());
+        for event in [
+            Event::CloseRequested,
+            Event::ExitRequested,
+            Event::AppQuit,
+            Event::TrayQuit,
+            Event::ShutdownRequested,
+            Event::ShutdownCompleted,
+            Event::UpdaterInstall,
+            Event::UpdaterInstallFailed,
+            Event::UpdaterRestart,
+            Event::UpdaterRestartTimedOut,
+            Event::Exit,
+        ] {
+            session.record(event, None);
+        }
+        assert_eq!(
+            recorded_events(dir.path()),
+            [
+                "session_started",
+                "close_requested",
+                "exit_requested",
+                "app_quit",
+                "tray_quit",
+                "shutdown_requested",
+                "shutdown_completed",
+                "updater_install",
+                "updater_install_failed",
+                "updater_restart",
+                "updater_restart_timed_out",
+                "exit",
+            ]
+        );
+    }
+
+    #[test]
+    fn normal_quit_paths_record_each_event_once_and_stay_clean() {
+        for source in [Event::AppQuit, Event::TrayQuit] {
+            let dir = tempfile::tempdir().unwrap();
+            let session = SessionTracker::start(dir.path(), dir.path());
+            session.record(source, None);
+            session.record(Event::ShutdownRequested, None);
+            session.record(Event::ShutdownCompleted, None);
+            session.record(Event::ExitRequested, Some(0));
+            session.record(Event::Exit, None);
+
+            let source_name = if source == Event::AppQuit {
+                "app_quit"
+            } else {
+                "tray_quit"
+            };
+            assert_eq!(
+                recorded_events(dir.path()),
+                [
+                    "session_started",
+                    source_name,
+                    "shutdown_requested",
+                    "shutdown_completed",
+                    "exit_requested",
+                    "exit",
+                ],
+                "{source:?}"
+            );
+            assert!(
+                !SessionTracker::start(dir.path(), dir.path())
+                    .recovery()
+                    .previous_unclean,
+                "{source:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn updater_restart_sequence_is_not_reported_as_abrupt() {
+        // Unix-style restart: real exit events follow the install.
+        let dir = tempfile::tempdir().unwrap();
+        let session = SessionTracker::start(dir.path(), dir.path());
+        session.record(Event::UpdaterInstall, None);
+        session.record(Event::UpdaterRestart, None);
+        session.record(Event::ExitRequested, Some(tauri::RESTART_EXIT_CODE));
+        session.record(Event::Exit, None);
+        assert_eq!(
+            recorded_events(dir.path()),
+            [
+                "session_started",
+                "updater_install",
+                "updater_restart",
+                "exit_requested",
+                "exit",
+            ]
+        );
+        assert!(
+            !SessionTracker::start(dir.path(), dir.path())
+                .recovery()
+                .previous_unclean
+        );
+
+        // Windows-style install: the installer ends the process before the
+        // event loop emits ExitRequested/Exit; the marker alone is enough.
+        let dir = tempfile::tempdir().unwrap();
+        let session = SessionTracker::start(dir.path(), dir.path());
+        session.record(Event::UpdaterInstall, None);
+        assert!(
+            !SessionTracker::start(dir.path(), dir.path())
+                .recovery()
+                .previous_unclean
+        );
+    }
+
+    #[test]
+    fn exit_request_without_exit_event_is_still_abrupt() {
+        let dir = tempfile::tempdir().unwrap();
+        let session = SessionTracker::start(dir.path(), dir.path());
+        session.record(Event::ExitRequested, Some(0));
+        assert!(
+            SessionTracker::start(dir.path(), dir.path())
+                .recovery()
+                .previous_unclean
+        );
+    }
+
+    #[test]
     fn corrupt_marker_is_unknown_unclean_and_io_failure_is_visible() {
         let dir = tempfile::tempdir().unwrap();
         fs::write(dir.path().join("desktop-session.json"), "{partial").unwrap();
@@ -452,7 +589,11 @@ mod tests {
         session.record(Event::CloseRequested, None);
         assert!(fs::metadata(&path).unwrap().len() < MAX_BREADCRUMB_BYTES);
         assert!(dir.path().join("desktop-exit.previous.jsonl").is_file());
-        for line in fs::read_to_string(&path).unwrap().lines() {
+        let contents = fs::read_to_string(&path).unwrap();
+        // Breadcrumbs are owner-local telemetry: no paths, command arguments,
+        // URLs or secrets may leak into them.
+        assert!(!contents.contains(dir.path().to_str().unwrap()));
+        for line in contents.lines() {
             let entry: serde_json::Value = serde_json::from_str(line).unwrap();
             assert_eq!(entry.as_object().unwrap().len(), 5);
             assert!(entry.get("event").is_some());

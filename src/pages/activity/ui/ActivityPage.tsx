@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
+import { RunCounts } from "@/entities/run/ui/RunCounts";
+import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
@@ -78,14 +80,10 @@ export const ActivityPage = observer(function ActivityPage({
                     </td>
                     <td data-label={t("activity.source")}>{run.source}</td>
                     <td data-label={t("common.status")}>
-                      <span className={`run-status run-${run.status}`}>
-                        {t(`runStatus.${run.status}`)}
-                      </span>
+                      <RunStatusBadge run={run} />
                     </td>
                     <td data-label={t("activity.counts")}>
-                      {run.stats
-                        ? `${run.stats.upserted}/${run.stats.seen}`
-                        : (run.counts?.items ?? t("common.none"))}
+                      <RunCounts run={run} />
                     </td>
                     <td data-label={t("common.actions")}>
                       <Button

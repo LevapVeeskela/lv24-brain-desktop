@@ -1,10 +1,22 @@
 import { observer } from "mobx-react-lite";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
-import type { SyncStore } from "@/entities/sync/model/SyncStore";
+import type {
+  SyncConnectionState,
+  SyncStore,
+} from "@/entities/sync/model/SyncStore";
 import { Button } from "@/shared/ui/Button";
 import { Tooltip } from "@/shared/ui/Tooltip";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type MessageKey } from "@/shared/i18n";
 import { enginePrimaryAction } from "../model/enginePrimaryAction";
+
+const stateLabel: Record<SyncConnectionState, MessageKey> = {
+  queued: "runStatus.queued",
+  running: "runStatus.running",
+  success: "runStatus.success",
+  partial: "runStatus.partial",
+  failed: "runStatus.failed",
+  canceled: "runStatus.canceled",
+};
 
 export const EngineControls = observer(function EngineControls({
   engine,
@@ -21,7 +33,7 @@ export const EngineControls = observer(function EngineControls({
     engine.isUpdating ||
     engine.phase === "starting" ||
     engine.phase === "initializing";
-  const busy = engine.busy !== null || sync.busy || engine.isUpdating;
+  const busy = engine.busy !== null || sync.syncing || engine.isUpdating;
   const primaryDisabled = busy || action === "wait";
 
   const primaryLabel = engineBusy
@@ -59,34 +71,74 @@ export const EngineControls = observer(function EngineControls({
       <Button
         variant={action === "pause" ? "primary" : "secondary"}
         disabled={busy}
-        aria-busy={sync.busy}
+        aria-busy={sync.syncing}
         onClick={() => {
           if (!busy) {
             void sync.runAll();
           }
         }}
       >
-        {sync.busy ? t("sync.queueing") : t("actions.syncAll")}
+        {sync.busy
+          ? t("sync.queueing")
+          : sync.syncing
+            ? t("sync.running")
+            : t("actions.syncAll")}
       </Button>
     </div>
-    {sync.busy ? <div className="sync-progress">
+    {sync.syncing ? <div className="sync-progress">
       <p role="status" aria-live="polite">
-        {sync.cancelRequested ? t("sync.cancelRequested") : sync.progress ? t("sync.progress", {
-          attempted: sync.progress.attempted,
-          total: sync.progress.total,
-          queued: sync.progress.queued,
-          failed: sync.progress.failed,
-        }) : t("sync.preparing")}
+        {sync.cancelRequested
+          ? t("sync.canceling", { count: sync.activeJobCount })
+          : sync.progress
+            ? t("sync.progress", {
+                attempted: sync.progress.attempted,
+                total: sync.progress.total,
+                queued: sync.progress.queued,
+                failed: sync.progress.failed,
+              })
+            : t("sync.preparing")}
       </p>
       <progress
         aria-label={t("sync.queueing")}
         max={Math.max(1, sync.progress?.total ?? 1)}
         value={sync.progress?.attempted}
       />
-      {sync.progress?.currentConnectionId ? <p className="muted small">{t("sync.currentConnection", { id: sync.progress.currentConnectionId })}</p> : null}
+      {sync.connectionProgress.length > 0 ? (
+        <ul className="sync-connections" aria-label={t("sync.connectionStates")}>
+          {sync.connectionProgress.map(({ connectionId, state }) => (
+            <li key={connectionId}>
+              <span className="sync-connection-id">{connectionId}</span>
+              <span className={`run-status run-${state}`}>
+                {t(stateLabel[state])}
+              </span>
+              {sync.cancelStates[connectionId] === "failed" ? (
+                <span className="muted small">{t("sync.cancelFailed")}</span>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {sync.progressError ? (
+        <p className="muted small">
+          {t("sync.progressError", { error: sync.progressError })}
+        </p>
+      ) : null}
+      {sync.progressStale ? (
+        <p className="muted small">
+          {t("sync.progressStale")}{" "}
+          <Button variant="link" onClick={sync.refreshProgress}>
+            {t("actions.retry")}
+          </Button>
+        </p>
+      ) : null}
       <p className="muted small">{t("sync.acceptedContinue")}</p>
-      <Button variant="secondary" disabled={!sync.canCancelRemaining} onClick={() => sync.cancelRemaining()}>
-        {t("sync.cancelRemaining")}
+      <Button
+        variant="secondary"
+        disabled={!sync.canCancel || sync.cancelRequested}
+        aria-busy={sync.cancelRequested && sync.hasActiveJobs}
+        onClick={() => void sync.cancelAll()}
+      >
+        {sync.cancelRequested ? t("sync.cancelingButton") : t("sync.cancel")}
       </Button>
     </div> : null}
     </div>

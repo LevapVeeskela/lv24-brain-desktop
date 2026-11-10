@@ -20,7 +20,10 @@ import { engineApi } from "../api/engineApi";
 import type { EnginePhase, ShellStatus } from "./types";
 import { EngineStore } from "./EngineStore";
 
-function shellStatus(phase: EnginePhase, updating = false): ShellStatus {
+function shellStatus(
+  phase: EnginePhase,
+  overrides: Partial<ShellStatus> = {},
+): ShellStatus {
   return {
     engine: {
       phase,
@@ -29,11 +32,14 @@ function shellStatus(phase: EnginePhase, updating = false): ShellStatus {
       restarts: 0,
     },
     paused: phase === "paused",
-    updating,
+    updating: false,
     autostart: { enabled: false, supported: true },
     desktopVersion: "1.0.1",
     deepLinkScheme: "lv24brain",
     logDir: "C:/logs",
+    previousSessionUnclean: false,
+    sessionDiagnosticsAvailable: true,
+    ...overrides,
   };
 }
 
@@ -102,7 +108,7 @@ describe("EngineStore", () => {
   it("refuses to start while the agent is being updated", async () => {
     const store = new EngineStore();
     runInAction(() => {
-      store.status = shellStatus("running", true);
+      store.status = shellStatus("running", { updating: true });
     });
 
     const started = await store.startEngine();
@@ -111,6 +117,46 @@ describe("EngineStore", () => {
     expect(engineApi.start).not.toHaveBeenCalled();
     expect(store.error).toContain("updating");
     expect(store.busy).toBeNull();
+  });
+
+  it("shows the previous-session notice until it is dismissed", () => {
+    const store = new EngineStore();
+    runInAction(() => {
+      store.status = shellStatus("running", { previousSessionUnclean: true });
+    });
+
+    expect(store.previousSessionUnclean).toBe(true);
+    expect(store.sessionDiagnosticsAvailable).toBe(true);
+    expect(store.logDir).toBe("C:/logs");
+    expect(store.sessionRecoveryNoticeVisible).toBe(true);
+
+    store.dismissSessionRecoveryNotice();
+    expect(store.sessionRecoveryNoticeVisible).toBe(false);
+
+    // Polling keeps reporting the previous session's outcome; the dismissal
+    // must survive that so the notice appears only once per desktop session.
+    runInAction(() => {
+      store.status = shellStatus("running", { previousSessionUnclean: true });
+    });
+    expect(store.sessionRecoveryNoticeVisible).toBe(false);
+  });
+
+  it("stays silent after a clean session and flags unreadable diagnostics", () => {
+    const store = new EngineStore();
+    runInAction(() => {
+      store.status = shellStatus("running");
+    });
+    expect(store.sessionRecoveryNoticeVisible).toBe(false);
+    expect(store.sessionDiagnosticsAvailable).toBe(true);
+
+    runInAction(() => {
+      store.status = shellStatus("running", {
+        previousSessionUnclean: true,
+        sessionDiagnosticsAvailable: false,
+      });
+    });
+    expect(store.sessionRecoveryNoticeVisible).toBe(true);
+    expect(store.sessionDiagnosticsAvailable).toBe(false);
   });
 
   it("never pauses an agent that is not running", async () => {

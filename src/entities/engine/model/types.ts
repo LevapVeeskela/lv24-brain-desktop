@@ -45,6 +45,8 @@ export interface ShellStatus {
   desktopVersion: string;
   deepLinkScheme: string;
   logDir: string;
+  previousSessionUnclean: boolean;
+  sessionDiagnosticsAvailable: boolean;
 }
 
 export type EngineAction =

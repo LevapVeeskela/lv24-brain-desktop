@@ -29,4 +29,11 @@ describe("run presentation", () => {
     expect(isRunFailure(sample("success"))).toBe(false);
     expect(runHealthStatus(undefined)).toBe("unknown");
   });
+
+  it("exposes the display status to filters and health sorting", () => {
+    const canceled = sample("partial", "canceled");
+    expect(runHealthStatus(canceled)).toBe("canceled");
+    expect(runHealthStatus(sample("partial"))).toBe("partial");
+    expect(runHealthStatus(sample("running"))).toBe("running");
+  });
 });

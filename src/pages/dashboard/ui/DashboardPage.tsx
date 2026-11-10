@@ -6,7 +6,12 @@ import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
-import type { ConnectorStatus } from "@/entities/connection/model/types";
+import {
+  isRunFailure,
+  runHealthStatus,
+  type RunHealthStatus,
+} from "@/entities/run/model/presentation";
+import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
 import { EngineOverview } from "@/widgets/engine-overview/ui/EngineOverview";
 import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { Button } from "@/shared/ui/Button";
@@ -15,12 +20,13 @@ import { Notice } from "@/shared/ui/Notice";
 import { useI18n } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
 
-const healthPriority: Record<ConnectorStatus | "unknown", number> = {
+const healthPriority: Record<RunHealthStatus, number> = {
   failed: 0,
   partial: 1,
-  running: 2,
-  unknown: 3,
-  success: 4,
+  canceled: 2,
+  running: 3,
+  unknown: 4,
+  success: 5,
 };
 
 export interface DashboardPageProps {
@@ -53,11 +59,11 @@ export const DashboardPage = observer(function DashboardPage({
         .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0],
     }))
     .sort((left, right) =>
-      healthPriority[left.run?.status ?? "unknown"] - healthPriority[right.run?.status ?? "unknown"] ||
+      healthPriority[runHealthStatus(left.run)] - healthPriority[runHealthStatus(right.run)] ||
       left.connection.id.localeCompare(right.connection.id),
     );
   const lastFailure = runs.items
-    .filter((run) => run.status === "failed" || run.status === "partial")
+    .filter(isRunFailure)
     .slice()
     .sort((left, right) => Date.parse(right.startedAt) - Date.parse(left.startedAt))[0];
 
@@ -114,7 +120,7 @@ export const DashboardPage = observer(function DashboardPage({
             <div className="row-actions">
               <Button
                 variant="link"
-                disabled={sync.busy}
+                disabled={sync.syncing}
                 onClick={() => void retrySync()}
               >
                 {t("actions.retry")}
@@ -147,7 +153,7 @@ export const DashboardPage = observer(function DashboardPage({
             action={
               <Button
                 variant="link"
-                disabled={sync.busy}
+                disabled={sync.syncing}
                 onClick={() => void retrySync()}
               >
                 {t("actions.retry")}
@@ -199,7 +205,7 @@ export const DashboardPage = observer(function DashboardPage({
         {runs.error ? <p className="muted">{runs.error}</p> : !runs.loaded ? <p className="muted" role="status">{engine.isRunning ? t("common.loading") : t("connections.waiting")}</p> : lastFailure ? <div className="connection-row">
           <div className="connection-main">
             <span>{lastFailure.connectionId ?? lastFailure.source}</span>
-            <span className="connection-meta">{formatDateTime(lastFailure.startedAt, locale)} · {t(`runStatus.${lastFailure.status}`)}</span>
+            <span className="connection-meta">{formatDateTime(lastFailure.startedAt, locale)} · <RunStatusBadge run={lastFailure} /></span>
           </div>
           <Button onClick={() => void runs.openLog(lastFailure.id)}>{t("detail.openLog")}</Button>
         </div> : <p className="muted">{t("dashboard.noFailures")}</p>}
@@ -227,7 +233,7 @@ export const DashboardPage = observer(function DashboardPage({
               <Link className="table-link" to={`/connections/${encodeURIComponent(connection.id)}`}>{connection.id}</Link>
               <span className="connection-meta">{connection.provider}{run ? ` · ${formatDateTime(run.startedAt, locale)}` : ""}</span>
             </div>
-            {run ? <span className={`run-status run-${run.status}`}>{t(`runStatus.${run.status}`)}</span> : <span className="muted small">{runs.loading ? t("common.loading") : t("connections.historyUnknown")}</span>}
+            {run ? <RunStatusBadge run={run} /> : <span className="muted small">{runs.loading ? t("common.loading") : t("connections.historyUnknown")}</span>}
           </li>)}
         </ul> : null}
         {latestRuns.length > 0 ? <p className="muted small">{t("connections.historyNote")}</p> : null}

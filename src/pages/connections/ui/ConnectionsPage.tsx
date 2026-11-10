@@ -7,6 +7,8 @@ import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsSt
 import type { Connection } from "@/entities/connection/model/types";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
+import { isRunFailure } from "@/entities/run/model/presentation";
+import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
@@ -169,9 +171,9 @@ export const ConnectionsPage = observer(function ConnectionsPage({
                     </td>
                     <td data-label={t("connections.health")}>
                       {run ? (
-                        <span className={`run-status run-${run.status}`}>{t(`runStatus.${run.status}`)}</span>
+                        <RunStatusBadge run={run} />
                       ) : <span className="muted small">{runs.loading ? t("common.loading") : t("connections.historyUnknown")}</span>}
-                      {run && (run.status === "failed" || run.status === "partial") ? (
+                      {run && isRunFailure(run) ? (
                         <span className="table-sub connection-result">
                           <Button variant="link" onClick={() => void runs.openLog(run.id)}>{t("detail.openLog")}</Button>
                         </span>
@@ -315,7 +317,7 @@ export const ConnectionsPage = observer(function ConnectionsPage({
                 <span>{t("connections.filterStatus")}</span>
                 <Select value={filter} onChange={(event) => setFilter(event.target.value as HealthFilter)}>
                   <option value="all">{t("connections.allStatuses")}</option>
-                  {(["failed", "partial", "running", "success"] as const).map((status) => <option key={status} value={status}>{t(`runStatus.${status}`)}</option>)}
+                  {(["failed", "partial", "canceled", "running", "success"] as const).map((status) => <option key={status} value={status}>{t(`runStatus.${status}`)}</option>)}
                   <option value="unknown">{t("connections.historyUnknown")}</option>
                 </Select>
               </label>

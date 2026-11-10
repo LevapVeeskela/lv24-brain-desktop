@@ -37,6 +37,7 @@ export class RootStore {
 
   dispose(): void {
     this.settings.dispose();
+    this.sync.dispose();
     this.runs.dispose();
     this.connections.dispose();
     this.engine.dispose();

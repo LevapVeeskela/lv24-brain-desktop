@@ -10,6 +10,8 @@ import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import type { ProvidersStore } from "@/entities/provider/model/ProvidersStore";
 import { RUN_LIST_LIMIT, type RunsStore } from "@/entities/run/model/RunsStore";
+import { RunCounts } from "@/entities/run/ui/RunCounts";
+import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
 import { settingsApi } from "@/entities/settings/api/settingsApi";
 import {
   credentialSecretName,
@@ -583,7 +585,7 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
         <div className="card-header">
           <div>
             <h3>{t("detail.lastKnownRun")}</h3>
-            {latestRun ? <p><span className={`run-status run-${latestRun.status}`}>{t(`runStatus.${latestRun.status}`)}</span> <span className="muted">{formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, locale)}</span></p> : <p className="muted">{runs.error ?? (runs.loaded ? t("detail.historyUnknown") : t("common.loading"))}</p>}
+            {latestRun ? <p><RunStatusBadge run={latestRun} /> <span className="muted">{formatDateTime(latestRun.finishedAt ?? latestRun.startedAt, locale)}</span></p> : <p className="muted">{runs.error ?? (runs.loaded ? t("detail.historyUnknown") : t("common.loading"))}</p>}
           </div>
           {latestRun ? <Button variant="secondary" onClick={() => {
             void runs.openLog(latestRun.id);
@@ -904,14 +906,10 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
                   <tr key={run.id}>
                     <td data-label={t("common.started")}>{formatDateTime(run.startedAt, locale)}</td>
                     <td data-label={t("common.status")}>
-                      <span className={`run-status run-${run.status}`}>
-                        {t(`runStatus.${run.status}`)}
-                      </span>
+                      <RunStatusBadge run={run} />
                     </td>
                     <td data-label={t("activity.counts")}>
-                      {run.stats
-                        ? `${run.stats.upserted}/${run.stats.seen}`
-                        : (run.counts?.items ?? t("common.none"))}
+                      <RunCounts run={run} />
                     </td>
                     <td data-label={t("common.actions")}>
                       <Button

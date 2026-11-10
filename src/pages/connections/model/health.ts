@@ -1,6 +1,11 @@
-import type { Connection, ConnectorStatus, Run } from "@/entities/connection/model/types";
+import type { Connection, Run } from "@/entities/connection/model/types";
+import {
+  runHealthStatus,
+  type RunDisplayStatus,
+  type RunHealthStatus,
+} from "@/entities/run/model/presentation";
 
-export type HealthFilter = "all" | ConnectorStatus | "unknown";
+export type HealthFilter = "all" | RunDisplayStatus | "unknown";
 export type ConnectionSort = "name" | "status" | "recent";
 
 function timestamp(value: string): number {
@@ -25,12 +30,13 @@ export function latestConnectionRun(
     );
 }
 
-const severity: Record<ConnectorStatus | "unknown", number> = {
+const severity: Record<RunHealthStatus, number> = {
   failed: 0,
   partial: 1,
-  running: 2,
-  unknown: 3,
-  success: 4,
+  canceled: 2,
+  running: 3,
+  unknown: 4,
+  success: 5,
 };
 
 export function selectConnections(
@@ -47,12 +53,12 @@ export function selectConnections(
       const matchesSearch = !needle ||
         [connection.id, connection.provider, connection.account ?? ""]
           .join(" ").toLocaleLowerCase().includes(needle);
-      const matchesStatus = filter === "all" || (run?.status ?? "unknown") === filter;
+      const matchesStatus = filter === "all" || runHealthStatus(run) === filter;
       return matchesSearch && matchesStatus;
     })
     .sort((left, right) => {
       if (sort === "status") {
-        const order = severity[left.run?.status ?? "unknown"] - severity[right.run?.status ?? "unknown"];
+        const order = severity[runHealthStatus(left.run)] - severity[runHealthStatus(right.run)];
         if (order) return order;
       }
       if (sort === "recent") {

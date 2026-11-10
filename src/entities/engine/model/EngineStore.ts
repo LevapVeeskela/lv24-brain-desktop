@@ -19,6 +19,7 @@ export class EngineStore {
   statusError: string | null = null;
   autostartError: string | null = null;
   oauthCallback: string | null = null;
+  sessionRecoveryDismissed = false;
 
   private lastAutostartTarget: boolean | null = null;
   private started = false;
@@ -71,6 +72,30 @@ export class EngineStore {
 
   get deepLinkScheme(): string {
     return this.status?.deepLinkScheme ?? "lv24brain";
+  }
+
+  get logDir(): string | null {
+    return this.status?.logDir ?? null;
+  }
+
+  get previousSessionUnclean(): boolean {
+    return this.status?.previousSessionUnclean ?? false;
+  }
+
+  get sessionDiagnosticsAvailable(): boolean {
+    return this.status?.sessionDiagnosticsAvailable ?? false;
+  }
+
+  /**
+   * The recovery notice is shown once per desktop session. Dismissal lives in
+   * memory only, so the next abrupt exit is reported again after a restart.
+   */
+  get sessionRecoveryNoticeVisible(): boolean {
+    return this.previousSessionUnclean && !this.sessionRecoveryDismissed;
+  }
+
+  dismissSessionRecoveryNotice(): void {
+    this.sessionRecoveryDismissed = true;
   }
 
   start(): void {

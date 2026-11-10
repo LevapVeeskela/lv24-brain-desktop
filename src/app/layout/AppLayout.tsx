@@ -7,6 +7,7 @@ import { AppNav } from "@/widgets/app-nav/ui/AppNav";
 import { OAuthCallbackCard } from "@/features/oauth-callback/ui/OAuthCallbackCard";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { Notice } from "@/shared/ui/Notice";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 
 function routeTitleKey(pathname: string): MessageKey {
@@ -86,6 +87,28 @@ export const AppLayout = observer(function AppLayout({
         tabIndex={-1}
         ref={mainRef}
       >
+        {engine.sessionRecoveryNoticeVisible ? (
+          <Notice
+            variant="info"
+            action={
+              <Button
+                variant="link"
+                onClick={engine.dismissSessionRecoveryNotice}
+              >
+                {t("actions.dismiss")}
+              </Button>
+            }
+          >
+            <strong>{t("session.recoveryTitle")}</strong>
+            <span>
+              {engine.sessionDiagnosticsAvailable
+                ? t("session.recoveryDetail", {
+                    logDir: engine.logDir ?? t("paths.notResolved"),
+                  })
+                : t("session.recoveryUnavailable")}
+            </span>
+          </Notice>
+        ) : null}
         <Outlet />
         <OAuthCallbackCard engine={engine} />
       </main>

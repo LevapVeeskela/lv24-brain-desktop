@@ -123,6 +123,16 @@ export class ConnectionApi {
     }
     return parseRuns(data);
   }
+
+  /** Requests cancellation; a 202 only acknowledges the request. */
+  async cancelRun(id: string): Promise<void> {
+    const { error, response } = await apiClient.POST("/v1/runs/{id}/cancel", {
+      params: { path: { id } },
+    });
+    if (error) {
+      throw toApiError(response, error);
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
