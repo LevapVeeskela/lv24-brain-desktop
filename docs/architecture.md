@@ -59,7 +59,11 @@ unknown, not evidence that a connection never ran. The API has no last-error
 text, so failed/partial results lead to the log. Follow scrolls received output;
 it does not add polling or promise live tailing.
 
-The mark comes from `shared/brand/mark.json`; its palette references CSS tokens.
+The selected Neuro mark comes from `shared/brand/mark.json`: two filled brain
+hemispheres with cubic curves and transparent interior cutouts. The header uses
+an instance-specific SVG mask; mask compositing retains black/white values in
+forced colors, while the visible mark inherits `currentColor`.
+Its palette references CSS tokens.
 The PowerShell generator writes every committed app/tray icon and public SVG.
 The header uses the same geometry and `currentColor`, including forced-color
 mode. See [design-refresh.md](design-refresh.md).

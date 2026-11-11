@@ -50,24 +50,65 @@ function New-RoundedRectanglePath([float]$Size, [float]$Radius) {
     return $path
 }
 
-function Draw-Mark([System.Drawing.Graphics]$Graphics, [System.Drawing.Color]$Color) {
-    $pen = New-Object System.Drawing.Pen($Color, [float]$mark.strokeWidth)
-    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $pen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
-    foreach ($points in $mark.paths) {
-        for ($index = 1; $index -lt $points.Count; $index++) {
-            $a = $points[$index - 1]
-            $b = $points[$index]
-            $Graphics.DrawLine($pen, [float]$a[0], [float]$a[1], [float]$b[0], [float]$b[1])
+function New-MarkPath([string]$Data) {
+    # The shared source uses absolute SVG M/L/C/Z commands, never SVG rasterization.
+    $number = '[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?'
+    $pattern = "[MLCZ]|$number"
+    if ([regex]::Replace($Data, $pattern, '') -notmatch '^[\s,]*$') {
+        throw "Unsupported command in mark geometry: $Data"
+    }
+    $tokens = @([regex]::Matches($Data, $pattern) | ForEach-Object { $_.Value })
+    $path = New-Object System.Drawing.Drawing2D.GraphicsPath
+    $index = 0
+    $current = $null
+    $start = $null
+    try {
+        while ($index -lt $tokens.Count) {
+            $command = $tokens[$index++]
+            $count = switch ($command) { 'M' { 2 } 'L' { 2 } 'C' { 6 } 'Z' { 0 } default { throw 'Expected an absolute M/L/C/Z command.' } }
+            if ($index + $count -gt $tokens.Count) { throw "Incomplete $command command in mark geometry." }
+            $values = @()
+            for ($item = 0; $item -lt $count; $item++) {
+                $values += [float]::Parse($tokens[$index++], [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+            if ($command -ne 'M' -and $null -eq $current) { throw 'Mark paths must start with M.' }
+            switch ($command) {
+                'M' {
+                    $path.StartFigure()
+                    $current = $values
+                    $start = $values
+                }
+                'L' {
+                    $path.AddLine([float]$current[0], [float]$current[1], [float]$values[0], [float]$values[1])
+                    $current = $values
+                }
+                'C' {
+                    $path.AddBezier([float]$current[0], [float]$current[1], [float]$values[0], [float]$values[1], [float]$values[2], [float]$values[3], [float]$values[4], [float]$values[5])
+                    $current = @($values[4], $values[5])
+                }
+                'Z' {
+                    $path.CloseFigure()
+                    $current = $start
+                }
+            }
         }
+        if ($path.PointCount -eq 0) { throw 'Empty mark geometry.' }
+        return $path
+    } catch {
+        $path.Dispose()
+        throw
     }
+}
+
+function Draw-Mark([System.Drawing.Graphics]$Graphics, [System.Drawing.Color]$Color) {
     $brush = New-Object System.Drawing.SolidBrush($Color)
-    $radius = [float]$mark.nodeRadius
-    foreach ($point in $mark.nodes) {
-        $Graphics.FillEllipse($brush, [float]($point[0] - $radius), [float]($point[1] - $radius), [float]($radius * 2), [float]($radius * 2))
-    }
-    $pen.Dispose()
+    foreach ($path in $silhouettePaths) { $Graphics.FillPath($brush, $path) }
+    $cut = New-Object System.Drawing.Pen((Get-BrandColor 'canvas'), [float]$mark.cutoutWidth)
+    $cut.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $cut.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $cut.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+    foreach ($path in $cutoutPaths) { $Graphics.DrawPath($cut, $path) }
+    $cut.Dispose()
     $brush.Dispose()
 }
 
@@ -84,7 +125,8 @@ function New-IconBitmap([int]$Size, [string]$State = '') {
     $graphics.FillPath($background, $shape)
     if ($State) {
         # Leave space for the dot without changing the source mark proportions.
-        $graphics.ScaleTransform(0.82, 0.82)
+        $graphics.TranslateTransform(1.28, 1.28)
+        $graphics.ScaleTransform(0.84, 0.84)
         Draw-Mark $graphics (Get-BrandColor 'trayMark')
         $graphics.ResetTransform()
         $graphics.ScaleTransform([float]($renderSize / 32.0), [float]($renderSize / 32.0))
@@ -120,6 +162,8 @@ function New-IconBitmap([int]$Size, [string]$State = '') {
         $glyph.Dispose()
         $glyphBrush.Dispose()
     } else {
+        $graphics.TranslateTransform(2.56, 2.56)
+        $graphics.ScaleTransform(0.84, 0.84)
         Draw-Mark $graphics (Get-BrandColor 'accent')
     }
     $shape.Dispose()
@@ -149,6 +193,10 @@ function Write-BigEndian([System.IO.BinaryWriter]$Writer, [uint32]$Value) {
     [Array]::Reverse($bytes)
     $Writer.Write($bytes)
 }
+
+# Validate all source geometry before writing any generated assets.
+$silhouettePaths = @($mark.silhouettes | ForEach-Object { New-MarkPath $_ })
+$cutoutPaths = @($mark.cutouts | ForEach-Object { New-MarkPath $_ })
 
 # Explicit desktop outputs: no accidental mobile/Windows Store icon proliferation.
 $pngFiles = @{
@@ -208,16 +256,13 @@ for ($index = 0; $index -lt $icnsTypes.Count; $index++) {
 $icnsWriter.Dispose()
 
 # Readable source-derived SVGs: header/forced-color mark and colored app master.
-$paths = @($mark.paths | ForEach-Object {
-    $points = @($_ | ForEach-Object { $_ -join ',' }) -join ' '
-    "<polyline points=`"$points`"/>"
-}) -join ''
-$nodes = @($mark.nodes | ForEach-Object {
-    "<circle cx=`"$($_[0])`" cy=`"$($_[1])`" r=`"$($mark.nodeRadius)`"/>"
-}) -join ''
-$geometry = "<g fill=`"none`" stroke=`"currentColor`" stroke-width=`"$($mark.strokeWidth)`" stroke-linecap=`"round`" stroke-linejoin=`"round`">$paths</g><g fill=`"currentColor`">$nodes</g>"
+$paths = @($mark.silhouettes | ForEach-Object { "<path d=`"$_`"/>" }) -join ''
+$cuts = @($mark.cutouts | ForEach-Object { "<path d=`"$_`"/>" }) -join ''
+$mask = "<defs><mask id=`"neuro-cutouts`" maskUnits=`"userSpaceOnUse`" x=`"0`" y=`"0`" width=`"32`" height=`"32`" style=`"forced-color-adjust:none`"><rect width=`"32`" height=`"32`" fill=`"white`"/><g fill=`"none`" stroke=`"black`" stroke-width=`"$($mark.cutoutWidth)`" stroke-linecap=`"round`" stroke-linejoin=`"round`">$cuts</g></mask></defs>"
+$geometry = "$mask<g fill=`"currentColor`" mask=`"url(#neuro-cutouts)`">$paths</g>"
 $svgMark = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`">$geometry</svg>`n"
-$svgApp = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`" color=`"$($palette.accent)`"><rect width=`"32`" height=`"32`" rx=`"7`" fill=`"$($palette.canvas)`"/>$geometry</svg>`n"
+$svgApp = "<svg xmlns=`"http://www.w3.org/2000/svg`" viewBox=`"0 0 32 32`" color=`"$($palette.accent)`"><rect width=`"32`" height=`"32`" rx=`"7`" fill=`"$($palette.canvas)`"/><g transform=`"translate(2.56 2.56) scale(.84)`">$geometry</g></svg>`n"
 [System.IO.File]::WriteAllText((Join-Path $brand 'mark-monochrome.svg'), $svgMark, (New-Object System.Text.UTF8Encoding($false)))
 [System.IO.File]::WriteAllText((Join-Path $brand 'mark.svg'), $svgApp, (New-Object System.Text.UTF8Encoding($false)))
+foreach ($path in @($silhouettePaths) + @($cutoutPaths)) { $path.Dispose() }
 Write-Host "Rebuilt desktop icons and SVGs from mark.json geometry and global.css theme tokens"

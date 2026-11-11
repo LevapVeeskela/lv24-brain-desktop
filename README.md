@@ -18,7 +18,11 @@ Versions and engine/API contracts are unchanged. See the
 [design audit](docs/design-refresh.md), [verification report](docs/design-refresh/report.md)
 and [before/after screenshots](docs/design-refresh/screenshots/README.md).
 
-![Dashboard preview with fictional local fixture data, not a live engine](docs/design-refresh/screenshots/after-dashboard-ru-980x720.jpg)
+The current mark is **Neuro**, selected by the owner: a two-hemisphere brain
+silhouette shared by the header, application icon and all tray states.
+See [the source and asset checks](docs/neuro-brand.md).
+
+![Neuro dashboard preview with fictional local fixture data, not a live engine](docs/neuro-dashboard.jpg)
 
 ## What works
 

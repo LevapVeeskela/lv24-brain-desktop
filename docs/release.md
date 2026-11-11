@@ -112,7 +112,8 @@ On Windows, regenerate all committed icons without network access:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/generate-icons.ps1
 ```
 
-Geometry is in `src/shared/brand/mark.json`; palette entries reference direct
+The owner-selected Neuro geometry is in `src/shared/brand/mark.json` (absolute
+SVG M/L/C/Z paths for silhouettes and cutouts); palette entries reference direct
 HEX tokens in `src/app/styles/global.css :root`. A missing token fails before
 writing outputs. Re-run the generator after changing geometry or those tokens.
 It writes 1024/512/256/128/64/32px PNGs, seven-frame ICO, seven-representation
