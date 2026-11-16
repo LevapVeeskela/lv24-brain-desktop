@@ -560,6 +560,446 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{id}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        /** @description Reads a project's state and its CAS revision. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Project state with revision */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["State"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        /** @description Changes the given state fields. expected_revision was returned by a previous read; a mismatch is 409 with the current revision in error.current_revision and writes nothing. Omit expected_revision for an unconditional write. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["StateWrite"];
+            responses: {
+                /** @description State after the write */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["State"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Newest-first curated records, paginated. project is required; every other filter is optional. due_review keeps records whose review date has passed. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                    /** @description Repeated or comma-separated: note, decision, attempt, handoff. */
+                    kind?: string[];
+                    /** @description Decision status (proposed, accepted, rejected, superseded). */
+                    status?: string;
+                    scope?: "project" | "personal" | "global";
+                    subtype?: string;
+                    topic?: string;
+                    /** @description A positive duration (24h, 7d, 2w), a date (2026-11-01) or an RFC3339 time. */
+                    since?: components["parameters"]["Since"];
+                    limit?: components["parameters"]["Limit"];
+                    /** @description Opaque next_cursor from the previous page; bound to its query. */
+                    cursor?: components["parameters"]["Cursor"];
+                    due_review?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of records */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RecordPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/records/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        /** @description One record with its body, links, backlinks, relations, validity and provenance. max_tokens bounds the body; history adds the timeline of the same kind around the record. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                    max_tokens?: number;
+                    history?: boolean;
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Record detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RecordDetail"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Ranked search over curated records only. Raw-zone kinds are never returned and kind=dump/item is refused. */
+        get: {
+            parameters: {
+                query: {
+                    q: string;
+                    project: components["parameters"]["Project"];
+                    /** @description Repeated or comma-separated: note, decision, attempt, handoff, state. */
+                    kind?: string[];
+                    limit?: number;
+                    /** @description Opaque next_cursor from the previous page; bound to its query. */
+                    cursor?: components["parameters"]["Cursor"];
+                    mode?: "all" | "any";
+                    min_score?: number;
+                    explain?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of ranked hits */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SearchPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Read-only review report: findings with severity/why/next/confirm, due reviews, pending proposals and the quarantined count. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Review report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Review"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Candidate records with source health. Proposal bodies stay out of the list. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                    /** @description Repeated or comma-separated: pending, stale, promoted, dismissed. */
+                    status?: string[];
+                    kind?: "decision" | "attempt" | "note";
+                    limit?: components["parameters"]["Limit"];
+                    /** @description Opaque next_cursor from the previous page; bound to its query. */
+                    cursor?: components["parameters"]["Cursor"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of proposals */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/proposals/{project}/{id}/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Promotes one pending proposal. Nothing is promoted automatically; as/status/title override the created record, force allows a stale or orphaned source and yes confirms a local-only source. The call is idempotent. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    project: string;
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["ProposalDecision"];
+            responses: {
+                /** @description Promotion receipt */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalOutcome"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/proposals/{project}/{id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Dismisses one proposal. Repeating the dismissal is idempotent; dismissing a promoted proposal is 409. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    project: string;
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ProposalDecision"];
+                };
+            };
+            responses: {
+                /** @description Dismissal receipt */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalOutcome"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/catchup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Recent changes since the latest handoff, an explicit since, or the default window. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                    /** @description A positive duration (24h, 7d, 2w), a date (2026-11-01) or an RFC3339 time. */
+                    since?: components["parameters"]["Since"];
+                    include_unreviewed?: boolean;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Catchup report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Catchup"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings": {
         parameters: {
             query?: never;
@@ -685,7 +1125,277 @@ export interface paths {
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        Page: {
+            page: number;
+            page_size: number;
+            has_more: boolean;
+            next_cursor?: string;
+        };
+        Provenance: {
+            /** @enum {string} */
+            origin: "human" | "agent" | "connector" | "import";
+            /** @enum {string} */
+            trust: "verified" | "stated" | "inferred";
+            reviewed: boolean;
+            quarantined: boolean;
+            needs_review: boolean;
+        };
+        Validity: {
+            /** Format: date-time */
+            valid_from?: string;
+            /** Format: date-time */
+            valid_to?: string;
+            superseded_by?: string;
+            supersedes?: string;
+            confidence?: number;
+            current?: boolean;
+        };
+        ReviewState: {
+            /** Format: date-time */
+            review_after?: string;
+            /** @enum {string} */
+            review_source?: "frontmatter" | "default";
+            due?: boolean;
+        };
+        Record: {
+            id: string;
+            project_id: string;
+            /** @enum {string} */
+            kind: "note" | "decision" | "attempt" | "handoff";
+            title: string;
+            status?: string;
+            path: string;
+            permalink?: string;
+            subtype?: string;
+            /** @enum {string} */
+            scope?: "project" | "personal" | "global";
+            topic_key?: string;
+            occurrences?: number;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            validity: components["schemas"]["Validity"];
+            provenance: components["schemas"]["Provenance"];
+            review: components["schemas"]["ReviewState"];
+        };
+        RecordLink: {
+            field: string;
+            ref: string;
+            text?: string;
+            project_id?: string;
+            id?: string;
+            /** @enum {string} */
+            state: "found" | "missing" | "unavailable";
+            detail?: string;
+            target?: components["schemas"]["Record"];
+        };
+        Backlink: {
+            field: string;
+            source: components["schemas"]["Record"];
+        };
+        Relation: {
+            target: string;
+            relation: string;
+            reason?: string;
+            confidence?: number;
+            /** @enum {string} */
+            status: "pending" | "accepted" | "rejected";
+            /** Format: date-time */
+            judged_at?: string;
+            /** @enum {string} */
+            verdict_by?: "human" | "agent";
+        };
+        RecordHistory: {
+            records: components["schemas"]["Record"][];
+            anchor_index: number;
+            before: number;
+            after: number;
+            total: number;
+        };
+        RecordDetail: components["schemas"]["Record"] & {
+            body: string;
+            body_truncated: boolean;
+            body_tokens: number;
+            max_tokens: number;
+            links: components["schemas"]["RecordLink"][];
+            backlinks: components["schemas"]["Backlink"][];
+            relations: components["schemas"]["Relation"][];
+            history?: components["schemas"]["RecordHistory"];
+        };
+        RecordPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Record"][];
+        };
+        SearchExplain: {
+            bm25?: number;
+            recency?: number;
+            importance?: number;
+            pin?: number;
+            link?: number;
+        };
+        SearchHit: {
+            id: string;
+            project_id: string;
+            kind: string;
+            title: string;
+            preview: string;
+            score: number;
+            subtype?: string;
+            scope?: string;
+            topic_key?: string;
+            occurrences?: number;
+            /** Format: date-time */
+            valid_from?: string;
+            /** Format: date-time */
+            valid_to?: string;
+            superseded_by?: string;
+            match_reasons?: string[];
+            explain?: components["schemas"]["SearchExplain"];
+        };
+        SearchPage: components["schemas"]["Page"] & {
+            query: string;
+            relaxed: boolean;
+            notice?: string;
+            hits: components["schemas"]["SearchHit"][];
+        };
+        State: {
+            project_id: string;
+            goal?: string;
+            next_action?: string;
+            active?: string[];
+            blocked?: string[];
+            open_questions?: string[];
+            /** Format: date-time */
+            updated_at?: string;
+            /** Format: date-time */
+            fresh_until?: string;
+            revision: string;
+        };
+        StateWrite: {
+            goal?: string;
+            next_action?: string;
+            active?: string[];
+            blocked?: string[];
+            open_questions?: string[];
+            /** @description RFC3339 time to mark the state current until; an empty string clears it; omit to keep it. */
+            fresh_until?: string;
+            expected_revision?: string;
+        };
+        Finding: {
+            kind: string;
+            /** @enum {string} */
+            severity: "error" | "warn" | "info";
+            message: string;
+            why: string;
+            next: string;
+            confirm: string;
+            evidence?: string;
+            fixable: boolean;
+            fix?: string;
+        };
+        DueReview: {
+            /** @enum {string} */
+            kind: "note" | "decision" | "attempt" | "handoff" | "state" | "proposal";
+            id: string;
+            title: string;
+            /** Format: date-time */
+            review_after: string;
+            overdue_seconds: number;
+            source: string;
+        };
+        Proposal: {
+            id: string;
+            project_id: string;
+            external_id?: string;
+            /** @enum {string} */
+            kind: "decision" | "attempt" | "note";
+            title: string;
+            rule?: string;
+            confidence: number;
+            /** @enum {string} */
+            status: "pending" | "stale" | "promoted" | "dismissed";
+            connection_id: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            source_stale: boolean;
+            source_orphan: boolean;
+            local_only: boolean;
+            source_health?: string;
+        };
+        ProposalPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Proposal"][];
+            total: number;
+        };
+        ProposalDecision: {
+            /** @enum {string} */
+            as?: "decision" | "attempt" | "note";
+            /** @enum {string} */
+            status?: "proposed" | "accepted";
+            title?: string;
+            /** @description Allow a stale or orphaned source (CLI --force). */
+            force?: boolean;
+            /** @description Confirm promotion from a local-only source (CLI --yes). */
+            yes?: boolean;
+            allow_duplicate?: boolean;
+            allow_protected?: boolean;
+            dry_run?: boolean;
+        };
+        ProposalOutcome: {
+            project_id: string;
+            proposal_id: string;
+            proposal_status: string;
+            record_kind?: string;
+            record_id?: string;
+            record_title?: string;
+            already: boolean;
+            dismissed: boolean;
+            dry_run: boolean;
+        };
+        Review: {
+            project_id: string;
+            findings: components["schemas"]["Finding"][];
+            due_reviews: components["schemas"]["DueReview"][];
+            proposals: {
+                pending_count: number;
+                items: components["schemas"]["Proposal"][];
+            };
+            quarantined_count: number;
+        };
+        JournalEntry: {
+            /** Format: date-time */
+            time: string;
+            event: string;
+            project?: string;
+            id?: string;
+            title?: string;
+            fields?: {
+                [key: string]: string;
+            };
+        };
+        Catchup: {
+            project: {
+                id: string;
+                name: string;
+            };
+            /** Format: date-time */
+            since: string;
+            /** @enum {string} */
+            since_source: "handoff" | "explicit" | "default";
+            baseline_handoff_id?: string;
+            state: components["schemas"]["State"];
+            state_changed: boolean;
+            notes: components["schemas"]["Record"][];
+            decisions: components["schemas"]["Record"][];
+            attempts: components["schemas"]["Record"][];
+            handoffs: components["schemas"]["Record"][];
+            journal: components["schemas"]["JournalEntry"][];
+            quarantined_count: number;
+            include_unreviewed: boolean;
+        };
+    };
     responses: {
         /** @description Sanitized API error */
         Error: {
@@ -697,6 +1407,7 @@ export interface components {
                     error: {
                         code: string;
                         message: string;
+                        current_revision?: string;
                     };
                 };
             };
@@ -704,6 +1415,12 @@ export interface components {
     };
     parameters: {
         ID: string;
+        Project: string;
+        /** @description A positive duration (24h, 7d, 2w), a date (2026-11-01) or an RFC3339 time. */
+        Since: string;
+        Limit: number;
+        /** @description Opaque next_cursor from the previous page; bound to its query. */
+        Cursor: string;
     };
     requestBodies: {
         JSON: {
@@ -711,6 +1428,16 @@ export interface components {
                 "application/json": {
                     [key: string]: unknown;
                 };
+            };
+        };
+        StateWrite: {
+            content: {
+                "application/json": components["schemas"]["StateWrite"];
+            };
+        };
+        ProposalDecision: {
+            content: {
+                "application/json": components["schemas"]["ProposalDecision"];
             };
         };
     };

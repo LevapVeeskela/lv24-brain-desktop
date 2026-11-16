@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import type { RootStore } from "@/app/model/RootStore";
 import { AppHeader } from "@/widgets/app-header/ui/AppHeader";
-import { AppNav } from "@/widgets/app-nav/ui/AppNav";
+import { AppRail } from "@/widgets/app-rail/ui/AppRail";
+import { CommandPalette } from "@/features/command-palette/ui/CommandPalette";
 import { OAuthCallbackCard } from "@/features/oauth-callback/ui/OAuthCallbackCard";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -15,24 +16,24 @@ function routeTitleKey(pathname: string): MessageKey {
   if (segments.length === 0) {
     return "nav.dashboard";
   }
-  if (segments.length === 1) {
-    switch (segments[0]) {
-      case "connections":
-        return "nav.connections";
-      case "activity":
-        return "nav.activity";
-      case "projects":
-        return "nav.projects";
-      case "settings":
-        return "nav.settings";
-      default:
-        return "app.notFound";
-    }
+  switch (segments[0]) {
+    case "connections":
+      return "nav.connections";
+    case "activity":
+      return "nav.activity";
+    case "projects":
+      return "nav.projects";
+    case "settings":
+      return "nav.settings";
+    case "memory":
+      return "nav.memory";
+    case "inbox":
+      return "nav.inbox";
+    case "search":
+      return "nav.search";
+    default:
+      return "app.notFound";
   }
-  if (segments[0] === "connections" && segments.length === 2) {
-    return "nav.connections";
-  }
-  return "app.notFound";
 }
 
 export const AppLayout = observer(function AppLayout({
@@ -80,51 +81,58 @@ export const AppLayout = observer(function AppLayout({
         {t("app.skipToContent")}
       </a>
       <AppHeader engine={engine} />
-      <AppNav />
-      <main
-        id="main-content"
-        className="content"
-        tabIndex={-1}
-        ref={mainRef}
-      >
-        {engine.sessionRecoveryNoticeVisible ? (
-          <Notice
-            variant="info"
-            action={
-              <Button
-                variant="link"
-                onClick={engine.dismissSessionRecoveryNotice}
-              >
-                {t("actions.dismiss")}
-              </Button>
-            }
-          >
-            <strong>{t("session.recoveryTitle")}</strong>
-            <span>
-              {engine.sessionDiagnosticsAvailable
-                ? t("session.recoveryDetail", {
-                    logDir: engine.logDir ?? t("paths.notResolved"),
-                  })
-                : t("session.recoveryUnavailable")}
-            </span>
-          </Notice>
-        ) : null}
-        <Outlet />
-        <OAuthCallbackCard engine={engine} />
-      </main>
-      <footer className="footer">
-        <span aria-live="polite">
-          {t("footer.desktop", { version: engine.desktopVersion })}
-          {engine.version && <> · {t("footer.engine", { version: engine.version })}</>}
-        </span>
-        <Button
-          variant="link"
-          disabled={quitDisabled}
-          onClick={() => setQuitOpen(true)}
+      <div className="shell-body">
+        <AppRail store={store} />
+        <main
+          id="main-content"
+          className="content"
+          tabIndex={-1}
+          ref={mainRef}
         >
-          {quitting ? t("actions.quitting") : t("actions.quit")}
-        </Button>
-      </footer>
+          {engine.sessionRecoveryNoticeVisible ? (
+            <Notice
+              variant="info"
+              action={
+                <Button
+                  variant="link"
+                  onClick={engine.dismissSessionRecoveryNotice}
+                >
+                  {t("actions.dismiss")}
+                </Button>
+              }
+            >
+              <strong>{t("session.recoveryTitle")}</strong>
+              <span>
+                {engine.sessionDiagnosticsAvailable
+                  ? t("session.recoveryDetail", {
+                      logDir: engine.logDir ?? t("paths.notResolved"),
+                    })
+                  : t("session.recoveryUnavailable")}
+              </span>
+            </Notice>
+          ) : null}
+          <Outlet />
+          <OAuthCallbackCard engine={engine} />
+          <footer className="footer">
+            <span aria-live="polite">
+              {t("footer.desktop", { version: engine.desktopVersion })}
+              {engine.version && <> · {t("footer.engine", { version: engine.version })}</>}
+            </span>
+            <Button
+              variant="link"
+              disabled={quitDisabled}
+              onClick={() => setQuitOpen(true)}
+            >
+              {quitting ? t("actions.quitting") : t("actions.quit")}
+            </Button>
+          </footer>
+        </main>
+      </div>
+      <CommandPalette
+        search={store.commandSearch}
+        projects={store.projects}
+        engine={store.engine}
+      />
       <ConfirmDialog
         open={quitOpen}
         title={t("actions.quit")}

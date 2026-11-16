@@ -13,6 +13,8 @@ export class LocalApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** Present on a state CAS conflict: the revision now stored. */
+    readonly currentRevision?: string,
   ) {
     super(message);
     this.name = "LocalApiError";
@@ -23,6 +25,7 @@ interface ErrorEnvelope {
   error?: {
     code?: string;
     message?: string;
+    current_revision?: string;
   };
 }
 
@@ -33,5 +36,6 @@ export function toApiError(response: Response, body: unknown): LocalApiError {
   const message =
     envelope?.error?.message?.trim() ||
     `Local API returned status ${response.status}`;
-  return new LocalApiError(response.status, code, message);
+  const currentRevision = envelope?.error?.current_revision?.trim() || undefined;
+  return new LocalApiError(response.status, code, message, currentRevision);
 }

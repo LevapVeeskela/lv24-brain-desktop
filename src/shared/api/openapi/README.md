@@ -1,7 +1,7 @@
 # localapi-v1 contract
 
 `localapi-v1.json` is a copy of the engine contract at
-`internal/adapters/localapi/openapi.json` (LV24 Brain v0.12.0), with one
+`internal/adapters/localapi/openapi.json` (LV24 Brain v0.18.0), with one
 desktop-side clarification: JSON request bodies are marked
 `additionalProperties: true` because the engine decodes them into typed structs
 or maps and the original file leaves the shape open. This does not change the

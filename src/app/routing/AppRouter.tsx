@@ -6,8 +6,12 @@ import { ConnectionDetailPage } from "@/pages/connection-detail";
 import { ConnectionWizardPage } from "@/pages/connection-wizard";
 import { ConnectionsPage } from "@/pages/connections";
 import { DashboardPage } from "@/pages/dashboard";
+import { InboxPage } from "@/pages/inbox";
+import { MemoryPage, RecordDetailPage } from "@/pages/memory";
 import { NotFoundPage } from "@/pages/not-found";
+import { ProjectDetailPage } from "@/pages/project-detail";
 import { ProjectsPage } from "@/pages/projects";
+import { SearchPage } from "@/pages/search";
 import { SettingsPage } from "@/pages/settings";
 
 export function AppRouter({ store }: { store: RootStore }) {
@@ -24,6 +28,46 @@ export function AppRouter({ store }: { store: RootStore }) {
                 sync={store.sync}
                 settings={store.settings}
                 runs={store.runs}
+              />
+            }
+          />
+          <Route
+            path="memory"
+            element={
+              <MemoryPage
+                memory={store.memory}
+                projects={store.projects}
+                engine={store.engine}
+              />
+            }
+          />
+          <Route
+            path="memory/:kind/:id"
+            element={
+              <RecordDetailPage
+                memory={store.memory}
+                projects={store.projects}
+                engine={store.engine}
+              />
+            }
+          />
+          <Route
+            path="inbox"
+            element={
+              <InboxPage
+                review={store.review}
+                projects={store.projects}
+                engine={store.engine}
+              />
+            }
+          />
+          <Route
+            path="search"
+            element={
+              <SearchPage
+                search={store.search}
+                projects={store.projects}
+                engine={store.engine}
               />
             }
           />
@@ -62,11 +106,29 @@ export function AppRouter({ store }: { store: RootStore }) {
           />
           <Route
             path="activity"
-            element={<ActivityPage runs={store.runs} />}
+            element={
+              <ActivityPage
+                runs={store.runs}
+                memory={store.memory}
+                projects={store.projects}
+                connections={store.connections}
+                engine={store.engine}
+              />
+            }
           />
           <Route
             path="projects"
             element={<ProjectsPage projects={store.projects} />}
+          />
+          <Route
+            path="projects/:projectId"
+            element={
+              <ProjectDetailPage
+                projects={store.projects}
+                memory={store.memory}
+                engine={store.engine}
+              />
+            }
           />
           <Route
             path="settings"

@@ -1,31 +1,120 @@
 import { useEffect } from "react";
 import { observer } from "mobx-react-lite";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
+import type { EngineStore } from "@/entities/engine/model/EngineStore";
+import type { MemoryStore } from "@/entities/memory/model/MemoryStore";
+import { RecordKindBadge } from "@/entities/memory/ui/MemoryBadges";
+import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
 import { RunCounts } from "@/entities/run/ui/RunCounts";
 import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
-import { Button } from "@/shared/ui/Button";
-import { Card } from "@/shared/ui/Card";
-import { Notice } from "@/shared/ui/Notice";
-import { Loading } from "@/shared/ui/Loading";
-import { EmptyState } from "@/shared/ui/EmptyState";
-import { Table } from "@/shared/ui/Table";
-import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
+import { Badge } from "@/shared/ui/Badge";
+import { Button } from "@/shared/ui/Button";
+import { EmptyState } from "@/shared/ui/EmptyState";
+import { Loading } from "@/shared/ui/Loading";
+import { Notice } from "@/shared/ui/Notice";
+import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
+import {
+  ACTIVITY_FILTERS,
+  buildActivityDays,
+  isActivityFilter,
+  type ActivityFilter,
+  type ActivityRow,
+} from "../model/activity";
+
+const actorKeys: Record<Exclude<ActivityFilter, "all">, MessageKey> = {
+  me: "activity.me",
+  agents: "activity.agents",
+  connections: "activity.connections",
+};
 
 export const ActivityPage = observer(function ActivityPage({
   runs,
+  memory,
+  projects,
+  connections,
+  engine,
 }: {
   runs: RunsStore;
+  memory: MemoryStore;
+  projects: ProjectsStore;
+  connections: ConnectionsStore;
+  engine: EngineStore;
 }) {
   const { t, locale } = useI18n();
+  const [params, setParams] = useSearchParams();
+  const rawFilter = params.get("actor");
+  const filter: ActivityFilter = isActivityFilter(rawFilter) ? rawFilter : "all";
+  const projectId = projects.selectedId;
+  const catchup = memory.catchupProjectId === projectId ? memory.catchup : null;
+  const records = catchup
+    ? [
+        ...catchup.notes,
+        ...catchup.decisions,
+        ...catchup.attempts,
+        ...catchup.handoffs,
+      ]
+    : [];
+  const connectionProjects: Record<string, string | undefined> = {};
+  for (const connection of connections.items) {
+    connectionProjects[connection.id] = connection.projects?.[0];
+  }
+  const projectNames: Record<string, string> = {};
+  for (const project of projects.items) {
+    projectNames[project.id] = project.name;
+  }
+  const days = buildActivityDays({
+    runs: runs.items,
+    records,
+    connectionProjects,
+    projectNames,
+    projectId,
+    filter,
+  });
 
   useEffect(() => {
     void runs.load(true);
     void runs.resetLog();
-    return () => { void runs.resetLog(); };
+    return () => {
+      void runs.resetLog();
+    };
   }, [runs]);
+
+  useEffect(() => {
+    void projects.load();
+  }, [projects]);
+
+  useEffect(() => {
+    if (engine.isRunning) {
+      void connections.load();
+    }
+  }, [connections, engine.isRunning]);
+
+  useEffect(() => {
+    if (projectId && engine.isRunning) {
+      void memory.loadCatchup(projectId);
+    }
+  }, [engine.isRunning, memory, projectId]);
+
+  const setFilter = (next: ActivityFilter): void => {
+    const updated = new URLSearchParams(params);
+    if (next === "all") {
+      updated.delete("actor");
+    } else {
+      updated.set("actor", next);
+    }
+    setParams(updated, { replace: true });
+  };
+
+  const refresh = (): void => {
+    void runs.load(true);
+    if (projectId) {
+      void memory.loadCatchup(projectId, { force: true });
+    }
+  };
 
   return (
     <div className="page">
@@ -34,75 +123,194 @@ export const ActivityPage = observer(function ActivityPage({
           <h2>{t("activity.title")}</h2>
           <p className="muted">{t("activity.subtitle")}</p>
         </div>
-        <Button
-          variant="primary"
-          disabled={runs.loading}
-          onClick={() => void runs.load(true)}
-        >
+        <Button disabled={runs.loading} onClick={refresh}>
           {runs.loading ? t("common.loading") : t("actions.refresh")}
         </Button>
       </div>
 
-      {runs.error ? <Notice variant="error" action={<Button variant="link" disabled={runs.loading} onClick={() => void runs.load(true)}>{t("actions.retry")}</Button>}><span>{runs.error}</span></Notice> : null}
+      {!engine.isRunning ? (
+        <Notice variant="info">
+          <span>{t("errors.engineUnavailable")}</span>
+        </Notice>
+      ) : null}
 
-      <Card>
-        {!runs.loaded && !runs.error ? (
-          <Loading label={`${t("common.loading")} ${t("activity.title")}`} />
-        ) : runs.loaded && runs.items.length === 0 ? (
-          <EmptyState title={t("activity.empty")} hint={t("activity.subtitle")} action={<Link className="text-link" to="/connections">{t("nav.connections")}</Link>} />
-        ) : runs.items.length > 0 ? (
-            <Table caption={t("activity.subtitle")}>
-              <thead>
-                <tr>
-                  <th scope="col">{t("common.started")}</th>
-                  <th scope="col">{t("activity.connection")}</th>
-                  <th scope="col">{t("activity.source")}</th>
-                  <th scope="col">{t("common.status")}</th>
-                  <th scope="col">{t("activity.counts")}</th>
-                  <th scope="col">{t("common.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {runs.items.map((run) => (
-                  <tr key={run.id}>
-                    <td data-label={t("common.started")}><time dateTime={run.startedAt}>{formatDateTime(run.startedAt, locale)}</time></td>
-                    <td data-label={t("activity.connection")}>
-                      {run.connectionId ? (
-                        <Link
-                          className="table-link"
-                          to={`/connections/${encodeURIComponent(run.connectionId)}`}
-                        >
-                          {run.connectionId}
-                        </Link>
-                      ) : (
-                        t("common.none")
-                      )}
-                    </td>
-                    <td data-label={t("activity.source")}>{run.source}</td>
-                    <td data-label={t("common.status")}>
-                      <RunStatusBadge run={run} />
-                    </td>
-                    <td data-label={t("activity.counts")}>
-                      <RunCounts run={run} />
-                    </td>
-                    <td data-label={t("common.actions")}>
-                      <Button
-                        variant="secondary"
-                        className="btn-small"
-                        aria-label={`${t("activity.log")}: ${run.id}`}
-                        onClick={() => void runs.openLog(run.id)}
-                      >
-                        {t("activity.log")}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
+      <div className="activity-toolbar">
+        <div className="segmented" role="group" aria-label={t("activity.filters")}>
+          {ACTIVITY_FILTERS.map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={`segment ${filter === value ? "active" : ""}`}
+              aria-pressed={filter === value}
+              onClick={() => setFilter(value)}
+            >
+              {value === "all" ? t("activity.all") : t(actorKeys[value])}
+            </button>
+          ))}
+        </div>
+        {catchup ? (
+          <span className="muted small">
+            {t("activity.since", {
+              time: formatDateTime(catchup.since, locale),
+              source: t(
+                catchup.sinceSource === "handoff"
+                  ? "activity.sinceHandoff"
+                  : catchup.sinceSource === "explicit"
+                    ? "activity.sinceExplicit"
+                    : "activity.sinceDefault",
+              ),
+            })}
+          </span>
         ) : null}
-        {runs.items.length > 0 ? <p className="muted small">{t("activity.historyNote")}</p> : null}
-      </Card>
-      {runs.selectedRunId ? <RunLogPanel runs={runs} /> : null}
+      </div>
+
+      {runs.error ? (
+        <Notice
+          variant="error"
+          action={<Button variant="link" onClick={refresh}>{t("actions.retry")}</Button>}
+        >
+          <span>{runs.error}</span>
+        </Notice>
+      ) : null}
+      {memory.catchupError ? (
+        <Notice variant="error">
+          <span>{memory.catchupError}</span>
+        </Notice>
+      ) : null}
+      {!projectId ? (
+        <p className="muted small">{t("activity.catchupDisabled")}</p>
+      ) : null}
+
+      {(!runs.loaded && runs.loading) ||
+      (projectId !== null && memory.catchupLoading && !catchup) ? (
+        <Loading label={t("activity.title")} />
+      ) : days.length === 0 ? (
+        <EmptyState
+          title={t("activity.noActivity")}
+          hint={t("activity.noActivityHint")}
+        />
+      ) : (
+        <div className="activity-groups">
+          {days.map((day) => (
+            <section key={day.day} className="activity-day" aria-label={dayLabel(day.day, locale, t)}>
+              <h3 className="activity-day-title">{dayLabel(day.day, locale, t)}</h3>
+              {day.projects.map((group) => (
+                <div key={group.projectId ?? "unassigned"} className="activity-project">
+                  <h4 className="activity-project-title">
+                    {group.projectName || t("activity.unknownProject")}
+                  </h4>
+                  <ul className="activity-list">
+                    {group.rows.map((row) =>
+                      row.type === "run" && row.run ? (
+                        <li key={row.key}>
+                          <button
+                            type="button"
+                            className="activity-row activity-run"
+                            aria-label={`${t("activity.openRun")}: ${row.run.id}`}
+                            onClick={() => void runs.openLog(row.run?.id ?? "")}
+                          >
+                            <time dateTime={row.time} className="activity-time">
+                              {timeLabel(row.time, locale)}
+                            </time>
+                            <span className="activity-main">
+                              <span className="activity-title">{row.title}</span>
+                              <span className="muted small">{row.detail}</span>
+                            </span>
+                            <RunStatusBadge run={row.run} />
+                            <RunCounts run={row.run} />
+                            <span className="muted small">
+                              {durationLabel(row.run, t)}
+                            </span>
+                          </button>
+                        </li>
+                      ) : row.record ? (
+                        <li key={row.key}>
+                          <Link
+                            className="activity-row activity-record"
+                            to={`/memory/${row.record.kind}/${encodeURIComponent(row.record.id)}`}
+                          >
+                            <time dateTime={row.time} className="activity-time">
+                              {timeLabel(row.time, locale)}
+                            </time>
+                            <span className="activity-main">
+                              <span className="activity-title">{row.title}</span>
+                              <span className="badge-row">
+                                <RecordKindBadge kind={row.record.kind} />
+                                <Badge>
+                                  {row.actor === "other"
+                                    ? t("activity.other")
+                                    : t(actorKeys[row.actor])}
+                                </Badge>
+                              </span>
+                            </span>
+                          </Link>
+                        </li>
+                      ) : null,
+                    )}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+
+      <p className="muted small">{t("activity.historyNote")}</p>
+
+      {runs.selectedRunId ? (
+        <aside id="run-drawer" className="run-drawer" aria-label={t("activity.openRun")}>
+          <div className="row-actions">
+            <Button variant="ghost" onClick={() => void runs.resetLog()}>
+              {t("common.close")}
+            </Button>
+          </div>
+          <RunLogPanel runs={runs} />
+        </aside>
+      ) : null}
     </div>
   );
 });
+
+function dayLabel(
+  day: string,
+  locale: string,
+  t: (key: MessageKey) => string,
+): string {
+  if (day === "unknown") {
+    return t("activity.dayUnknown");
+  }
+  const date = new Date(`${day}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return day;
+  }
+  return date.toLocaleDateString(locale, {
+    weekday: "long",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function timeLabel(value: string, locale: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+}
+
+function durationLabel(
+  run: ActivityRow["run"],
+  t: (key: MessageKey, params?: Record<string, string | number>) => string,
+): string {
+  if (!run?.finishedAt) {
+    return t("common.none");
+  }
+  const seconds = Math.max(
+    0,
+    Math.round((Date.parse(run.finishedAt) - Date.parse(run.startedAt)) / 1000),
+  );
+  return t("activity.duration", {
+    seconds: Number.isFinite(seconds) ? seconds : 0,
+  });
+}

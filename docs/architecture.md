@@ -1,25 +1,29 @@
-# Shell architecture (WP5.1–WP5.5)
+# Shell architecture (WP5.1–WP5.5, desktop 1.2)
 
-This document describes the v1.1.0 desktop shell. WP5.2 added the UI foundation,
-WP5.3 the screens, WP5.4 packaging and WP5.5 the UX/accessibility pass.
+This document describes the desktop shell. WP5.2 added the UI foundation, WP5.3
+the screens, WP5.4 packaging, WP5.5 the UX/accessibility pass, and desktop 1.2
+the memory browser, inbox, project state, command palette and Activity v2.
 
 ## Frontend layers (FSD)
 
 ```
 src/
   app/        RootStore composition, providers, router, layout, global styles
-  pages/      dashboard, connections, connection detail/wizard, activity,
-              projects, settings
-  widgets/    app header/nav, engine overview/card, paths, connections,
+  pages/      dashboard, memory browser/detail, inbox, search, projects,
+              project detail, activity, connections, connection detail/wizard,
+              settings
+  widgets/    app header/rail, engine overview/card, paths, connections,
               run log panel
-  features/   engine controls, autostart, update check, locale, OAuth callback
-  entities/   engine, connection, run, project, provider, sync, settings
+  features/   engine controls, autostart, update check, locale, OAuth callback,
+              command palette
+  entities/   engine, connection, run, project, provider, sync, settings, memory
   shared/     API transport/client, i18n, UI primitives, error/format helpers
 ```
 
-- `RootStore` owns the Engine, Connections, Sync, Settings, Runs, Projects and
-  Providers stores. It is created once by `RootStoreProvider`; the provider
-  starts polling/event subscriptions and disposes them on unmount.
+- `RootStore` owns the Engine, Connections, Sync, Settings, Runs, Projects,
+  Providers, Memory, Search, Review and CommandSearch stores. It is created once
+  by `RootStoreProvider`; the provider starts polling/event subscriptions and
+  disposes them on unmount.
 - `EngineStore` polls `shell_status` every 4 seconds, listens for
   `engine-status`, `shell-error` and `oauth-callback`, and exposes start, pause,
   autostart and quit actions. An `engine-status` event refreshes the full shell
@@ -31,11 +35,55 @@ src/
 - `RunsStore` lists recent runs and owns the SSE log stream. Events are matched
   by stream id; lines that arrive while `run_log_open` is still resolving are
   buffered. A finished stream reloads the run list.
-- `ProjectsStore` and `ProvidersStore` load on demand; provider descriptors come
-  from the engine CLI bridge.
+- `ProjectsStore` loads projects, keeps the shell's selected project and owns
+  the project state document (goal, next action, active/blocked items, open
+  questions, revision). State saves use `expected_revision`; a 409 sets
+  `stateConflict` with the engine's `current_revision` and reloads the latest
+  document.
+- `MemoryStore` owns the record browser: project/filter state, cursor
+  pagination, record detail (body, links, backlinks, relations, history), a
+  project summary (latest handoff plus recent records) and the catchup report
+  used by Activity. Every request carries a generation token so a late answer
+  for a previous project or filter cannot overwrite current data.
+- `SearchStore` debounces queries (palette 160 ms, page 220 ms), applies kind,
+  mode, minimum-score and explain filters, and paginates by cursor. Short input,
+  empty results and failures are separate states. The palette uses a second
+  instance so it never replaces the Search page's results.
+- `ReviewStore` owns the review report, the proposal queue and the promote or
+  dismiss actions. Actions remove the proposal optimistically, restore it on
+  failure and refresh the report after success; bulk promotion keeps failed
+  items and reports the first error.
 - `SettingsStore` owns the UI locale (persisted in WebView local storage) and
   the desktop update check/install flow.
 - Router: `HashRouter`, so a packaged webview never needs server-side routes.
+
+### Memory routes and screens
+
+The left rail (`widgets/app-rail`) carries the project selector, primary
+navigation and the pending-proposal badge; Settings sits at the bottom. The
+project selector scopes every memory route because the engine requires a
+project for each memory query.
+
+| Route | Content |
+| --- | --- |
+| `/` | dashboard, engine and connection health |
+| `/memory` | filters, paginated record table and preview pane |
+| `/memory/:kind/:id` | read-only record detail: body, provenance, links/backlinks, relations, validity and history |
+| `/inbox` | proposal queue with confidence/source-health badges, accept/dismiss/edit-title, bulk and keyboard actions; review findings and due reviews |
+| `/projects` | registered projects |
+| `/projects/:projectId` | editable state with CAS save, latest handoff, recent records and CLI hint |
+| `/search` | full ranked results with filters, explain data and cursor paging |
+| `/activity` | runs plus catchup memory events, grouped by day and project, filtered All/Me/Agents/Connections; the existing SSE log panel is the run drawer |
+| `/connections`, `/settings` | unchanged management screens |
+
+Global `Cmd/Ctrl+K` opens the command palette (`features/command-palette`). It
+searches curated records and offers navigation actions; Enter opens the record
+or page, arrows move and Escape closes. `/search?q=…` lets "show all results"
+hand the query to the full page.
+
+The UI is read-only except for proposal promotion/dismissal and project-state
+saves. Record editing, `review --fix` execution, proposal snooze and an
+all-projects scope stay out of 1.2 because the engine has no route for them.
 
 ### UI design system and feedback
 
@@ -71,13 +119,26 @@ mode. See [design-refresh.md](design-refresh.md).
 ### Typed client
 
 `src/shared/api/openapi/localapi-v1.json` is a copy of the engine's
-`internal/adapters/localapi/openapi.json`. `npm run api:generate` produces
-`src/shared/api/generated/schema.d.ts` with `openapi-typescript`. The runtime
-client is `openapi-fetch` with a custom fetch implementation that converts
-`Request` to `api_request` and `ApiResponse` back to `Response`. Entity API
-adapters validate response shapes and strip unknown fields; the token never
-enters this layer. JSON request bodies are marked `additionalProperties: true`
-to mirror the engine's open decode shapes.
+`internal/adapters/localapi/openapi.json` (engine 0.18), with one desktop-side
+clarification: JSON request bodies are marked `additionalProperties: true`
+because the engine decodes them into typed structs or maps and the original file
+leaves the shape open. This does not change the wire contract.
+`npm run api:generate` produces `src/shared/api/generated/schema.d.ts` with
+`openapi-typescript`. The runtime client is `openapi-fetch` with a custom fetch
+implementation that converts `Request` to `api_request` and `ApiResponse` back
+to `Response`. Entity API adapters validate response shapes and strip unknown
+fields; the token never enters this layer.
+
+Memory adapters call the frozen memory routes added in engine 0.18:
+`GET/PUT /v1/projects/{id}/state` (PUT uses `expected_revision` CAS),
+`GET /v1/records`, `GET /v1/records/{id}`, `GET /v1/search`,
+`GET /v1/review`, `GET /v1/proposals`,
+`POST /v1/proposals/{project}/{id}/promote`,
+`POST /v1/proposals/{project}/{id}/dismiss` and `GET /v1/catchup`. All of them
+are project-scoped; unknown fields are dropped during parsing. Store tests cover
+loading/empty/error, cursor pagination, stale responses, CAS conflicts and
+proposal optimistic updates, and page tests assert the main landmarks, tables
+and states.
 
 ### Packaging (WP5.4)
 
@@ -174,7 +235,9 @@ each request, verifies `/v1/health`, and never includes the token in an error,
 log or event. Local requests disable system proxies and redirects.
 
 Run logs are opened by the Rust process and delivered as parsed SSE frames; the
-webview never receives a URL, port or token it could use directly.
+webview never receives a URL, port or token it could use directly. The 1.2
+memory pages and the command palette reuse this same allowlisted proxy; no
+route, origin or token is exposed to the webview.
 
 ## Deep links
 
