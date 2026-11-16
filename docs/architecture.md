@@ -106,7 +106,9 @@ record text edit (title/body/tags for notes, with `expected_updated_at`),
 reversible record trash/restore, quarantine review, and the safe `review/fix`
 set after a dry-run preview. Destructive actions use `ConfirmDialog`; a trashed
 record stays recoverable from the Memory page's undo banner. Proposal snooze
-still has no engine route. The record detail route does not expose stored tags,
+uses the engine snooze route with CAS; the inbox merges snoozed candidates
+through include_snoozed and filters them as All/Pending/Snoozed. The record
+detail route does not expose stored tags,
 so the tag field starts empty and is only sent when the user edits it.
 
 ### UI design system and feedback

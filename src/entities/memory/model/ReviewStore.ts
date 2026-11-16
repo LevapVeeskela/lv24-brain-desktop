@@ -16,10 +16,15 @@ import type {
 export interface ReviewLoadOptions {
   force?: boolean;
   allProjects?: boolean;
+  includeSnoozed?: boolean;
 }
 
-function scopeKey(projectId: string | null, allProjects: boolean): string {
-  return `${projectId ?? ""}|${allProjects ? "all" : "one"}`;
+function scopeKey(
+  projectId: string | null,
+  allProjects: boolean,
+  includeSnoozed: boolean,
+): string {
+  return `${projectId ?? ""}|${allProjects ? "all" : "one"}|${includeSnoozed ? "snoozed" : "active"}`;
 }
 
 export class ReviewStore {
@@ -98,7 +103,7 @@ export class ReviewStore {
       return false;
     }
     if (this.loadedScope) {
-      return this.loadedScope === scopeKey(projectId, this.allProjects);
+      return this.loadedScope === scopeKey(projectId, this.allProjects, this.includeSnoozed);
     }
     return this.report?.projectId ===
       (this.allProjects ? "*" : (projectId ?? ""));
@@ -125,12 +130,22 @@ export class ReviewStore {
     this.resetScope();
   }
 
+  setIncludeSnoozed(value: boolean): void {
+    if (this.includeSnoozed === value) {
+      return;
+    }
+    this.includeSnoozed = value;
+    this.resetScope();
+  }
+
   load(
     projectId: string | null,
     options: ReviewLoadOptions = {},
   ): Promise<void> {
     const allProjects = options.allProjects ?? this.allProjects;
-    const key = scopeKey(projectId, allProjects);
+    const includeSnoozed = options.includeSnoozed ?? this.includeSnoozed;
+    this.includeSnoozed = includeSnoozed;
+    const key = scopeKey(projectId, allProjects, includeSnoozed);
     if (this.loadedScope === key && !options.force) {
       return Promise.resolve();
     }
@@ -139,8 +154,9 @@ export class ReviewStore {
     }
     this.projectId = projectId;
     this.allProjects = allProjects;
+    this.includeSnoozed = includeSnoozed;
     const token = ++this.token;
-    const task = this.performLoad(projectId, token, key, allProjects).finally(
+    const task = this.performLoad(projectId, token, key, allProjects, includeSnoozed).finally(
       () => {
         if (this.inFlight === task) {
           this.inFlight = null;
@@ -235,12 +251,22 @@ export class ReviewStore {
       this.bodiesError = null;
     });
     try {
-      const page = await this.api.listProposals(projectId, {
+      const bodiesQuery: {
+        statuses: ("pending" | "stale")[];
+        includeBody: true;
+        maxTokens: number;
+        limit: number;
+        includeSnoozed?: boolean;
+      } = {
         statuses: ["pending", "stale"],
         includeBody: true,
         maxTokens,
         limit: 200,
-      });
+      };
+      if (this.includeSnoozed) {
+        bodiesQuery.includeSnoozed = true;
+      }
+      const page = await this.api.listProposals(projectId, bodiesQuery);
       if (token !== this.bodiesToken) {
         return;
       }
@@ -516,6 +542,9 @@ export class ReviewStore {
         this.report = before;
         this.actionError = errorMessage(cause);
       });
+      if (cause instanceof LocalApiError && cause.status === 409) {
+        void this.refresh();
+      }
       return null;
     } finally {
       runInAction(() => {
@@ -651,6 +680,7 @@ export class ReviewStore {
     token: number,
     key: string,
     allProjects: boolean,
+    includeSnoozed: boolean,
   ): Promise<void> {
     runInAction(() => {
       if (this.loadedScope !== key) {
@@ -666,8 +696,21 @@ export class ReviewStore {
       if (token !== this.token) {
         return;
       }
+      let mergedReport = report;
+      if (includeSnoozed) {
+        const merged = await this.mergeSnoozedProposals(
+          report,
+          projectId,
+          allProjects,
+          token,
+        );
+        if (token !== this.token) {
+          return;
+        }
+        mergedReport = merged;
+      }
       runInAction(() => {
-        this.report = report;
+        this.report = mergedReport;
         this.loaded = true;
         this.loadedScope = key;
       });
@@ -687,6 +730,65 @@ export class ReviewStore {
       }
     }
   }
+
+  /**
+   * Fetches snoozed candidates through the proposal listing and merges them
+   * into the review report. The report itself only carries pending candidates,
+   * so this is what makes the inbox's All/Snoozed views possible. Duplicates
+   * (the same candidate already present in the report) are dropped.
+   */
+  private async mergeSnoozedProposals(
+    report: ReviewReport,
+    projectId: string | null,
+    allProjects: boolean,
+    token: number,
+  ): Promise<ReviewReport> {
+    const projectIds =
+      allProjects && report.projectIds.length > 0
+        ? report.projectIds
+        : projectId
+          ? [projectId]
+          : [];
+    if (projectIds.length === 0) {
+      return report;
+    }
+    const merged = [...report.proposals];
+    const seen = new Set(merged.map((proposal) => proposalKey(proposal)));
+    for (const pid of projectIds) {
+      let cursor: string | undefined;
+      do {
+        if (token !== this.token) {
+          return report;
+        }
+        const page = await this.api.listProposals(pid, {
+          statuses: ["pending", "stale"],
+          includeSnoozed: true,
+          limit: 200,
+          cursor,
+        });
+        if (token !== this.token) {
+          return report;
+        }
+        for (const proposal of page.items) {
+          if (!proposal.snoozed) {
+            continue;
+          }
+          const key = proposalKey(proposal);
+          if (seen.has(key)) {
+            continue;
+          }
+          seen.add(key);
+          merged.push(proposal);
+        }
+        cursor = page.hasMore ? page.nextCursor : undefined;
+      } while (cursor);
+    }
+    return { ...report, proposals: merged };
+  }
+}
+
+function proposalKey(proposal: Proposal): string {
+  return `${proposal.projectId}:${proposal.id}`;
 }
 
 function removePending(report: ReviewReport, ids: string[]): ReviewReport {

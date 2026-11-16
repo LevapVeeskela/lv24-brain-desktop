@@ -82,6 +82,9 @@ export const InboxPage = observer(function InboxPage({
   const projectId = projects.selectedId;
   const dataReady = review.isReadyFor(projectId);
   const [tab, setTab] = useState<InboxTab>("proposals");
+  const [proposalFilter, setProposalFilter] = useState<
+    "all" | "pending" | "snoozed"
+  >("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
@@ -93,7 +96,19 @@ export const InboxPage = observer(function InboxPage({
   const [snoozePreset, setSnoozePreset] = useState<"7d" | "30d" | "custom">("7d");
   const [snoozeDate, setSnoozeDate] = useState("");
   const proposals = sortProposals(review.proposals);
-  const active = proposals.find((proposal) => proposal.id === selectedId) ?? proposals[0] ?? null;
+  const filteredProposals = proposals.filter((proposal) => {
+    if (proposalFilter === "pending") {
+      return !proposal.snoozed;
+    }
+    if (proposalFilter === "snoozed") {
+      return Boolean(proposal.snoozed);
+    }
+    return true;
+  });
+  const active =
+    filteredProposals.find((proposal) => proposal.id === selectedId) ??
+    filteredProposals[0] ??
+    null;
   const preview = review.previewId === active?.id ? review.preview : null;
   const listed = active ? review.bodies[active.id] : undefined;
   const listedBody = listed?.body;
@@ -108,7 +123,7 @@ export const InboxPage = observer(function InboxPage({
     }
     review.setProject(projectId);
     if (engine.isRunning) {
-      void review.load(projectId);
+      void review.load(projectId, { includeSnoozed: true });
     }
   }, [engine.isRunning, projectId, review]);
 
@@ -144,7 +159,11 @@ export const InboxPage = observer(function InboxPage({
   const toggleAllProjects = (enabled: boolean): void => {
     review.setAllProjects(enabled);
     if (projectId) {
-      void review.load(projectId, { force: true, allProjects: enabled });
+      void review.load(projectId, {
+        force: true,
+        allProjects: enabled,
+        includeSnoozed: true,
+      });
     }
   };
 
@@ -447,7 +466,7 @@ export const InboxPage = observer(function InboxPage({
             <EmptyState title={t("memory.noProject")} />
           ) : !dataReady || (!review.loaded && review.loading) ? (
             <Loading label={t("inbox.title")} />
-          ) : proposals.length === 0 ? (            <EmptyState
+          ) : filteredProposals.length === 0 ? (            <EmptyState
               title={t("inbox.empty")}
               hint={t("inbox.emptyHint")}
             />
@@ -472,8 +491,37 @@ export const InboxPage = observer(function InboxPage({
                     {t("inbox.bulkAccept", { count: checkedProposals.length })}
                   </Button>
                 </div>
+                <div
+                  className="tabs-list"
+                  role="tablist"
+                  aria-label={t("inbox.filter.label")}
+                >
+                  {(
+                    ["all", "pending", "snoozed"] as const
+                  ).map((value) => {
+                    const count =
+                      value === "all"
+                        ? proposals.length
+                        : value === "pending"
+                          ? proposals.filter((item) => !item.snoozed).length
+                          : proposals.filter((item) => Boolean(item.snoozed))
+                              .length;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        role="tab"
+                        aria-selected={proposalFilter === value}
+                        tabIndex={proposalFilter === value ? 0 : -1}
+                        onClick={() => setProposalFilter(value)}
+                      >
+                        {t(`inbox.filter.${value}` as MessageKey, { count })}
+                      </button>
+                    );
+                  })}
+                </div>
                 <ul className="queue-list">
-                  {proposals.map((proposal) => (
+                  {filteredProposals.map((proposal) => (
                     <li
                       key={proposal.id}
                       className={`queue-item ${proposal.id === active?.id ? "is-selected" : ""}`}
@@ -510,6 +558,14 @@ export const InboxPage = observer(function InboxPage({
                           {proposal.connectionId} ·{" "}
                           {relativeTime(proposal.createdAt, locale)}
                         </span>
+                        {proposal.snoozed && proposal.snoozedUntil ? (
+                          <span className="muted small">
+                            {t("inbox.snoozed")}{" "}
+                            {t("inbox.snoozedRemaining", {
+                              value: relativeTime(proposal.snoozedUntil, locale),
+                            })}
+                          </span>
+                        ) : null}
                       </button>
                     </li>
                   ))}
@@ -546,7 +602,7 @@ export const InboxPage = observer(function InboxPage({
                         {active.snoozedUntil
                           ? ` ${t("inbox.snoozedUntil", {
                               date: new Date(active.snoozedUntil).toLocaleDateString(),
-                            })}`
+                            })} (${relativeTime(active.snoozedUntil, locale)})`
                           : ""}
                       </Badge>
                     ) : null}

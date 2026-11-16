@@ -45,3 +45,36 @@ export function nextSelection(
   );
   return proposals[next].id;
 }
+
+export function dedupeProposals(proposals: readonly Proposal[]): Proposal[] {
+  const seen = new Set<string>();
+  const result: Proposal[] = [];
+  for (const proposal of proposals) {
+    const key = `${proposal.projectId}:${proposal.id}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(proposal);
+  }
+  return result;
+}
+
+export function mergeProposals(...groups: readonly (readonly Proposal[])[]): Proposal[] {
+  return sortProposals(dedupeProposals(groups.flat()));
+}
+
+export function filterProposals(
+  proposals: readonly Proposal[],
+  filter: "all" | "pending" | "snoozed",
+): Proposal[] {
+  return proposals.filter((proposal) => {
+    if (filter === "pending") {
+      return !proposal.snoozed;
+    }
+    if (filter === "snoozed") {
+      return Boolean(proposal.snoozed);
+    }
+    return true;
+  });
+}
