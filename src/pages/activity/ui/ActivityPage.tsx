@@ -215,6 +215,15 @@ export const ActivityPage = observer(function ActivityPage({
                             <span className="activity-main">
                               <span className="activity-title">{row.title}</span>
                               <span className="muted small">{row.detail}</span>
+                              {row.run.projectIds?.length ? (
+                                <span className="badge-row">
+                                  {row.run.projectIds.map((project) => (
+                                    <Badge key={project} tone="neutral">
+                                      {project}
+                                    </Badge>
+                                  ))}
+                                </span>
+                              ) : null}
                             </span>
                             <RunStatusBadge run={row.run} />
                             <RunCounts run={row.run} />

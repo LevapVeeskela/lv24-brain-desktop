@@ -6,17 +6,24 @@ The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/l
 built with Tauri v2. See connection results, investigate failed runs and manage
 the background agent, schedules and credentials from one offline-first interface.
 
-**Status: v1.1.0, design refresh + recovery/cancel hardening.** The dashboard, connections list, add
-connection wizard, connection detail (schedule, credentials, runs, received logs),
-activity, projects and settings screens are implemented. Packaging bundles a
-checksum-pinned engine sidecar; the WP5.5 pass added accessible dialogs, phase-
-based engine recovery, truthful offline/paused states and update progress.
+**Status: v1.2.0, memory browser and review inbox.** The dashboard, connections
+list, add connection wizard, connection detail (schedule, credentials, runs,
+received logs), activity, projects, settings, memory and review screens are
+implemented. Desktop 1.2 adds the record browser and detail (body, provenance,
+links, relations, history), inline record editing with `expected_updated_at`
+compare-and-swap, reversible trash/restore, the proposal queue with bounded body
+previews, safe `review --fix` dry-run/apply, a quarantine inbox, project-state
+CAS saves and an all-projects scope for memory, search and review. Packaging
+bundles a checksum-pinned engine sidecar; the WP5.5 pass added accessible
+dialogs, phase-based engine recovery, truthful offline/paused states and update
+progress.
 
-The `design/ux-refresh` branch adds a semantic dark theme, a shared memory mark,
+The 1.1 design refresh added a semantic dark theme, a shared memory mark,
 last-known connection results, a clearer setup wizard and persistent feedback.
-Versions and engine/API contracts are unchanged. See the
-[design audit](docs/design-refresh.md), [verification report](docs/design-refresh/report.md)
-and [before/after screenshots](docs/design-refresh/screenshots/README.md).
+The 1.2 release refreshes the pinned `localapi-v1` contract and regenerates the
+typed client. See the [design audit](docs/design-refresh.md),
+[verification report](docs/design-refresh/report.md) and
+[before/after screenshots](docs/design-refresh/screenshots/README.md).
 
 The current mark is **Neuro**, selected by the owner: a two-hemisphere brain
 silhouette shared by the header, application icon and all tray states.
@@ -208,7 +215,7 @@ Signing status: macOS signing/notarization waits for Apple Developer Program
 approval; Windows signing waits for SignPath Foundation approval. Until then,
 release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 
-## Known limitations (v1.1.0)
+## Known limitations (v1.2.0)
 
 - Local `cargo`/Vite development still resolves the engine from the
   environment; only packaged builds include the sidecar.
@@ -224,6 +231,11 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
   IDs from the owner.
 - Settings displays the data directory/update channel but does not edit
   `brain.yaml`; use the engine CLI or edit the file.
+- The record detail route does not return stored tags, so the edit form's tag
+  field starts empty and only writes tags when the user changes it.
+- `review --fix` executes only the safe repairs (adopt a later next action, drop
+  answered open questions); semantic fixes stay manual. Proposal snooze has no
+  engine route yet.
 - Provider config labels/help come from the engine descriptors and are English;
   the desktop chrome is fully localized.
 - The release matrix currently builds Windows x64, Linux x64, and macOS

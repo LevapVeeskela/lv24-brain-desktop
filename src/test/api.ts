@@ -2,12 +2,16 @@ import type { MemorySource } from "@/entities/memory/api/memoryApi";
 import type { ProjectsSource } from "@/entities/project/api/projectApi";
 import {
   catchupReport,
+  proposalDetail,
   proposalOutcome,
   proposalPage,
   project,
   projectState,
+  quarantinePage,
+  quarantineReview,
   recordDetail,
   recordPage,
+  reviewFixResult,
   reviewReport,
   searchPage,
 } from "./fixtures";
@@ -16,9 +20,16 @@ export function memorySource(overrides: Partial<MemorySource> = {}): MemorySourc
   return {
     listRecords: async () => recordPage([]),
     getRecord: async () => recordDetail(),
+    editRecord: async () => recordDetail(),
+    trashRecord: async () => recordDetail(),
+    restoreRecord: async () => recordDetail(),
     search: async () => searchPage(),
     review: async () => reviewReport(),
+    reviewFix: async () => reviewFixResult(),
+    listQuarantine: async () => quarantinePage(),
+    reviewQuarantine: async () => quarantineReview(),
     listProposals: async () => proposalPage(),
+    getProposal: async () => proposalDetail(),
     promote: async () => proposalOutcome(),
     dismiss: async () => proposalOutcome({ proposalStatus: "dismissed", dismissed: true }),
     catchup: async () => catchupReport(),

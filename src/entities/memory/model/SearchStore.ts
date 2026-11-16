@@ -1,4 +1,5 @@
 import { makeAutoObservable, runInAction } from "mobx";
+import { LocalApiError } from "@/shared/api/client";
 import { errorMessage } from "@/shared/lib/errors";
 import type { MemorySource } from "../api/memoryApi";
 import {
@@ -30,6 +31,8 @@ interface SearchStoreOptions {
 
 export class SearchStore {
   projectId: string | null = null;
+  /** Reads every project the agent allowlist serves instead of one project. */
+  allProjects = false;
   query = "";
   appliedQuery = "";
   filters: SearchFilters = emptySearchFilters();
@@ -40,6 +43,7 @@ export class SearchStore {
   loadingMore = false;
   searched = false;
   error: string | null = null;
+  errorCode: string | null = null;
   notice: string | null = null;
   relaxed = false;
 
@@ -78,6 +82,18 @@ export class SearchStore {
       previousQuery.trim().length >= SEARCH_MIN_LENGTH
     ) {
       this.setQuery(previousQuery);
+    }
+  }
+
+  setAllProjects(value: boolean): void {
+    if (this.allProjects === value) {
+      return;
+    }
+    this.allProjects = value;
+    this.cancelTimer();
+    this.resetResults();
+    if (this.query.trim().length >= SEARCH_MIN_LENGTH) {
+      this.submit();
     }
   }
 
@@ -151,6 +167,7 @@ export class SearchStore {
     this.loadingMore = false;
     this.searched = false;
     this.error = null;
+    this.errorCode = null;
     this.notice = null;
     this.relaxed = false;
     this.cursor = null;
@@ -163,6 +180,7 @@ export class SearchStore {
 
   dismissError(): void {
     this.error = null;
+    this.errorCode = null;
   }
 
   private cancelTimer(): void {
@@ -214,6 +232,7 @@ export class SearchStore {
       const page: SearchPage = await this.api.search({
         query,
         projectId,
+        allProjects: this.allProjects,
         filters: this.filters,
         limit: SEARCH_PAGE_SIZE,
         cursor,
@@ -230,6 +249,7 @@ export class SearchStore {
         this.relaxed = page.relaxed;
         this.searched = true;
         this.appliedQuery = page.query || query;
+        this.errorCode = null;
       });
     } catch (cause) {
       if (token !== this.token || projectId !== this.projectId) {
@@ -237,6 +257,7 @@ export class SearchStore {
       }
       runInAction(() => {
         this.error = errorMessage(cause);
+        this.errorCode = cause instanceof LocalApiError ? cause.code : null;
         this.searched = true;
       });
     } finally {

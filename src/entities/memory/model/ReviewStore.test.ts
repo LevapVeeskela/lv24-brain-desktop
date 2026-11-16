@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { deferred, memorySource } from "@/test/api";
-import { proposal, proposalOutcome, reviewReport } from "@/test/fixtures";
+import {
+  proposal,
+  proposalDetail,
+  proposalOutcome,
+  proposalPage,
+  reviewFixResult,
+  reviewReport,
+} from "@/test/fixtures";
 import { ReviewStore } from "./ReviewStore";
 
 describe("ReviewStore", () => {
@@ -96,6 +103,108 @@ describe("ReviewStore", () => {
     const outcome = await store.dismiss("lv24", "prop-1");
     expect(outcome?.dismissed).toBe(true);
     expect(dismiss).toHaveBeenCalledWith("lv24", "prop-1", {});
+  });
+
+  it("loads an all-projects report and refetches when the scope changes", async () => {
+    const review = vi.fn(async (_project: string | null, options?: { allProjects?: boolean }) =>
+      reviewReport([proposal({ projectId: "beta", id: "prop-b" })], {
+        projectId: options?.allProjects ? "*" : "lv24",
+        projectIds: options?.allProjects ? ["lv24", "beta"] : [],
+        allProjects: options?.allProjects ?? false,
+      }),
+    );
+    const store = new ReviewStore(memorySource({ review }));
+    await store.load("lv24", { allProjects: true });
+    expect(review).toHaveBeenCalledWith("lv24", { allProjects: true });
+    expect(store.report?.projectId).toBe("*");
+    expect(store.report?.projectIds).toEqual(["lv24", "beta"]);
+    expect(store.isReadyFor("lv24")).toBe(true);
+
+    store.setAllProjects(false);
+    expect(store.report).toBeNull();
+    expect(store.isReadyFor("lv24")).toBe(false);
+  });
+
+  it("loads queue bodies once with include_body and a token bound", async () => {
+    const listProposals = vi.fn(async () =>
+      proposalPage([
+        proposal({
+          body: "Use FTS5 because it ships with SQLite.",
+          bodyTruncated: true,
+          bodyTokens: 9,
+          maxTokens: 600,
+        }),
+      ]),
+    );
+    const store = new ReviewStore(memorySource({ listProposals }));
+    await store.loadProposalBodies("lv24", 600);
+    expect(listProposals).toHaveBeenCalledWith("lv24", {
+      statuses: ["pending", "stale"],
+      includeBody: true,
+      maxTokens: 600,
+      limit: 200,
+    });
+    expect(store.bodies["prop-1"]?.body).toContain("FTS5");
+    expect(store.bodies["prop-1"]?.bodyTruncated).toBe(true);
+    await store.loadProposalBodies("lv24", 600);
+    expect(listProposals).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads a bounded proposal preview once per selection", async () => {
+    const getProposal = vi.fn(async () => proposalDetail());
+    const store = new ReviewStore(memorySource({ getProposal }));
+    await store.loadPreview("lv24", "prop-1", 600);
+    expect(getProposal).toHaveBeenCalledWith("lv24", "prop-1", 600);
+    expect(store.preview?.body).toContain("FTS5");
+    await store.loadPreview("lv24", "prop-1", 600);
+    expect(getProposal).toHaveBeenCalledTimes(1);
+    store.clearPreview();
+    expect(store.preview).toBeNull();
+  });
+
+  it("previews safe fixes as a dry run and applies only after confirmation", async () => {
+    const preview = reviewFixResult({
+      dryRun: true,
+      changes: [
+        {
+          kind: "stale-next",
+          action: "set_next_action",
+          field: "next_action",
+          value: "Ship 1.2",
+          evidence: "handoff-2",
+        },
+      ],
+    });
+    const applied = reviewFixResult({
+      dryRun: false,
+      changes: preview.changes,
+    });
+    const reviewFix = vi
+      .fn()
+      .mockResolvedValueOnce(preview)
+      .mockResolvedValueOnce(applied);
+    const review = vi
+      .fn()
+      .mockResolvedValueOnce(reviewReport([]))
+      .mockResolvedValueOnce(reviewReport([]));
+    const store = new ReviewStore(memorySource({ reviewFix, review }));
+    await store.load("lv24");
+
+    await store.previewFix("lv24");
+    expect(reviewFix).toHaveBeenLastCalledWith("lv24", { kinds: undefined });
+    expect(store.fixPreview?.dryRun).toBe(true);
+    expect(store.fixPreview?.changes).toHaveLength(1);
+    expect(store.fixApplied).toBeNull();
+
+    const result = await store.applyFix("lv24");
+    expect(reviewFix).toHaveBeenLastCalledWith("lv24", {
+      apply: true,
+      kinds: undefined,
+    });
+    expect(result?.dryRun).toBe(false);
+    expect(store.fixApplied?.changes[0].value).toBe("Ship 1.2");
+    expect(store.fixPreview).toBeNull();
+    await vi.waitFor(() => expect(review).toHaveBeenCalledTimes(2));
   });
 
   it("bulk promotion keeps failed items and reports the error", async () => {

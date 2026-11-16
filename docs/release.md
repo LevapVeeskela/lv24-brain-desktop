@@ -1,4 +1,4 @@
-# Packaging and release (v1.1.0)
+# Packaging and release (v1.2.0)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -16,7 +16,7 @@ Inputs:
 | `engine_version` | `0.14.0` | LV24 Brain engine release to bundle. |
 | `signed` | `false` | Create updater artifacts and signatures. Requires repo secrets. |
 | `publish_release` | `false` | Publish a GitHub release and `latest.json`. Requires `signed=true` and a tag. |
-| `tag` | empty | Release tag, for example `v1.1.0`. Required only for publishing. |
+| `tag` | empty | Release tag, for example `v1.2.0`. Required only for publishing. |
 | `prerelease` | `true` | Mark the published release as a prerelease. |
 
 Matrix:

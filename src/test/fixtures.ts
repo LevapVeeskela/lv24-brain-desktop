@@ -2,10 +2,15 @@ import type {
   CatchupReport,
   MemoryRecord,
   Proposal,
+  ProposalDetail,
   ProposalOutcome,
   ProposalPage,
+  QuarantineItem,
+  QuarantinePage,
+  QuarantineReviewOutcome,
   RecordDetail,
   RecordPage,
+  ReviewFixResult,
   ReviewReport,
   SearchPage,
 } from "@/entities/memory/model/types";
@@ -90,11 +95,91 @@ export function reviewReport(
 ): ReviewReport {
   return {
     projectId: "lv24",
+    projectIds: [],
+    allProjects: false,
     findings: [],
     dueReviews: [],
     proposals,
     pendingCount: proposals.length,
     quarantinedCount: 0,
+    findingsTruncated: false,
+    dueReviewsTruncated: false,
+    proposalsTruncated: false,
+    ...overrides,
+  };
+}
+
+export function proposalDetail(
+  overrides: Partial<ProposalDetail> = {},
+): ProposalDetail {
+  return {
+    id: "prop-1",
+    projectId: "lv24",
+    kind: "decision",
+    title: "Use SQLite FTS5",
+    status: "pending",
+    body: "Prefer FTS5 because it ships with SQLite.",
+    bodyTruncated: false,
+    bodyTokens: 9,
+    maxTokens: 600,
+    ...overrides,
+  };
+}
+
+export function quarantineItem(
+  overrides: Partial<QuarantineItem> = {},
+): QuarantineItem {
+  return {
+    id: "note-q1",
+    kind: "note",
+    projectId: "lv24",
+    title: "External note",
+    reason: "unreviewed",
+    origin: "connector",
+    trust: "stated",
+    createdAt: timestamp,
+    ageSeconds: 3600,
+    ...overrides,
+  };
+}
+
+export function quarantinePage(
+  items: QuarantineItem[] = [],
+  overrides: Partial<QuarantinePage> = {},
+): QuarantinePage {
+  return {
+    items,
+    page: 1,
+    pageSize: 25,
+    hasMore: false,
+    ...overrides,
+  };
+}
+
+export function quarantineReview(
+  overrides: Partial<QuarantineReviewOutcome> = {},
+): QuarantineReviewOutcome {
+  return {
+    record: memoryRecord({ id: "note-q1" }),
+    provenance: {
+      origin: "connector",
+      trust: "verified",
+      reviewed: true,
+      quarantined: false,
+      needsReview: false,
+    },
+    ...overrides,
+  };
+}
+
+export function reviewFixResult(
+  overrides: Partial<ReviewFixResult> = {},
+): ReviewFixResult {
+  return {
+    projectId: "lv24",
+    dryRun: true,
+    findings: [],
+    changes: [],
     ...overrides,
   };
 }

@@ -6,11 +6,12 @@ import { ConnectionDetailPage } from "@/pages/connection-detail";
 import { ConnectionWizardPage } from "@/pages/connection-wizard";
 import { ConnectionsPage } from "@/pages/connections";
 import { DashboardPage } from "@/pages/dashboard";
-import { InboxPage } from "@/pages/inbox";
+import { InboxPage, ProposalDetailPage } from "@/pages/inbox";
 import { MemoryPage, RecordDetailPage } from "@/pages/memory";
 import { NotFoundPage } from "@/pages/not-found";
 import { ProjectDetailPage } from "@/pages/project-detail";
 import { ProjectsPage } from "@/pages/projects";
+import { QuarantinePage } from "@/pages/quarantine";
 import { SearchPage } from "@/pages/search";
 import { SettingsPage } from "@/pages/settings";
 
@@ -55,6 +56,26 @@ export function AppRouter({ store }: { store: RootStore }) {
             path="inbox"
             element={
               <InboxPage
+                review={store.review}
+                projects={store.projects}
+                engine={store.engine}
+              />
+            }
+          />
+          <Route
+            path="inbox/proposal/:project/:id"
+            element={
+              <ProposalDetailPage
+                review={store.review}
+                engine={store.engine}
+              />
+            }
+          />
+          <Route
+            path="quarantine"
+            element={
+              <QuarantinePage
+                quarantine={store.quarantine}
                 review={store.review}
                 projects={store.projects}
                 engine={store.engine}

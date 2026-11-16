@@ -93,6 +93,17 @@ describe("activity grouping", () => {
     expect(days[0].projects[0].rows[0].actor).toBe("agents");
   });
 
+  it("prefers the run's own project ids over the connection catalogue", () => {
+    const days = buildActivityDays({
+      ...input({ records: [] }),
+      connectionProjects: {},
+      projectNames: { desktop: "Desktop" },
+      runs: [{ ...run, connectionId: undefined, projectIds: ["desktop"] }],
+    });
+    expect(days[0].projects[0].projectName).toBe("Desktop");
+    expect(days[0].projects[0].rows[0].projectId).toBe("desktop");
+  });
+
   it("validates filters and day keys", () => {
     expect(isActivityFilter("me")).toBe(true);
     expect(isActivityFilter("nobody")).toBe(false);

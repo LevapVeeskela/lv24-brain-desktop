@@ -3,7 +3,13 @@ import { EngineStore } from "@/entities/engine/model/EngineStore";
 import { ReviewStore } from "@/entities/memory/model/ReviewStore";
 import { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { memorySource, projectsSource } from "@/test/api";
-import { proposal, project, reviewReport } from "@/test/fixtures";
+import {
+  proposal,
+  proposalDetail,
+  project,
+  reviewFixResult,
+  reviewReport,
+} from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 import { InboxPage } from "./InboxPage";
 
@@ -52,6 +58,100 @@ describe("InboxPage", () => {
     );
     expect(html).toContain("stale source");
     expect(html).toContain("Promote a stale or orphaned source");
+  });
+
+  it("shows a bounded proposal preview and the detail link", () => {
+    const { projects, review, engine } = stores();
+    review.loaded = true;
+    review.report = reviewReport([proposal()]);
+    review.preview = proposalDetail({
+      body: "Prefer FTS5 because it ships with SQLite.",
+      bodyTruncated: true,
+      bodyTokens: 9,
+      maxTokens: 8,
+    });
+    review.previewId = "prop-1";
+    review.previewProjectId = "lv24";
+    const html = renderPage(
+      <InboxPage review={review} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain("Proposal preview");
+    expect(html).toContain("Prefer FTS5 because it ships with SQLite.");
+    expect(html).toContain("Body truncated at 9 of 8 tokens.");
+    expect(html).toContain("/inbox/proposal/lv24/prop-1");
+    expect(html).toContain("Open proposal");
+  });
+
+  it("uses the include_body queue body without a detail request", () => {
+    const { projects, review, engine } = stores();
+    review.loaded = true;
+    review.report = reviewReport([proposal()]);
+    review.bodies = {
+      "prop-1": proposal({
+        body: "Queue body from include_body.",
+        bodyOmitted: false,
+      }),
+    };
+    const html = renderPage(
+      <InboxPage review={review} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain("Queue body from include_body.");
+    expect(html).toContain("Open proposal");
+  });
+
+  it("previews safe fixes before offering an explicit apply", () => {
+    const { projects, review, engine } = stores();
+    review.loaded = true;
+    review.report = reviewReport([]);
+    review.fixPreview = reviewFixResult({
+      dryRun: true,
+      findings: [
+        {
+          kind: "stale-next",
+          severity: "warn",
+          message: "Next action is behind a later handoff",
+          why: "A later handoff exists",
+          next: "Adopt the later next action",
+          confirm: "Is the later handoff authoritative?",
+          fixable: true,
+          fix: "set_next_action",
+        },
+      ],
+      changes: [
+        {
+          kind: "stale-next",
+          action: "set_next_action",
+          field: "next_action",
+          value: "Ship 1.2",
+          evidence: "handoff-2",
+        },
+      ],
+    });
+    const html = renderPage(
+      <InboxPage review={review} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain("Safe fixes");
+    expect(html).toContain("Planned changes: 1");
+    expect(html).toContain("Next action is behind a later handoff");
+    expect(html).toContain("set_next_action");
+    expect(html).toContain("Ship 1.2");
+    expect(html).toContain("Apply (1)");
+    expect(html).toContain("This is a dry run. Nothing has been written.");
+  });
+
+  it("labels rows with their project in an all-projects review", () => {
+    const { projects, review, engine } = stores();
+    review.allProjects = true;
+    review.loaded = true;
+    review.report = reviewReport(
+      [proposal({ projectId: "beta", id: "prop-b" })],
+      { projectId: "*", projectIds: ["lv24", "beta"], allProjects: true },
+    );
+    const html = renderPage(
+      <InboxPage review={review} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain(">beta<");
+    expect(html).toContain("Select one project to preview and apply safe fixes.");
   });
 
   it("renders inbox zero and load errors", () => {

@@ -20,9 +20,12 @@ import {
   PROPOSAL_KINDS,
   PROPOSAL_STATUSES,
   PROVENANCE_ORIGINS,
+  QUARANTINE_REASONS,
   RECORD_KINDS,
   RECORD_SCOPES,
   RELATION_STATUSES,
+  REVIEW_FIX_ACTIONS,
+  REVIEW_FIX_FIELDS,
   REVIEW_SOURCES,
   SEARCH_KINDS,
   TRUST_LEVELS,
@@ -35,17 +38,24 @@ import {
   type MemoryRecord,
   type PageInfo,
   type Proposal,
+  type ProposalDetail,
   type ProposalOutcome,
   type ProposalPage,
+  type QuarantineItem,
+  type QuarantinePage,
+  type QuarantineReviewOutcome,
   type RecordDetail,
   type RecordHistory,
   type RecordLink,
   type RecordPage,
   type Relation,
+  type ReviewFixChange,
+  type ReviewFixResult,
   type ReviewReport,
   type SearchExplain,
   type SearchHit,
   type SearchPage,
+  type TrustLevel,
 } from "../model/types";
 
 export function parsePageInfo(value: unknown, what: string): PageInfo {
@@ -209,6 +219,11 @@ function readRelations(value: unknown): Relation[] {
     const relation = asObject(item, what);
     return {
       target: asString(relation.target, `${what}.target`),
+      targetKind: asOptionalEnum(
+        relation.target_kind,
+        RECORD_KINDS,
+        `${what}.target_kind`,
+      ),
       relation: asString(relation.relation, `${what}.relation`),
       reason: asOptionalString(relation.reason, `${what}.reason`),
       confidence: asOptionalNumber(relation.confidence, `${what}.confidence`),
@@ -295,6 +310,14 @@ export function parseReview(value: unknown): ReviewReport {
   const proposals = asObject(review.proposals, "review.proposals");
   return {
     projectId: asString(review.project_id, "review.project_id"),
+    projectIds:
+      review.project_ids === undefined || review.project_ids === null
+        ? []
+        : asArray(review.project_ids, "review.project_ids", (item, where) =>
+            asString(item, where),
+          ),
+    allProjects:
+      asOptionalBoolean(review.all_projects, "review.all_projects") ?? false,
     findings: asArray(review.findings, "review.findings", (item, what) =>
       parseFinding(item, what),
     ),
@@ -314,12 +337,28 @@ export function parseReview(value: unknown): ReviewReport {
       review.quarantined_count,
       "review.quarantined_count",
     ),
+    findingsTruncated:
+      asOptionalBoolean(
+        review.findings_truncated,
+        "review.findings_truncated",
+      ) ?? false,
+    dueReviewsTruncated:
+      asOptionalBoolean(
+        review.due_reviews_truncated,
+        "review.due_reviews_truncated",
+      ) ?? false,
+    proposalsTruncated:
+      asOptionalBoolean(
+        review.proposals_truncated,
+        "review.proposals_truncated",
+      ) ?? false,
   };
 }
 
 function parseFinding(value: unknown, what: string): Finding {
   const finding = asObject(value, what);
   return {
+    projectId: asOptionalString(finding.project_id, `${what}.project_id`),
     kind: asString(finding.kind, `${what}.kind`),
     severity: asEnum(finding.severity, FINDING_SEVERITIES, `${what}.severity`),
     message: asString(finding.message, `${what}.message`),
@@ -335,6 +374,7 @@ function parseFinding(value: unknown, what: string): Finding {
 function parseDueReview(value: unknown, what: string): DueReview {
   const due = asObject(value, what);
   return {
+    projectId: asOptionalString(due.project_id, `${what}.project_id`),
     kind: asString(due.kind, `${what}.kind`),
     id: asString(due.id, `${what}.id`),
     title: asString(due.title, `${what}.title`),
@@ -380,6 +420,134 @@ export function parseProposal(value: unknown, what = "proposal"): Proposal {
       proposal.source_health,
       `${what}.source_health`,
     ),
+    body: asOptionalString(proposal.body, `${what}.body`),
+    bodyTruncated: asOptionalBoolean(
+      proposal.body_truncated,
+      `${what}.body_truncated`,
+    ),
+    bodyTokens: asOptionalNumber(
+      proposal.body_tokens,
+      `${what}.body_tokens`,
+    ),
+    maxTokens: asOptionalNumber(proposal.max_tokens, `${what}.max_tokens`),
+    bodyOmitted:
+      asOptionalBoolean(proposal.body_omitted, `${what}.body_omitted`) ??
+      false,
+  };
+}
+
+export function parseProposalDetail(value: unknown): ProposalDetail {
+  const proposal = asObject(value, "proposal detail");
+  return {
+    id: asString(proposal.id, "proposal detail.id"),
+    projectId: asString(proposal.project_id, "proposal detail.project_id"),
+    kind: asEnum(
+      proposal.kind,
+      PROPOSAL_KINDS,
+      "proposal detail.kind",
+    ),
+    title: asString(proposal.title, "proposal detail.title"),
+    status: asString(proposal.status, "proposal detail.status"),
+    body: asString(proposal.body, "proposal detail.body"),
+    bodyTruncated: asBoolean(
+      proposal.body_truncated,
+      "proposal detail.body_truncated",
+    ),
+    bodyTokens: asNumber(proposal.body_tokens, "proposal detail.body_tokens"),
+    maxTokens: asNumber(proposal.max_tokens, "proposal detail.max_tokens"),
+  };
+}
+
+export function parseReviewFixResult(value: unknown): ReviewFixResult {
+  const result = asObject(value, "review fix");
+  return {
+    projectId: asString(result.project_id, "review fix.project_id"),
+    dryRun: asBoolean(result.dry_run, "review fix.dry_run"),
+    findings: asArray(result.findings, "review fix.findings", (item, what) =>
+      parseFinding(item, what),
+    ),
+    changes: asArray(result.changes, "review fix.changes", (item, what) =>
+      parseReviewFixChange(item, what),
+    ),
+  };
+}
+
+function parseReviewFixChange(
+  value: unknown,
+  what: string,
+): ReviewFixChange {
+  const change = asObject(value, what);
+  return {
+    kind: asString(change.kind, `${what}.kind`),
+    action: asEnum(change.action, REVIEW_FIX_ACTIONS, `${what}.action`),
+    field: asEnum(change.field, REVIEW_FIX_FIELDS, `${what}.field`),
+    value: asString(change.value, `${what}.value`),
+    evidence: asOptionalString(change.evidence, `${what}.evidence`),
+  };
+}
+
+export function parseQuarantinePage(value: unknown): QuarantinePage {
+  const page = asObject(value, "quarantine page");
+  return {
+    ...parsePageInfo(page, "quarantine page"),
+    items: asArray(page.items, "quarantine page.items", (item, what) =>
+      parseQuarantineItem(item, what),
+    ),
+  };
+}
+
+function parseQuarantineItem(value: unknown, what: string): QuarantineItem {
+  const item = asObject(value, what);
+  return {
+    id: asString(item.id, `${what}.id`),
+    kind: asEnum(item.kind, RECORD_KINDS, `${what}.kind`),
+    projectId: asString(item.project_id, `${what}.project_id`),
+    title: asString(item.title, `${what}.title`),
+    reason: asEnum(item.reason, QUARANTINE_REASONS, `${what}.reason`),
+    origin: asOptionalString(item.origin, `${what}.origin`),
+    trust: asOptionalString(item.trust, `${what}.trust`),
+    createdAt: asOptionalTimestamp(item.created_at, `${what}.created_at`),
+    ageSeconds: asNumber(item.age_seconds, `${what}.age_seconds`),
+  };
+}
+
+export function parseQuarantineReview(
+  value: unknown,
+): QuarantineReviewOutcome {
+  const review = asObject(value, "quarantine review");
+  const provenance = asObject(
+    review.provenance,
+    "quarantine review.provenance",
+  );
+  return {
+    record: parseMemoryRecord(review.record, "quarantine review.record"),
+    provenance: {
+      origin: asEnum(
+        provenance.origin,
+        PROVENANCE_ORIGINS,
+        "quarantine review.provenance.origin",
+      ),
+      trust: asEnum(
+        provenance.trust,
+        TRUST_LEVELS,
+        "quarantine review.provenance.trust",
+      ) as TrustLevel,
+      reviewed:
+        asOptionalBoolean(
+          provenance.reviewed,
+          "quarantine review.provenance.reviewed",
+        ) ?? false,
+      quarantined:
+        asOptionalBoolean(
+          provenance.quarantined,
+          "quarantine review.provenance.quarantined",
+        ) ?? false,
+      needsReview:
+        asOptionalBoolean(
+          provenance.needs_review,
+          "quarantine review.provenance.needs_review",
+        ) ?? false,
+    },
   };
 }
 

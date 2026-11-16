@@ -1,6 +1,8 @@
 import { makeAutoObservable, runInAction } from "mobx";
+import { LocalApiError } from "@/shared/api/client";
 import { errorMessage } from "@/shared/lib/errors";
 import type { MemorySource } from "../api/memoryApi";
+import { RecordEditor } from "./RecordEditor";
 import {
   emptyRecordFilters,
   type CatchupReport,
@@ -13,7 +15,11 @@ import {
 
 export const RECORD_PAGE_SIZE = 25;
 
-function queryFromFilters(filters: RecordFilters, limit: number): RecordListQuery {
+function queryFromFilters(
+  filters: RecordFilters,
+  limit: number,
+  allProjects: boolean,
+): RecordListQuery {
   return {
     kinds: filters.kinds.length ? [...filters.kinds] : undefined,
     status: filters.status || undefined,
@@ -21,13 +27,17 @@ function queryFromFilters(filters: RecordFilters, limit: number): RecordListQuer
     subtype: filters.subtype.trim() || undefined,
     topic: filters.topic.trim() || undefined,
     dueReview: filters.dueReview,
+    allProjects: allProjects || undefined,
     limit,
   };
 }
 
 export class MemoryStore {
+  readonly editor: RecordEditor;
   projectId: string | null = null;
   filters: RecordFilters = emptyRecordFilters();
+  /** Reads every project the agent allowlist serves instead of one project. */
+  allProjects = false;
   items: MemoryRecord[] = [];
   page = 0;
   hasMore = false;
@@ -35,6 +45,7 @@ export class MemoryStore {
   loadingMore = false;
   loaded = false;
   error: string | null = null;
+  errorCode: string | null = null;
 
   detail: RecordDetail | null = null;
   detailId: string | null = null;
@@ -53,6 +64,11 @@ export class MemoryStore {
   catchupLoading = false;
   catchupError: string | null = null;
 
+  recordAction: "trash" | "restore" | null = null;
+  recordActionId: string | null = null;
+  recordActionError: string | null = null;
+  lastTrashed: MemoryRecord | null = null;
+
   private readonly api: MemorySource;
   private cursor: string | null = null;
   private listToken = 0;
@@ -63,6 +79,7 @@ export class MemoryStore {
 
   constructor(api: MemorySource) {
     this.api = api;
+    this.editor = new RecordEditor(api, (detail) => this.applySavedRecord(detail));
     makeAutoObservable(this, {}, { autoBind: true });
   }
 
@@ -93,6 +110,14 @@ export class MemoryStore {
     this.catchupProjectId = null;
     this.catchupLoading = false;
     this.catchupError = null;
+  }
+
+  setAllProjects(value: boolean): void {
+    if (this.allProjects === value) {
+      return;
+    }
+    this.allProjects = value;
+    this.invalidateList();
   }
 
   applyFilters(patch: Partial<RecordFilters>): void {
@@ -143,7 +168,7 @@ export class MemoryStore {
     this.loadingMore = true;
     return this.api
       .listRecords(projectId, {
-        ...queryFromFilters(this.filters, RECORD_PAGE_SIZE),
+        ...queryFromFilters(this.filters, RECORD_PAGE_SIZE, this.allProjects),
         cursor,
       })
       .then(
@@ -163,6 +188,8 @@ export class MemoryStore {
           if (token === this.listToken && projectId === this.projectId) {
             runInAction(() => {
               this.error = errorMessage(cause);
+              this.errorCode =
+                cause instanceof LocalApiError ? cause.code : null;
               this.loadingMore = false;
             });
           }
@@ -224,6 +251,83 @@ export class MemoryStore {
     this.detailProjectId = null;
     this.detailLoading = false;
     this.detailError = null;
+  }
+
+  /** Moves one live record to the project trash and refreshes the list. */
+  async trash(projectId: string, recordId: string): Promise<boolean> {
+    if (this.recordAction) {
+      return false;
+    }
+    runInAction(() => {
+      this.recordAction = "trash";
+      this.recordActionId = recordId;
+      this.recordActionError = null;
+    });
+    try {
+      const trashed = await this.api.trashRecord(projectId, recordId);
+      runInAction(() => {
+        this.lastTrashed = trashed;
+        this.items = this.items.filter(
+          (item) =>
+            !(
+              item.id === trashed.id &&
+              item.projectId === trashed.projectId
+            ),
+        );
+        if (this.detailId === recordId) {
+          this.clearDetail();
+        }
+      });
+      this.reloadActiveList(projectId);
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.recordActionError = errorMessage(cause);
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.recordAction = null;
+        this.recordActionId = null;
+      });
+    }
+  }
+
+  /** Reverses a trash move; the record keeps its id, file and edited text. */
+  async restore(projectId: string, recordId: string): Promise<boolean> {
+    if (this.recordAction) {
+      return false;
+    }
+    runInAction(() => {
+      this.recordAction = "restore";
+      this.recordActionId = recordId;
+      this.recordActionError = null;
+    });
+    try {
+      const restored = await this.api.restoreRecord(projectId, recordId);
+      runInAction(() => {
+        if (this.lastTrashed?.id === restored.id) {
+          this.lastTrashed = null;
+        }
+      });
+      this.reloadActiveList(projectId);
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.recordActionError = errorMessage(cause);
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.recordAction = null;
+        this.recordActionId = null;
+      });
+    }
+  }
+
+  restoreLast(): Promise<boolean> {
+    const trashed = this.lastTrashed;
+    return trashed ? this.restore(trashed.projectId, trashed.id) : Promise.resolve(false);
   }
 
   async loadProjectSummary(projectId: string, limit = 8): Promise<void> {
@@ -309,9 +413,37 @@ export class MemoryStore {
 
   dismissError(): void {
     this.error = null;
+    this.errorCode = null;
     this.detailError = null;
     this.recentError = null;
     this.catchupError = null;
+    this.recordActionError = null;
+  }
+
+  /** Optimistically patches the open detail and the list row after an edit. */
+  private applySavedRecord(detail: RecordDetail): void {
+    this.detail = detail;
+    this.items = this.items.map((item) =>
+      item.id === detail.id && item.projectId === detail.projectId
+        ? detail
+        : item,
+    );
+    this.reloadActiveList(detail.projectId);
+  }
+
+  /**
+   * Refreshes the list only when the changed record belongs to the loaded
+   * scope. Editing a record opened from another project must not retarget the
+   * browser or leave the page waiting for a different project.
+   */
+  private reloadActiveList(projectId: string): void {
+    if (this.allProjects && this.projectId) {
+      void this.load(this.projectId, { force: true });
+      return;
+    }
+    if (this.projectId === projectId) {
+      void this.load(projectId, { force: true });
+    }
   }
 
   private loadListInFlight(): boolean {
@@ -325,6 +457,7 @@ export class MemoryStore {
     this.cursor = null;
     this.loaded = false;
     this.error = null;
+    this.errorCode = null;
     this.loading = false;
     this.loadingMore = false;
     this.listToken++;
@@ -346,7 +479,7 @@ export class MemoryStore {
     try {
       const page: RecordPage = await this.api.listRecords(
         projectId,
-        queryFromFilters(this.filters, RECORD_PAGE_SIZE),
+        queryFromFilters(this.filters, RECORD_PAGE_SIZE, this.allProjects),
       );
       if (token !== this.listToken) {
         return;
@@ -357,6 +490,7 @@ export class MemoryStore {
         this.hasMore = page.hasMore;
         this.cursor = page.nextCursor ?? null;
         this.loaded = true;
+        this.errorCode = null;
       });
     } catch (cause) {
       if (token !== this.listToken) {
@@ -364,6 +498,7 @@ export class MemoryStore {
       }
       runInAction(() => {
         this.error = errorMessage(cause);
+        this.errorCode = cause instanceof LocalApiError ? cause.code : null;
       });
     } finally {
       if (token === this.listToken) {

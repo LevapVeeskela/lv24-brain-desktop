@@ -84,6 +84,36 @@ describe("MemoryPage", () => {
     expect(html).toContain("denied");
   });
 
+  it("labels the project on every row in the all-projects scope", () => {
+    const { projects, memory, engine } = stores();
+    memory.loaded = true;
+    memory.allProjects = true;
+    memory.items = [
+      memoryRecord({ id: "dec-1", projectId: "alpha", title: "Alpha record" }),
+      memoryRecord({ id: "dec-2", projectId: "beta", title: "Beta record" }),
+    ];
+    const html = renderPage(
+      <MemoryPage memory={memory} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain("All projects");
+    expect(html).toContain(">Project</th>");
+    expect(html).toContain(">alpha<");
+    expect(html).toContain(">beta<");
+    expect(html).toContain("/memory/note/dec-1?project=alpha");
+    expect(html).toContain("/memory/note/dec-2?project=beta");
+  });
+
+  it("offers to restore the last trashed record", () => {
+    const { projects, memory, engine } = stores();
+    memory.loaded = true;
+    memory.lastTrashed = memoryRecord({ id: "note-9", title: "Undo me" });
+    const html = renderPage(
+      <MemoryPage memory={memory} projects={projects} engine={engine} />,
+    );
+    expect(html).toContain("was moved to trash.");
+    expect(html).toContain(">Restore</button>");
+  });
+
   it("explains a filtered empty result and offers to clear filters", () => {
     const { projects, memory, engine } = stores();
     memory.loaded = true;

@@ -278,9 +278,7 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": Record<string, never>;
                 };
             };
             responses: {
@@ -309,6 +307,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @description Recent run summaries without error text. Items carry connectionId plus the snake_case connection_id and project_ids of the connection when it is known; actor is omitted because run records do not persist a trigger. */
         get: {
             parameters: {
                 query?: {
@@ -325,7 +324,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Run"][];
+                    };
                 };
             };
         };
@@ -362,7 +363,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Run"];
+                    };
                 };
                 404: components["responses"]["Error"];
             };
@@ -636,11 +639,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Newest-first curated records, paginated. project is required; every other filter is optional. due_review keeps records whose review date has passed. */
+        /** @description Newest-first curated records, paginated. project is optional: omit it or pass all_projects=true to read every project the API serves. due_review keeps records whose review date has passed. */
         get: {
             parameters: {
-                query: {
-                    project: components["parameters"]["Project"];
+                query?: {
+                    /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+                    project?: components["parameters"]["ProjectOptional"];
+                    /** @description Reads every project the API's allowlist serves. Mutually exclusive with project and refused when the allowlist names several projects. */
+                    all_projects?: components["parameters"]["AllProjects"];
                     /** @description Repeated or comma-separated: note, decision, attempt, handoff. */
                     kind?: string[];
                     /** @description Decision status (proposed, accepted, rejected, superseded). */
@@ -691,7 +697,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description One record with its body, links, backlinks, relations, validity and provenance. max_tokens bounds the body; history adds the timeline of the same kind around the record. */
+        /** @description One record with its body, links, backlinks, relations, validity and provenance. max_tokens bounds the body; history adds the timeline of the same kind around the record. Relation rows carry target_kind when the target is live. */
         get: {
             parameters: {
                 query: {
@@ -725,6 +731,135 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /** @description Edits the text of one record in place: title and body (plus tags on a note), never its ID, kind, project, provenance, validity, relations or review state. Body is the note text, the decision context, the attempt result or the handoff summary; a handoff has no title. The stored body is kept in bounded history. expected_updated_at makes the edit a compare-and-swap; a stale value returns 409 with error.current_revision and writes nothing. allow_duplicate accepts text another live record of the same kind already has. An unreviewed record stays unreviewed. */
+        patch: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        title?: string;
+                        body?: string;
+                        tags?: string[];
+                        /** Format: date-time */
+                        expected_updated_at?: string;
+                        /** @default false */
+                        allow_duplicate?: boolean;
+                    };
+                };
+            };
+            responses: {
+                /** @description The edited record with its body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RecordDetail"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                403: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+            };
+        };
+        trace?: never;
+    };
+    "/v1/records/{id}/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Moves one record to its project trash through the same use case as brain record trash. The move is reversible and never deletes a file; an unknown record is 404 and a hand-written note without an id marker is 400 validation. */
+        post: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The trashed record */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Record"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/records/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Restores one trashed record. An id that is not in the project trash is 404. */
+        post: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The restored record */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Record"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -740,7 +875,10 @@ export interface paths {
             parameters: {
                 query: {
                     q: string;
-                    project: components["parameters"]["Project"];
+                    /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+                    project?: components["parameters"]["ProjectOptional"];
+                    /** @description Reads every project the API's allowlist serves. Mutually exclusive with project and refused when the allowlist names several projects. */
+                    all_projects?: components["parameters"]["AllProjects"];
                     /** @description Repeated or comma-separated: note, decision, attempt, handoff, state. */
                     kind?: string[];
                     limit?: number;
@@ -784,11 +922,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Read-only review report: findings with severity/why/next/confirm, due reviews, pending proposals and the quarantined count. */
+        /** @description Read-only review report: findings with severity/why/next/confirm, due reviews, pending proposals and the quarantined count. project is optional; an all-projects report sets project_id to * and names each item's project_id. */
         get: {
             parameters: {
-                query: {
-                    project: components["parameters"]["Project"];
+                query?: {
+                    /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+                    project?: components["parameters"]["ProjectOptional"];
+                    /** @description Reads every project the API's allowlist serves. Mutually exclusive with project and refused when the allowlist names several projects. */
+                    all_projects?: components["parameters"]["AllProjects"];
                 };
                 header?: never;
                 path?: never;
@@ -817,6 +958,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/review/fix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Applies the same safe fixes as brain review --fix: adopts the next action of a later handoff and removes open questions a later record answers. The default is a dry run; writing needs apply=true, and dry_run=true with apply is refused. Semantic fixes are never performed. */
+        post: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: components["requestBodies"]["ReviewFix"];
+            responses: {
+                /** @description Planned or applied safe fixes */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReviewFixResult"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quarantine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The quarantine inbox: unreviewed external writes and unknown origins, newest first, without bodies. Age is whole seconds since creation. */
+        get: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                    limit?: components["parameters"]["Limit"];
+                    /** @description Opaque next_cursor from the previous page; bound to its query. */
+                    cursor?: components["parameters"]["Cursor"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of quarantined records */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["QuarantinePage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/quarantine/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Marks one quarantined record reviewed, optionally replacing its trust, like brain record review. A record with an unknown origin stays quarantined because review cannot repair a malformed origin. Records have no revision, so review is idempotent and has no compare-and-swap. */
+        post: {
+            parameters: {
+                query: {
+                    project: components["parameters"]["Project"];
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        trust?: "verified" | "stated" | "inferred";
+                    };
+                };
+            };
+            responses: {
+                /** @description The record after review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["QuarantineReview"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/proposals": {
         parameters: {
             query?: never;
@@ -824,7 +1101,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Candidate records with source health. Proposal bodies stay out of the list. */
+        /** @description Candidate records with source health. Bodies stay out unless include_body=true; the page shares a body budget and items past it are marked body_omitted. */
         get: {
             parameters: {
                 query: {
@@ -835,6 +1112,9 @@ export interface paths {
                     limit?: components["parameters"]["Limit"];
                     /** @description Opaque next_cursor from the previous page; bound to its query. */
                     cursor?: components["parameters"]["Cursor"];
+                    /** @description Render each candidate's redacted text under max_tokens. */
+                    include_body?: boolean;
+                    max_tokens?: number;
                 };
                 header?: never;
                 path?: never;
@@ -849,6 +1129,52 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ProposalPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/proposals/{project}/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        /** @description One candidate with its bounded redacted body; the preview a promotion would create. */
+        get: {
+            parameters: {
+                query?: {
+                    max_tokens?: number;
+                };
+                header?: never;
+                path: {
+                    project: string;
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Proposal detail */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalDetail"];
                     };
                 };
                 400: components["responses"]["Error"];
@@ -1126,6 +1452,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Run: {
+            id: string;
+            source: string;
+            /** @description Frozen camelCase connection id. */
+            connectionId?: string;
+            /** @description The same id under the memory-route naming. */
+            connection_id?: string;
+            /** @description Projects of the connection record, when it is known. */
+            project_ids?: string[];
+            /** @description Reserved and omitted: run records do not persist who triggered a run. */
+            actor?: string;
+            /** @enum {string} */
+            status: "running" | "success" | "partial" | "failed";
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            counts?: {
+                [key: string]: number;
+            };
+            stats?: Record<string, never>;
+        };
         Page: {
             page: number;
             page_size: number;
@@ -1197,6 +1545,8 @@ export interface components {
         };
         Relation: {
             target: string;
+            /** @enum {string} */
+            target_kind?: "note" | "decision" | "attempt" | "handoff";
             relation: string;
             reason?: string;
             confidence?: number;
@@ -1283,6 +1633,8 @@ export interface components {
             expected_revision?: string;
         };
         Finding: {
+            /** @description Set in an all-projects review. */
+            project_id?: string;
             kind: string;
             /** @enum {string} */
             severity: "error" | "warn" | "info";
@@ -1295,6 +1647,8 @@ export interface components {
             fix?: string;
         };
         DueReview: {
+            /** @description Set in an all-projects review. */
+            project_id?: string;
             /** @enum {string} */
             kind: "note" | "decision" | "attempt" | "handoff" | "state" | "proposal";
             id: string;
@@ -1324,6 +1678,25 @@ export interface components {
             source_orphan: boolean;
             local_only: boolean;
             source_health?: string;
+            /** @description Redacted candidate text; present only with include_body=true. */
+            body?: string;
+            body_truncated?: boolean;
+            body_tokens?: number;
+            max_tokens?: number;
+            /** @description The item's body did not fit the page budget. */
+            body_omitted?: boolean;
+        };
+        ProposalDetail: {
+            id: string;
+            project_id: string;
+            /** @enum {string} */
+            kind: "decision" | "attempt" | "note";
+            title: string;
+            status: string;
+            body: string;
+            body_truncated: boolean;
+            body_tokens: number;
+            max_tokens: number;
         };
         ProposalPage: components["schemas"]["Page"] & {
             items: components["schemas"]["Proposal"][];
@@ -1355,7 +1728,11 @@ export interface components {
             dry_run: boolean;
         };
         Review: {
+            /** @description * in an all-projects review. */
             project_id: string;
+            /** @description The scope of an all-projects review. */
+            project_ids?: string[];
+            all_projects?: boolean;
             findings: components["schemas"]["Finding"][];
             due_reviews: components["schemas"]["DueReview"][];
             proposals: {
@@ -1363,6 +1740,61 @@ export interface components {
                 items: components["schemas"]["Proposal"][];
             };
             quarantined_count: number;
+            /** @description The all-projects aggregate hit its findings cap. */
+            findings_truncated?: boolean;
+            due_reviews_truncated?: boolean;
+            proposals_truncated?: boolean;
+        };
+        ReviewFixRequest: {
+            /**
+             * @description Preview only. Combining dry_run=true with apply=true is refused.
+             * @default true
+             */
+            dry_run: boolean;
+            /**
+             * @description Explicit confirmation to write the safe fixes.
+             * @default false
+             */
+            apply: boolean;
+            /** @description Optional finding kinds to fix; empty fixes every fixable kind. */
+            kinds?: string[];
+        };
+        ReviewFixChange: {
+            kind: string;
+            /** @enum {string} */
+            action: "set_next_action" | "drop_question";
+            /** @enum {string} */
+            field: "next_action" | "open_questions";
+            value: string;
+            evidence?: string;
+        };
+        ReviewFixResult: {
+            project_id: string;
+            dry_run: boolean;
+            findings: components["schemas"]["Finding"][];
+            changes: components["schemas"]["ReviewFixChange"][];
+            state: components["schemas"]["State"];
+        };
+        QuarantineItem: {
+            id: string;
+            /** @enum {string} */
+            kind: "note" | "decision" | "attempt" | "handoff";
+            project_id: string;
+            title: string;
+            /** @enum {string} */
+            reason: "unreviewed" | "unknown_origin";
+            origin?: string;
+            trust?: string;
+            /** Format: date-time */
+            created_at?: string;
+            age_seconds: number;
+        };
+        QuarantinePage: components["schemas"]["Page"] & {
+            items: components["schemas"]["QuarantineItem"][];
+        };
+        QuarantineReview: {
+            record: components["schemas"]["Record"];
+            provenance: components["schemas"]["Provenance"];
         };
         JournalEntry: {
             /** Format: date-time */
@@ -1416,6 +1848,10 @@ export interface components {
     parameters: {
         ID: string;
         Project: string;
+        /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+        ProjectOptional: string;
+        /** @description Reads every project the API's allowlist serves. Mutually exclusive with project and refused when the allowlist names several projects. */
+        AllProjects: boolean;
         /** @description A positive duration (24h, 7d, 2w), a date (2026-11-01) or an RFC3339 time. */
         Since: string;
         Limit: number;
@@ -1425,9 +1861,7 @@ export interface components {
     requestBodies: {
         JSON: {
             content: {
-                "application/json": {
-                    [key: string]: unknown;
-                };
+                "application/json": Record<string, never>;
             };
         };
         StateWrite: {
@@ -1438,6 +1872,11 @@ export interface components {
         ProposalDecision: {
             content: {
                 "application/json": components["schemas"]["ProposalDecision"];
+            };
+        };
+        ReviewFix: {
+            content: {
+                "application/json": components["schemas"]["ReviewFixRequest"];
             };
         };
     };

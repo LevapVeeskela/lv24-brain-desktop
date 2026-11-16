@@ -7,6 +7,7 @@ import {
   isPromotableBulk,
   proposalBlockers,
   type Proposal,
+  type ReviewFixResult,
 } from "@/entities/memory/model/types";
 import {
   ConfidenceBadge,
@@ -18,11 +19,14 @@ import { useI18n, type MessageKey } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { useFeedback } from "@/shared/ui/Feedback";
 import { nextSelection, sortProposals } from "../model/queue";
+
+const PROPOSAL_PREVIEW_TOKENS = 600;
 
 type InboxTab = "proposals" | "findings";
 
@@ -60,6 +64,10 @@ function overdueText(seconds: number, locale: string): string {
   return format.format(Math.round(seconds / 86400), "day");
 }
 
+function proposalDetailPath(proposal: Proposal): string {
+  return `/inbox/proposal/${encodeURIComponent(proposal.projectId)}/${encodeURIComponent(proposal.id)}`;
+}
+
 export const InboxPage = observer(function InboxPage({
   review,
   projects,
@@ -72,7 +80,7 @@ export const InboxPage = observer(function InboxPage({
   const { t, locale } = useI18n();
   const { notify } = useFeedback();
   const projectId = projects.selectedId;
-  const dataReady = review.projectId === projectId;
+  const dataReady = review.isReadyFor(projectId);
   const [tab, setTab] = useState<InboxTab>("proposals");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checked, setChecked] = useState<string[]>([]);
@@ -80,8 +88,12 @@ export const InboxPage = observer(function InboxPage({
   const [title, setTitle] = useState("");
   const [force, setForce] = useState(false);
   const [localYes, setLocalYes] = useState(false);
+  const [applyFixOpen, setApplyFixOpen] = useState(false);
   const proposals = sortProposals(review.proposals);
   const active = proposals.find((proposal) => proposal.id === selectedId) ?? proposals[0] ?? null;
+  const preview = review.previewId === active?.id ? review.preview : null;
+  const listed = active ? review.bodies[active.id] : undefined;
+  const listedBody = listed?.body;
 
   useEffect(() => {
     void projects.load();
@@ -104,6 +116,35 @@ export const InboxPage = observer(function InboxPage({
     setLocalYes(false);
   }, [active?.id, active?.title]);
 
+  useEffect(() => {
+    if (!projectId || !engine.isRunning || review.allProjects) {
+      return;
+    }
+    void review.loadProposalBodies(projectId, PROPOSAL_PREVIEW_TOKENS);
+  }, [engine.isRunning, projectId, review, review.allProjects]);
+
+  useEffect(() => {
+    if (!active || !engine.isRunning) {
+      review.clearPreview();
+      return;
+    }
+    if (listedBody !== undefined) {
+      return;
+    }
+    void review.loadPreview(
+      active.projectId,
+      active.id,
+      PROPOSAL_PREVIEW_TOKENS,
+    );
+  }, [active?.id, active?.projectId, engine.isRunning, listedBody, review]);
+
+  const toggleAllProjects = (enabled: boolean): void => {
+    review.setAllProjects(enabled);
+    if (projectId) {
+      void review.load(projectId, { force: true, allProjects: enabled });
+    }
+  };
+
   const confirmFlags = (proposal: Proposal): boolean => {
     const blockers = proposalBlockers(proposal);
     if (blockers.includes("local-only") && !localYes) {
@@ -119,14 +160,15 @@ export const InboxPage = observer(function InboxPage({
   };
 
   const accept = async (proposal: Proposal): Promise<void> => {
-    if (!projectId || !engine.isRunning || review.isBusy(proposal.id)) {
+    const targetProject = proposal.projectId || projectId;
+    if (!targetProject || !engine.isRunning || review.isBusy(proposal.id)) {
       return;
     }
     if (!confirmFlags(proposal)) {
       notify(t("inbox.acceptBlocked"), "error");
       return;
     }
-    const outcome = await review.promote(projectId, proposal.id, {
+    const outcome = await review.promote(targetProject, proposal.id, {
       as: proposal.kind,
       status: "proposed",
       title: title.trim() && title.trim() !== proposal.title ? title.trim() : undefined,
@@ -148,10 +190,11 @@ export const InboxPage = observer(function InboxPage({
   };
 
   const dismiss = async (proposal: Proposal): Promise<void> => {
-    if (!projectId || !engine.isRunning || review.isBusy(proposal.id)) {
+    const targetProject = proposal.projectId || projectId;
+    if (!targetProject || !engine.isRunning || review.isBusy(proposal.id)) {
       return;
     }
-    const outcome = await review.dismiss(projectId, proposal.id, {});
+    const outcome = await review.dismiss(targetProject, proposal.id, {});
     if (outcome) {
       notify(t("inbox.dismissed"), "success");
       setChecked((current) => current.filter((id) => id !== proposal.id));
@@ -163,7 +206,8 @@ export const InboxPage = observer(function InboxPage({
   const checkedProposals = proposals.filter((proposal) =>
     checked.includes(proposal.id),
   );
-  const canBulk = isPromotableBulk(checkedProposals);
+  // A bulk promotion writes one project; an aggregate queue may span several.
+  const canBulk = !review.allProjects && isPromotableBulk(checkedProposals);
 
   const bulkAccept = async (): Promise<void> => {
     if (!projectId || !canBulk) {
@@ -181,6 +225,26 @@ export const InboxPage = observer(function InboxPage({
     } else {
       notify(t("inbox.actionFailed"), "error");
     }
+  };
+
+  const previewFix = async (): Promise<void> => {
+    if (projectId) {
+      await review.previewFix(projectId);
+    }
+  };
+
+  const applyFix = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    const applied = await review.applyFix(projectId);
+    setApplyFixOpen(false);
+    notify(
+      applied
+        ? t("inbox.fixApplied", { count: applied.changes.length })
+        : t("inbox.fixFailed"),
+      applied ? "success" : "error",
+    );
   };
 
   useEffect(() => {
@@ -240,12 +304,22 @@ export const InboxPage = observer(function InboxPage({
           <h2>{t("inbox.title")}</h2>
           <p className="muted">{t("inbox.subtitle")}</p>
         </div>
-        <Button
-          disabled={!projectId || !engine.isRunning || review.loading}
-          onClick={() => void review.refresh()}
-        >
-          {review.loading ? t("common.loading") : t("actions.refresh")}
-        </Button>
+        <div className="row-actions">
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={review.allProjects}
+              onChange={(event) => toggleAllProjects(event.target.checked)}
+            />
+            {t("memory.allProjects")}
+          </label>
+          <Button
+            disabled={!projectId || !engine.isRunning || review.loading}
+            onClick={() => void review.refresh()}
+          >
+            {review.loading ? t("common.loading") : t("actions.refresh")}
+          </Button>
+        </div>
       </div>
 
       {!engine.isRunning ? (
@@ -264,6 +338,9 @@ export const InboxPage = observer(function InboxPage({
           }
         >
           <span>{review.error}</span>
+          {review.allProjects && review.errorCode === "validation" ? (
+            <span className="muted small"> {t("errors.allProjectsScope")}</span>
+          ) : null}
         </Notice>
       ) : null}
 
@@ -277,6 +354,14 @@ export const InboxPage = observer(function InboxPage({
           }
         >
           <span>{review.actionError}</span>
+        </Notice>
+      ) : null}
+
+      {review.report?.findingsTruncated ||
+      review.report?.dueReviewsTruncated ||
+      review.report?.proposalsTruncated ? (
+        <Notice variant="info">
+          <span>{t("inbox.truncated")}</span>
         </Notice>
       ) : null}
 
@@ -384,6 +469,9 @@ export const InboxPage = observer(function InboxPage({
                           <RecordKindBadge kind={proposal.kind} />
                           <ConfidenceBadge confidence={proposal.confidence} />
                           <SourceHealthBadges proposal={proposal} />
+                          {review.allProjects ? (
+                            <Badge tone="neutral">{proposal.projectId}</Badge>
+                          ) : null}
                         </span>
                         <span className="muted small">
                           {proposal.connectionId} ·{" "}
@@ -420,6 +508,9 @@ export const InboxPage = observer(function InboxPage({
                     <ConfidenceBadge confidence={active.confidence} />
                     <Badge>{t(`inbox.status.${active.status}` as MessageKey)}</Badge>
                     <SourceHealthBadges proposal={active} />
+                    {review.allProjects ? (
+                      <Badge tone="neutral">{active.projectId}</Badge>
+                    ) : null}
                   </div>
                   <dl className="details">
                     <dt>{t("inbox.kind")}</dt>
@@ -431,7 +522,44 @@ export const InboxPage = observer(function InboxPage({
                     <dt>{t("inbox.rule")}</dt>
                     <dd>{active.rule ?? t("common.none")}</dd>
                   </dl>
-                  <p className="muted small">{t("inbox.bodyNote")}</p>
+
+                  <section
+                    className="proposal-preview"
+                    aria-label={t("inbox.preview")}
+                  >
+                    <h4>{t("inbox.preview")}</h4>
+                    {review.previewLoading ? (
+                      <Loading label={t("inbox.preview")} />
+                    ) : review.previewError && listedBody === undefined ? (
+                      <p className="inline-error" role="alert">
+                        {review.previewError}
+                      </p>
+                    ) : listedBody !== undefined || preview ? (
+                      <>
+                        <p className="proposal-body">
+                          {listedBody ?? preview?.body}
+                        </p>
+                        {listed?.bodyTruncated || preview?.bodyTruncated ? (
+                          <p className="muted small">
+                            {t("inbox.previewTruncated", {
+                              tokens:
+                                listed?.bodyTokens ?? preview?.bodyTokens ?? 0,
+                              max: listed?.maxTokens ?? preview?.maxTokens ?? 0,
+                            })}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      <p className="muted small">{t("inbox.previewEmpty")}</p>
+                    )}
+                    <Link
+                      className="text-link"
+                      to={proposalDetailPath(active)}
+                    >
+                      {t("inbox.openDetail")}
+                    </Link>
+                  </section>
+
                   {active.sourceStale || active.sourceOrphan ? (
                     <label className="checkbox">
                       <input
@@ -498,14 +626,84 @@ export const InboxPage = observer(function InboxPage({
             <Notice variant="info">
               <span>
                 {t("inbox.quarantine", { count: review.quarantinedCount })}
-              </span>
+              </span>{" "}
+              <Link className="text-link" to="/quarantine">
+                {t("inbox.openQuarantine")}
+              </Link>
             </Notice>
           ) : null}
+
+          <Card>
+            <div className="card-header">
+              <div>
+                <h3>{t("inbox.fixTitle")}</h3>
+                <p className="muted">{t("inbox.fixSubtitle")}</p>
+              </div>
+              <Button
+                disabled={
+                  !projectId ||
+                  !engine.isRunning ||
+                  review.allProjects ||
+                  review.fixPreviewLoading
+                }
+                title={review.allProjects ? t("inbox.fixNeedsProject") : undefined}
+                loading={review.fixPreviewLoading}
+                onClick={() => void previewFix()}
+              >
+                {t("inbox.fixPreview")}
+              </Button>
+            </div>
+            {review.allProjects ? (
+              <p className="muted small">{t("inbox.fixNeedsProject")}</p>
+            ) : null}
+            {review.fixError ? (
+              <p className="inline-error" role="alert">
+                {review.fixError}
+              </p>
+            ) : null}
+            {review.fixApplied ? (
+              <FixChanges
+                result={review.fixApplied}
+                title={t("inbox.fixAppliedTitle", {
+                  count: review.fixApplied.changes.length,
+                })}
+              />
+            ) : review.fixPreview ? (
+              review.fixPreview.changes.length === 0 ? (
+                <p className="muted">{t("inbox.fixNone")}</p>
+              ) : (
+                <>
+                  <FixChanges
+                    result={review.fixPreview}
+                    title={t("inbox.fixPlanned", {
+                      count: review.fixPreview.changes.length,
+                    })}
+                  />
+                  <p className="muted small">{t("inbox.fixDryRun")}</p>
+                  <div className="form-actions">
+                    <Button
+                      variant="primary"
+                      disabled={review.fixApplyLoading}
+                      onClick={() => setApplyFixOpen(true)}
+                    >
+                      {t("inbox.fixApply", {
+                        count: review.fixPreview.changes.length,
+                      })}
+                    </Button>
+                    <Button variant="ghost" onClick={review.clearFix}>
+                      {t("common.cancel")}
+                    </Button>
+                  </div>
+                </>
+              )
+            ) : null}
+          </Card>
+
           {review.findings.length === 0 ? (
             <EmptyState title={t("inbox.findingsEmpty")} />
           ) : (
             review.findings.map((finding) => (
-              <Card key={`${finding.kind}-${finding.message}`}>
+              <Card key={`${finding.projectId ?? ""}-${finding.kind}-${finding.message}`}>
                 <div className="badge-row">
                   <Badge
                     tone={
@@ -519,6 +717,9 @@ export const InboxPage = observer(function InboxPage({
                     {finding.severity}
                   </Badge>
                   <Badge>{finding.kind}</Badge>
+                  {review.allProjects && finding.projectId ? (
+                    <Badge tone="neutral">{finding.projectId}</Badge>
+                  ) : null}
                   {finding.fixable ? <Badge tone="success">{t("inbox.findingFix", { fix: finding.fix ?? "" })}</Badge> : null}
                 </div>
                 <h3>{finding.message}</h3>
@@ -553,7 +754,11 @@ export const InboxPage = observer(function InboxPage({
                     due.kind === "handoff" ? (
                       <Link
                         className="table-link"
-                        to={`/memory/${due.kind}/${encodeURIComponent(due.id)}`}
+                        to={`/memory/${due.kind}/${encodeURIComponent(due.id)}${
+                          due.projectId
+                            ? `?project=${encodeURIComponent(due.projectId)}`
+                            : ""
+                        }`}
                       >
                         {due.title}
                       </Link>
@@ -561,8 +766,11 @@ export const InboxPage = observer(function InboxPage({
                       <span>{due.title}</span>
                     );
                   return (
-                    <li key={`${due.kind}-${due.id}`}>
+                    <li key={`${due.projectId ?? ""}-${due.kind}-${due.id}`}>
                       {recordLink}{" "}
+                      {due.projectId ? (
+                        <Badge tone="neutral">{due.projectId}</Badge>
+                      ) : null}{" "}
                       <Badge tone="warning">
                         {t("inbox.overdueBy", {
                           value: overdueText(due.overdueSeconds, locale),
@@ -576,6 +784,70 @@ export const InboxPage = observer(function InboxPage({
             )}
           </Card>
         </div>
+
+      <ConfirmDialog
+        open={applyFixOpen}
+        title={t("inbox.fixApplyTitle")}
+        confirmLabel={t("inbox.fixApply", {
+          count: review.fixPreview?.changes.length ?? 0,
+        })}
+        cancelLabel={t("common.cancel")}
+        busy={review.fixApplyLoading}
+        onConfirm={() => void applyFix()}
+        onCancel={() => setApplyFixOpen(false)}
+      >
+        <p>{t("inbox.fixApplyBody")}</p>
+      </ConfirmDialog>
     </div>
   );
 });
+
+function FixChanges({
+  result,
+  title,
+}: {
+  result: ReviewFixResult;
+  title: string;
+}) {
+  const { t } = useI18n();
+  if (result.changes.length === 0) {
+    return <p className="muted">{t("inbox.fixNone")}</p>;
+  }
+  return (
+    <>
+      <h4>{title}</h4>
+      {result.findings.length > 0 ? (
+        <ul className="record-list">
+          {result.findings.map((finding) => (
+            <li key={`${finding.kind}-${finding.message}`}>
+              <Badge
+                tone={
+                  finding.severity === "error"
+                    ? "danger"
+                    : finding.severity === "warn"
+                      ? "warning"
+                      : "info"
+                }
+              >
+                {finding.severity}
+              </Badge>{" "}
+              {finding.message}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <ul className="record-list">
+        {result.changes.map((change, index) => (
+          <li key={`${change.kind}-${change.action}-${index}`}>
+            <Badge tone="info">{change.action}</Badge>{" "}
+            <code>{change.field}</code>{" "}
+            <span>{change.value}</span>
+            {change.evidence ? (
+              <span className="muted small"> — {change.evidence}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { observer } from "mobx-react-lite";
 import { Link, useSearchParams } from "react-router-dom";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
+import { recordPath } from "@/entities/memory/model/links";
 import type { SearchStore } from "@/entities/memory/model/SearchStore";
 import {
   SEARCH_KINDS,
@@ -176,6 +177,16 @@ export const SearchPage = observer(function SearchPage({
                 />
                 {t("search.explain")}
               </label>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={search.allProjects}
+                  onChange={(event) =>
+                    search.setAllProjects(event.target.checked)
+                  }
+                />
+                {t("search.allProjects")}
+              </label>
             </div>
           </fieldset>
         </form>
@@ -197,6 +208,9 @@ export const SearchPage = observer(function SearchPage({
           }
         >
           <span>{search.error}</span>
+          {search.allProjects && search.errorCode === "validation" ? (
+            <span className="muted small"> {t("errors.allProjectsScope")}</span>
+          ) : null}
         </Notice>
       ) : null}
 
@@ -238,6 +252,11 @@ export const SearchPage = observer(function SearchPage({
                       <RecordKindBadge kind={hit.kind as Exclude<SearchKind, "state">} />
                     )}
                     <Badge>{t("search.score", { score: hit.score.toFixed(2) })}</Badge>
+                    {search.allProjects ? (
+                      <Badge tone="neutral">
+                        {t("search.project", { project: hit.projectId })}
+                      </Badge>
+                    ) : null}
                     {hit.supersededBy ? <Badge tone="warning">{t("record.superseded")}</Badge> : null}
                   </div>
                   <h4 className="search-hit-title">
@@ -246,7 +265,11 @@ export const SearchPage = observer(function SearchPage({
                     ) : (
                       <Link
                         className="table-link"
-                        to={`/memory/${hit.kind}/${encodeURIComponent(hit.id)}`}
+                        to={recordPath(
+                          hit.kind as Exclude<SearchKind, "state">,
+                          hit.id,
+                          hit.projectId,
+                        )}
                       >
                         {hit.title}
                       </Link>

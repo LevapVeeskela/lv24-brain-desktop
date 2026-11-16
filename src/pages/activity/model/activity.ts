@@ -111,9 +111,11 @@ export function buildActivityDays(input: ActivityInput): ActivityDayGroup[] {
 }
 
 function runRow(run: Run, input: ActivityInput): ActivityRow | null {
-  const projectId = run.connectionId
-    ? (input.connectionProjects[run.connectionId] ?? null)
-    : null;
+  const projectId =
+    run.projectIds?.[0] ??
+    (run.connectionId
+      ? (input.connectionProjects[run.connectionId] ?? null)
+      : null);
   return {
     key: `run-${run.id}`,
     type: "run",

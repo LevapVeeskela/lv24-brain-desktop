@@ -4,6 +4,7 @@ import { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import { EngineStore } from "@/entities/engine/model/EngineStore";
 import { memoryApi } from "@/entities/memory/api/memoryApi";
 import { MemoryStore } from "@/entities/memory/model/MemoryStore";
+import { QuarantineStore } from "@/entities/memory/model/QuarantineStore";
 import { ReviewStore } from "@/entities/memory/model/ReviewStore";
 import { SearchStore } from "@/entities/memory/model/SearchStore";
 import { projectApi } from "@/entities/project/api/projectApi";
@@ -25,6 +26,7 @@ export class RootStore {
   readonly memory: MemoryStore;
   readonly search: SearchStore;
   readonly review: ReviewStore;
+  readonly quarantine: QuarantineStore;
   /** A second search instance keeps the palette from replacing page results. */
   readonly commandSearch: SearchStore;
 
@@ -42,6 +44,7 @@ export class RootStore {
     this.memory = new MemoryStore(memoryApi);
     this.search = new SearchStore(memoryApi);
     this.review = new ReviewStore(memoryApi);
+    this.quarantine = new QuarantineStore(memoryApi);
     this.commandSearch = new SearchStore(memoryApi, { debounceMs: 160 });
   }
 

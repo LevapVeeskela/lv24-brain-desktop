@@ -142,6 +142,69 @@ describe("MemoryStore", () => {
     expect(store.detail).toBeNull();
   });
 
+  it("reads every project and keeps the project id on each row", async () => {
+    const listRecords = vi.fn(async () =>
+      recordPage([
+        memoryRecord({ id: "a-1", projectId: "alpha" }),
+        memoryRecord({ id: "b-1", projectId: "beta" }),
+      ]),
+    );
+    const store = new MemoryStore(memorySource({ listRecords }));
+    store.setAllProjects(true);
+    expect(store.loaded).toBe(false);
+    await store.load("lv24");
+    expect(listRecords).toHaveBeenCalledWith(
+      "lv24",
+      expect.objectContaining({ allProjects: true }),
+    );
+    expect(store.items.map((item) => item.projectId)).toEqual([
+      "alpha",
+      "beta",
+    ]);
+  });
+
+  it("trashes and restores a record through the reversible lifecycle", async () => {
+    const trashed = memoryRecord({ id: "note-1", title: "Undo me" });
+    const trashRecord = vi.fn(async () => trashed);
+    const restoreRecord = vi.fn(async () => trashed);
+    const listRecords = vi
+      .fn()
+      .mockResolvedValueOnce(recordPage([trashed]))
+      .mockResolvedValue(recordPage([]));
+    const store = new MemoryStore(
+      memorySource({ listRecords, trashRecord, restoreRecord }),
+    );
+    await store.load("lv24");
+    expect(store.items).toHaveLength(1);
+
+    const done = await store.trash("lv24", "note-1");
+    expect(done).toBe(true);
+    expect(trashRecord).toHaveBeenCalledWith("lv24", "note-1");
+    expect(store.items).toEqual([]);
+    expect(store.lastTrashed?.id).toBe("note-1");
+    expect(store.recordAction).toBeNull();
+
+    const restored = await store.restoreLast();
+    expect(restored).toBe(true);
+    expect(restoreRecord).toHaveBeenCalledWith("lv24", "note-1");
+    expect(store.lastTrashed).toBeNull();
+  });
+
+  it("keeps the trashed record and reports a failed move", async () => {
+    const store = new MemoryStore(
+      memorySource({
+        trashRecord: async () => Promise.reject(new Error("protected")),
+      }),
+    );
+    store.items = [memoryRecord({ id: "note-1" })];
+    const done = await store.trash("lv24", "note-1");
+    expect(done).toBe(false);
+    expect(store.items).toHaveLength(1);
+    expect(store.lastTrashed).toBeNull();
+    expect(store.recordActionError).toBe("protected");
+    expect(store.recordAction).toBeNull();
+  });
+
   it("loads the project summary and catchup report", async () => {
     const handoff = memoryRecord({ id: "handoff-1", kind: "handoff" });
     const listRecords = vi.fn(async (_project: string, query?: { kinds?: string[] }) =>

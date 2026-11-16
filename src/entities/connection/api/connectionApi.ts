@@ -31,7 +31,7 @@ export class ConnectionApi {
 
   async create(input: CreateConnectionInput): Promise<Connection> {
     const { data, error, response } = await apiClient.POST("/v1/connections", {
-      body: {
+      body: jsonBody({
         id: input.id,
         provider: input.provider,
         backend: input.backend,
@@ -41,7 +41,7 @@ export class ConnectionApi {
         schedule: input.schedule,
         publish: input.publish,
         settings: input.settings,
-      },
+      }),
     });
     if (error) {
       throw toApiError(response, error);
@@ -64,7 +64,7 @@ export class ConnectionApi {
       "/v1/connections/{id}/credentials/{field}",
       {
         params: { path: { id, field } },
-        body: { value },
+        body: jsonBody({ value }),
       },
     );
     if (error) {
@@ -75,7 +75,7 @@ export class ConnectionApi {
   async setSchedule(id: string, schedule: string): Promise<void> {
     const { error, response } = await apiClient.PUT("/v1/schedules/{connectionId}", {
       params: { path: { connectionId: id } },
-      body: { schedule },
+      body: jsonBody({ schedule }),
     });
     if (error) {
       throw toApiError(response, error);
@@ -208,7 +208,9 @@ function parseRun(value: unknown): Run {
   return {
     id: value.id,
     source: value.source,
-    connectionId: optionalString(value.connectionId),
+    connectionId:
+      optionalString(value.connectionId) ?? optionalString(value.connection_id),
+    projectIds: optionalStringArray(value.project_ids),
     status: parseStatus(value.status),
     startedAt: value.startedAt,
     finishedAt: optionalString(value.finishedAt),
@@ -253,6 +255,14 @@ function parseStats(value: unknown): RunStats | undefined {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+/**
+ * Some frozen routes document an open JSON object, which openapi-typescript
+ * renders as an empty record. The adapters still send a typed object.
+ */
+function jsonBody(body: Record<string, unknown>): Record<string, never> {
+  return body as unknown as Record<string, never>;
 }
 
 function optionalStringArray(value: unknown): string[] | undefined {

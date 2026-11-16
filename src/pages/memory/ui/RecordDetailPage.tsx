@@ -1,8 +1,14 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { observer } from "mobx-react-lite";
-import { Link, useParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { MemoryStore } from "@/entities/memory/model/MemoryStore";
+import { recordPath } from "@/entities/memory/model/links";
 import {
   RECORD_KINDS,
   type MemoryRecord,
@@ -24,12 +30,14 @@ import { formatDateTime } from "@/shared/lib/format";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { Tabs } from "@/shared/ui/Tabs";
 import { useFeedback } from "@/shared/ui/Feedback";
 import { RecordBody } from "./RecordBody";
+import { RecordEditForm } from "./RecordEditForm";
 
 function isRecordKind(value: string | undefined): value is RecordKind {
   return value !== undefined && RECORD_KINDS.includes(value as RecordKind);
@@ -46,10 +54,15 @@ export const RecordDetailPage = observer(function RecordDetailPage({
 }) {
   const { t, locale } = useI18n();
   const { notify } = useFeedback();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const params = useParams<{ kind: string; id: string }>();
-  const projectId = projects.selectedId;
+  const queryProject = searchParams.get("project");
+  const projectId = queryProject || projects.selectedId;
   const kind = params.kind;
   const recordId = params.id;
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
 
   useEffect(() => {
     void projects.load();
@@ -59,7 +72,10 @@ export const RecordDetailPage = observer(function RecordDetailPage({
     if (kind && recordId && projectId && engine.isRunning) {
       void memory.loadDetail(projectId, recordId, { history: true });
     }
-    return () => memory.clearDetail();
+    return () => {
+      memory.editor.close();
+      memory.clearDetail();
+    };
   }, [engine.isRunning, kind, memory, projectId, recordId]);
 
   const detail = memory.detail;
@@ -69,6 +85,28 @@ export const RecordDetailPage = observer(function RecordDetailPage({
       notify(t("memory.permalinkCopied"), "success");
     } catch {
       notify(t("memory.permalinkFailed"), "error");
+    }
+  };
+
+  const cancelEdit = (): void => {
+    if (memory.editor.dirty) {
+      setDiscardOpen(true);
+      return;
+    }
+    memory.editor.close();
+  };
+
+  const confirmTrash = async (): Promise<void> => {
+    if (!projectId || !recordId) {
+      return;
+    }
+    const done = await memory.trash(projectId, recordId);
+    setTrashOpen(false);
+    if (done) {
+      notify(t("memory.trashed"), "success");
+      navigate("/memory");
+    } else if (memory.recordActionError) {
+      notify(memory.recordActionError, "error");
     }
   };
 
@@ -119,11 +157,30 @@ export const RecordDetailPage = observer(function RecordDetailPage({
             </span>
           ) : null}
         </div>
-        {detail?.permalink ? (
-          <Button onClick={() => void copyPermalink(detail.permalink ?? "")}>
-            {t("memory.copyPermalink")}
-          </Button>
-        ) : null}
+        <div className="row-actions">
+          {detail && !memory.editor.open ? (
+            <Button
+              disabled={!engine.isRunning || Boolean(memory.recordAction)}
+              onClick={() => memory.editor.openFor(detail)}
+            >
+              {t("memory.editOpen")}
+            </Button>
+          ) : null}
+          {detail && !memory.editor.open ? (
+            <Button
+              variant="danger"
+              disabled={!engine.isRunning || Boolean(memory.recordAction)}
+              onClick={() => setTrashOpen(true)}
+            >
+              {t("memory.trash")}
+            </Button>
+          ) : null}
+          {detail?.permalink && !memory.editor.open ? (
+            <Button onClick={() => void copyPermalink(detail.permalink ?? "")}>
+              {t("memory.copyPermalink")}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {!engine.isRunning ? (
@@ -150,26 +207,40 @@ export const RecordDetailPage = observer(function RecordDetailPage({
         <Loading label={t("memory.title")} />
       ) : detail ? (
         <>
-          <Card>
-            {detail.bodyTruncated ? (
-              <Notice variant="info">
-                <span>
-                  {t("memory.bodyTruncated", {
-                    tokens: detail.bodyTokens,
-                    max: detail.maxTokens,
-                  })}
-                </span>
-              </Notice>
-            ) : null}
-            <RecordBody body={detail.body} />
-            <p className="muted small">
-              {t("memory.tokens", { count: detail.bodyTokens })} ·{" "}
-              {detail.projectId} ·{" "}
-              {detail.updatedAt
-                ? formatDateTime(detail.updatedAt, locale)
-                : t("common.none")}
-            </p>
-          </Card>
+          {memory.editor.open ? (
+            <Card>
+              <RecordEditForm
+                key={`${detail.id}-${detail.updatedAt ?? ""}`}
+                editor={memory.editor}
+                disabled={!engine.isRunning}
+                onCancel={cancelEdit}
+                onSaved={() => void memory.loadDetail(projectId, recordId, { force: true })}
+              />
+            </Card>
+          ) : null}
+
+          {memory.editor.open ? null : (
+            <Card>
+              {detail.bodyTruncated ? (
+                <Notice variant="info">
+                  <span>
+                    {t("memory.bodyTruncated", {
+                      tokens: detail.bodyTokens,
+                      max: detail.maxTokens,
+                    })}
+                  </span>
+                </Notice>
+              ) : null}
+              <RecordBody body={detail.body} />
+              <p className="muted small">
+                {t("memory.tokens", { count: detail.bodyTokens })} ·{" "}
+                {detail.projectId} ·{" "}
+                {detail.updatedAt
+                  ? formatDateTime(detail.updatedAt, locale)
+                  : t("common.none")}
+              </p>
+            </Card>
+          )}
 
           <Card>
             <Tabs
@@ -195,7 +266,20 @@ export const RecordDetailPage = observer(function RecordDetailPage({
                       <ul className="record-list">
                         {detail.relations.map((relation) => (
                           <li key={`${relation.target}-${relation.relation}`}>
-                            <code>{relation.target}</code>{" "}
+                            {relation.targetKind ? (
+                              <Link
+                                className="table-link"
+                                to={recordPath(
+                                  relation.targetKind,
+                                  relation.target,
+                                  detail.projectId,
+                                )}
+                              >
+                                {relation.target}
+                              </Link>
+                            ) : (
+                              <code>{relation.target}</code>
+                            )}{" "}
                             <Badge tone={relation.status === "accepted" ? "success" : "warning"}>
                               {relation.relation} · {relation.status}
                             </Badge>
@@ -217,6 +301,34 @@ export const RecordDetailPage = observer(function RecordDetailPage({
           </Card>
         </>
       ) : null}
+
+      <ConfirmDialog
+        open={trashOpen}
+        title={t("memory.trashTitle")}
+        confirmLabel={t("memory.trashConfirm")}
+        cancelLabel={t("common.cancel")}
+        danger
+        busy={memory.recordAction === "trash"}
+        onConfirm={() => void confirmTrash()}
+        onCancel={() => setTrashOpen(false)}
+      >
+        <p>{t("memory.trashBody")}</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={discardOpen}
+        title={t("memory.editDiscardTitle")}
+        confirmLabel={t("memory.editDiscard")}
+        cancelLabel={t("common.cancel")}
+        danger
+        onConfirm={() => {
+          setDiscardOpen(false);
+          memory.editor.close();
+        }}
+        onCancel={() => setDiscardOpen(false)}
+      >
+        <p>{t("memory.editDiscardBody")}</p>
+      </ConfirmDialog>
     </div>
   );
 });
@@ -354,7 +466,7 @@ function RecordLinkItem({ record }: { record: MemoryRecord }) {
   return (
     <Link
       className="table-link"
-      to={`/memory/${record.kind}/${encodeURIComponent(record.id)}`}
+      to={recordPath(record.kind, record.id, record.projectId)}
     >
       {record.title}
     </Link>

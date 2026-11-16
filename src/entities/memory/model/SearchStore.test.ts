@@ -105,6 +105,27 @@ describe("SearchStore", () => {
     );
   });
 
+  it("searches every project when the scope toggle is on", async () => {
+    const search = vi.fn(async () => searchPage([{ ...hit, projectId: "beta" }]));
+    const store = new SearchStore(memorySource({ search }), {
+      scheduler: immediateScheduler(),
+    });
+    store.setProject("lv24");
+    store.setQuery("sqlite");
+    await vi.waitFor(() => expect(store.hits).toHaveLength(1));
+    expect(search).toHaveBeenLastCalledWith(
+      expect.objectContaining({ projectId: "lv24", allProjects: false }),
+    );
+
+    store.setAllProjects(true);
+    await vi.waitFor(() =>
+      expect(search).toHaveBeenLastCalledWith(
+        expect.objectContaining({ projectId: "lv24", allProjects: true }),
+      ),
+    );
+    expect(store.hits[0].projectId).toBe("beta");
+  });
+
   it("ignores a stale result after a project change", async () => {
     let resolveSlow!: (value: ReturnType<typeof searchPage>) => void;
     const slow = new Promise<ReturnType<typeof searchPage>>((resolve) => {

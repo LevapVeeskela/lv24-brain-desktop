@@ -125,6 +125,8 @@ export interface Backlink {
 
 export interface Relation {
   target: string;
+  /** Present when the target record is live, so the UI can deep-link it. */
+  targetKind?: RecordKind;
   relation: string;
   reason?: string;
   confidence?: number;
@@ -193,6 +195,17 @@ export interface RecordListQuery {
   limit?: number;
   cursor?: string;
   dueReview?: boolean;
+  /** Reads every project the agent allowlist serves instead of one project. */
+  allProjects?: boolean;
+}
+
+/** Wire request for PATCH /v1/records/{id}. */
+export interface RecordEditPatch {
+  title?: string;
+  body?: string;
+  tags?: string[];
+  expectedUpdatedAt?: string;
+  allowDuplicate?: boolean;
 }
 
 export interface SearchExplain {
@@ -243,13 +256,16 @@ export function emptySearchFilters(): SearchFilters {
 
 export interface SearchRequest {
   query: string;
-  projectId: string;
+  projectId: string | null;
+  allProjects?: boolean;
   filters: SearchFilters;
   limit: number;
   cursor?: string;
 }
 
 export interface Finding {
+  /** Set in an all-projects review. */
+  projectId?: string;
   kind: string;
   severity: FindingSeverity;
   message: string;
@@ -262,6 +278,8 @@ export interface Finding {
 }
 
 export interface DueReview {
+  /** Set in an all-projects review. */
+  projectId?: string;
   kind: string;
   id: string;
   title: string;
@@ -286,6 +304,25 @@ export interface Proposal {
   sourceOrphan: boolean;
   localOnly: boolean;
   sourceHealth?: string;
+  /** Redacted candidate text; present only with include_body=true. */
+  body?: string;
+  bodyTruncated?: boolean;
+  bodyTokens?: number;
+  maxTokens?: number;
+  /** The item's body did not fit the page budget. */
+  bodyOmitted?: boolean;
+}
+
+export interface ProposalDetail {
+  id: string;
+  projectId: string;
+  kind: ProposalKind;
+  title: string;
+  status: string;
+  body: string;
+  bodyTruncated: boolean;
+  bodyTokens: number;
+  maxTokens: number;
 }
 
 export interface ProposalPage extends PageInfo {
@@ -298,15 +335,82 @@ export interface ProposalListQuery {
   kind?: ProposalKind;
   limit?: number;
   cursor?: string;
+  includeBody?: boolean;
+  maxTokens?: number;
 }
 
 export interface ReviewReport {
+  /** `*` in an all-projects review. */
   projectId: string;
+  projectIds: string[];
+  allProjects: boolean;
   findings: Finding[];
   dueReviews: DueReview[];
   proposals: Proposal[];
   pendingCount: number;
   quarantinedCount: number;
+  findingsTruncated: boolean;
+  dueReviewsTruncated: boolean;
+  proposalsTruncated: boolean;
+}
+
+export const REVIEW_FIX_ACTIONS = [
+  "set_next_action",
+  "drop_question",
+] as const;
+export type ReviewFixAction = (typeof REVIEW_FIX_ACTIONS)[number];
+
+export const REVIEW_FIX_FIELDS = ["next_action", "open_questions"] as const;
+export type ReviewFixField = (typeof REVIEW_FIX_FIELDS)[number];
+
+export interface ReviewFixChange {
+  kind: string;
+  action: ReviewFixAction;
+  field: ReviewFixField;
+  value: string;
+  evidence?: string;
+}
+
+export interface ReviewFixRequest {
+  /** Writes the planned fixes when true; the default is a dry run. */
+  apply?: boolean;
+  kinds?: string[];
+}
+
+export interface ReviewFixResult {
+  projectId: string;
+  dryRun: boolean;
+  findings: Finding[];
+  changes: ReviewFixChange[];
+}
+
+export const QUARANTINE_REASONS = ["unreviewed", "unknown_origin"] as const;
+export type QuarantineReason = (typeof QUARANTINE_REASONS)[number];
+
+export interface QuarantineItem {
+  id: string;
+  kind: RecordKind;
+  projectId: string;
+  title: string;
+  reason: QuarantineReason;
+  origin?: string;
+  trust?: string;
+  createdAt?: string;
+  ageSeconds: number;
+}
+
+export interface QuarantinePage extends PageInfo {
+  items: QuarantineItem[];
+}
+
+export interface QuarantineQuery {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface QuarantineReviewOutcome {
+  record: MemoryRecord;
+  provenance: Provenance;
 }
 
 export interface ProposalDecision {

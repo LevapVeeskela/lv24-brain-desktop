@@ -62,6 +62,18 @@ describe("local API response parsing", () => {
     ]);
     expect(runs[0]?.stats?.upserted).toBe(3);
     expect(runs[0]?.counts).toEqual({ items: 12 });
+    const additive = parseRuns([
+      {
+        id: "github-main-2",
+        source: "github",
+        connection_id: "github-main",
+        project_ids: ["lv24", "desktop"],
+        status: "partial",
+        startedAt: "2026-11-09T18:00:00Z",
+      },
+    ]);
+    expect(additive[0]?.connectionId).toBe("github-main");
+    expect(additive[0]?.projectIds).toEqual(["lv24", "desktop"]);
     expect(() => parseRuns([{ id: "x", source: "y", startedAt: "z", status: "wat" }])).toThrow(
       /unknown run status/,
     );

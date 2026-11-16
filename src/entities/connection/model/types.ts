@@ -46,6 +46,8 @@ export interface Run {
   id: string;
   source: string;
   connectionId?: string;
+  /** Projects of the connection record, when the engine knows them. */
+  projectIds?: string[];
   status: ConnectorStatus;
   startedAt: string;
   finishedAt?: string;

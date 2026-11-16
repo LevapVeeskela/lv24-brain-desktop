@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link } from "react-router-dom";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
+import { recordPath } from "@/entities/memory/model/links";
 import type { MemoryStore } from "@/entities/memory/model/MemoryStore";
 import {
   DECISION_STATUSES,
@@ -23,11 +24,13 @@ import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { Select } from "@/shared/ui/Select";
 import { Table } from "@/shared/ui/Table";
+import { useFeedback } from "@/shared/ui/Feedback";
 
 const kindKeys: Record<RecordKind, MessageKey> = {
   note: "record.kind.note",
@@ -46,11 +49,13 @@ export const MemoryPage = observer(function MemoryPage({
   engine: EngineStore;
 }) {
   const { t, locale } = useI18n();
+  const { notify } = useFeedback();
   const projectId = projects.selectedId;
   const projectDataReady = memory.projectId === projectId;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [subtypeDraft, setSubtypeDraft] = useState(memory.filters.subtype);
   const [topicDraft, setTopicDraft] = useState(memory.filters.topic);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const selected =
     memory.items.find((record) => record.id === selectedId) ??
     memory.items[0] ??
@@ -86,6 +91,20 @@ export const MemoryPage = observer(function MemoryPage({
     setSubtypeDraft("");
     setTopicDraft("");
     reload();
+  };
+
+  const toggleAllProjects = (enabled: boolean): void => {
+    memory.setAllProjects(enabled);
+    reload(true);
+  };
+
+  const confirmRestore = async (): Promise<void> => {
+    const restored = await memory.restoreLast();
+    setRestoreOpen(false);
+    notify(
+      restored ? t("memory.restored") : t("memory.restoreFailed"),
+      restored ? "success" : "error",
+    );
   };
 
   return (
@@ -214,6 +233,14 @@ export const MemoryPage = observer(function MemoryPage({
               />
               {t("memory.dueReview")}
             </label>
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={memory.allProjects}
+                onChange={(event) => toggleAllProjects(event.target.checked)}
+              />
+              {t("memory.allProjects")}
+            </label>
             <Button
               variant="secondary"
               onClick={() => updateFilters({ subtype: subtypeDraft, topic: topicDraft })}
@@ -226,6 +253,25 @@ export const MemoryPage = observer(function MemoryPage({
           </div>
         </div>
       </Card>
+
+      {memory.lastTrashed ? (
+        <Notice
+          variant="info"
+          action={
+            <Button
+              variant="link"
+              onClick={() => setRestoreOpen(true)}
+              disabled={Boolean(memory.recordAction)}
+            >
+              {t("memory.restoreLast")}
+            </Button>
+          }
+        >
+          <span>
+            {t("memory.trashUndo", { title: memory.lastTrashed.title })}
+          </span>
+        </Notice>
+      ) : null}
 
       {memory.error ? (
         <Notice
@@ -244,6 +290,9 @@ export const MemoryPage = observer(function MemoryPage({
           }
         >
           <span>{memory.error}</span>
+          {memory.allProjects && memory.errorCode === "validation" ? (
+            <span className="muted small"> {t("errors.allProjectsScope")}</span>
+          ) : null}
         </Notice>
       ) : null}
 
@@ -290,6 +339,9 @@ export const MemoryPage = observer(function MemoryPage({
               <thead>
                 <tr>
                   <th scope="col">{t("common.name")}</th>
+                  {memory.allProjects ? (
+                    <th scope="col">{t("common.project")}</th>
+                  ) : null}
                   <th scope="col">{t("common.kind")}</th>
                   <th scope="col">{t("common.status")}</th>
                   <th scope="col">{t("common.updated")}</th>
@@ -304,7 +356,7 @@ export const MemoryPage = observer(function MemoryPage({
                     <td data-label={t("common.name")}>
                       <Link
                         className="table-link"
-                        to={`/memory/${record.kind}/${encodeURIComponent(record.id)}`}
+                        to={recordPath(record.kind, record.id, record.projectId)}
                         onFocus={() => setSelectedId(record.id)}
                         onClick={() => setSelectedId(record.id)}
                       >
@@ -320,6 +372,11 @@ export const MemoryPage = observer(function MemoryPage({
                         />
                       </span>
                     </td>
+                    {memory.allProjects ? (
+                      <td data-label={t("common.project")}>
+                        <code>{record.projectId}</code>
+                      </td>
+                    ) : null}
                     <td data-label={t("common.kind")}>
                       <RecordKindBadge kind={record.kind} />
                     </td>
@@ -379,7 +436,7 @@ export const MemoryPage = observer(function MemoryPage({
                   </dl>
                   <Link
                     className="btn btn-primary"
-                    to={`/memory/${selected.kind}/${encodeURIComponent(selected.id)}`}
+                    to={recordPath(selected.kind, selected.id, selected.projectId)}
                   >
                     {t("memory.openRecord")}
                   </Link>
@@ -391,6 +448,18 @@ export const MemoryPage = observer(function MemoryPage({
           </aside>
         </div>
       ) : null}
+
+      <ConfirmDialog
+        open={restoreOpen}
+        title={t("memory.restoreTitle")}
+        confirmLabel={t("memory.restoreConfirm")}
+        cancelLabel={t("common.cancel")}
+        busy={memory.recordAction === "restore"}
+        onConfirm={() => void confirmRestore()}
+        onCancel={() => setRestoreOpen(false)}
+      >
+        <p>{t("memory.restoreBody", { title: memory.lastTrashed?.title ?? "" })}</p>
+      </ConfirmDialog>
     </div>
   );
 });
