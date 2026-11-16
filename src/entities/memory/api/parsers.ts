@@ -41,6 +41,7 @@ import {
   type ProposalDetail,
   type ProposalOutcome,
   type ProposalPage,
+  type ProposalSnoozeReceipt,
   type QuarantineItem,
   type QuarantinePage,
   type QuarantineReviewOutcome,
@@ -82,6 +83,12 @@ export function parseMemoryRecord(value: unknown, what = "record"): MemoryRecord
     scope: asOptionalEnum(record.scope, RECORD_SCOPES, `${what}.scope`),
     topicKey: asOptionalString(record.topic_key, `${what}.topic_key`),
     occurrences: asOptionalNumber(record.occurrences, `${what}.occurrences`),
+    tags:
+      record.tags === undefined || record.tags === null
+        ? undefined
+        : asArray(record.tags, `${what}.tags`, (item, where) =>
+            asString(item, where),
+          ),
     createdAt: asOptionalTimestamp(record.created_at, `${what}.created_at`),
     updatedAt: asOptionalTimestamp(record.updated_at, `${what}.updated_at`),
     validity: parseValidity(record.validity, `${what}.validity`),
@@ -333,6 +340,10 @@ export function parseReview(value: unknown): ReviewReport {
       proposals.pending_count,
       "review.proposals.pending_count",
     ),
+    snoozedCount: asNumber(
+      proposals.snoozed_count,
+      "review.proposals.snoozed_count",
+    ),
     quarantinedCount: asNumber(
       review.quarantined_count,
       "review.quarantined_count",
@@ -419,6 +430,11 @@ export function parseProposal(value: unknown, what = "proposal"): Proposal {
     sourceHealth: asOptionalString(
       proposal.source_health,
       `${what}.source_health`,
+    ),
+    snoozed: asOptionalBoolean(proposal.snoozed, `${what}.snoozed`),
+    snoozedUntil: asOptionalTimestamp(
+      proposal.snoozed_until,
+      `${what}.snoozed_until`,
     ),
     body: asOptionalString(proposal.body, `${what}.body`),
     bodyTruncated: asOptionalBoolean(
@@ -573,6 +589,27 @@ export function parseProposalOutcome(value: unknown): ProposalOutcome {
     dismissed:
       asOptionalBoolean(outcome.dismissed, "proposal outcome.dismissed") ?? false,
     dryRun: asOptionalBoolean(outcome.dry_run, "proposal outcome.dry_run") ?? false,
+  };
+}
+
+export function parseProposalSnoozeReceipt(value: unknown): ProposalSnoozeReceipt {
+  const receipt = asObject(value, "proposal snooze receipt");
+  return {
+    projectId: asString(receipt.project_id, "proposal snooze receipt.project_id"),
+    proposalId: asString(
+      receipt.proposal_id,
+      "proposal snooze receipt.proposal_id",
+    ),
+    status: asString(receipt.status, "proposal snooze receipt.status"),
+    snoozed: asBoolean(receipt.snoozed, "proposal snooze receipt.snoozed"),
+    snoozedUntil: asOptionalTimestamp(
+      receipt.snoozed_until,
+      "proposal snooze receipt.snoozed_until",
+    ),
+    updatedAt: asOptionalTimestamp(
+      receipt.updated_at,
+      "proposal snooze receipt.updated_at",
+    ),
   };
 }
 

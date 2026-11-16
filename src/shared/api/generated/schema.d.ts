@@ -1101,7 +1101,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Candidate records with source health. Bodies stay out unless include_body=true; the page shares a body budget and items past it are marked body_omitted. */
+        /** @description Candidate records with source health. Bodies stay out unless include_body=true; the page shares a body budget and items past it are marked body_omitted. Candidates hidden by an active snooze are omitted unless a status filter is given or include_snoozed=true. */
         get: {
             parameters: {
                 query: {
@@ -1114,6 +1114,8 @@ export interface paths {
                     cursor?: components["parameters"]["Cursor"];
                     /** @description Render each candidate's redacted text under max_tokens. */
                     include_body?: boolean;
+                    /** @description Keep candidates hidden by a snooze that has not come due. */
+                    include_snoozed?: boolean;
                     max_tokens?: number;
                 };
                 header?: never;
@@ -1277,6 +1279,79 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/proposals/{project}/{id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Hides a pending or stale candidate from the review queue until a time. until accepts an RFC3339 time, a calendar date, a positive duration (7d) or null to clear; repeating the stored value writes nothing. expected_updated_at makes the write a compare-and-swap and a stale value returns 409 with error.current_revision. Snoozing a promoted or dismissed proposal is 400 validation. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    project: string;
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["ProposalSnooze"];
+            responses: {
+                /** @description The candidate after the snooze write */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalSnoozeReceipt"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+            };
+        };
+        /** @description Clears the snooze of one candidate. The call is idempotent: clearing a candidate that is not snoozed succeeds unchanged. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    project: string;
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The candidate after clearing its snooze */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProposalSnoozeReceipt"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -1520,6 +1595,8 @@ export interface components {
             scope?: "project" | "personal" | "global";
             topic_key?: string;
             occurrences?: number;
+            /** @description Note tags; omitted for every other kind. */
+            tags?: string[];
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
@@ -1678,6 +1755,13 @@ export interface components {
             source_orphan: boolean;
             local_only: boolean;
             source_health?: string;
+            /**
+             * Format: date-time
+             * @description When a snoozed candidate returns to the inbox.
+             */
+            snoozed_until?: string;
+            /** @description The candidate is hidden until snoozed_until. */
+            snoozed?: boolean;
             /** @description Redacted candidate text; present only with include_body=true. */
             body?: string;
             body_truncated?: boolean;
@@ -1693,10 +1777,37 @@ export interface components {
             kind: "decision" | "attempt" | "note";
             title: string;
             status: string;
+            /** Format: date-time */
+            snoozed_until?: string;
+            snoozed?: boolean;
+            /**
+             * Format: date-time
+             * @description Revision for the snooze compare-and-swap.
+             */
+            updated_at?: string;
             body: string;
             body_truncated: boolean;
             body_tokens: number;
             max_tokens: number;
+        };
+        ProposalSnoozeRequest: {
+            /** @description RFC3339 time, calendar date, positive duration (7d) or null to clear. */
+            until: string | null;
+            /**
+             * Format: date-time
+             * @description The updated_at the client read; a stale value is 409 with error.current_revision.
+             */
+            expected_updated_at?: string;
+        };
+        ProposalSnoozeReceipt: {
+            project_id: string;
+            proposal_id: string;
+            status: string;
+            snoozed: boolean;
+            /** Format: date-time */
+            snoozed_until?: string;
+            /** Format: date-time */
+            updated_at?: string;
         };
         ProposalPage: components["schemas"]["Page"] & {
             items: components["schemas"]["Proposal"][];
@@ -1736,7 +1847,10 @@ export interface components {
             findings: components["schemas"]["Finding"][];
             due_reviews: components["schemas"]["DueReview"][];
             proposals: {
+                /** @description Pending candidates only; an active snooze is excluded. */
                 pending_count: number;
+                /** @description Pending or stale candidates hidden by a snooze that has not come due. */
+                snoozed_count: number;
                 items: components["schemas"]["Proposal"][];
             };
             quarantined_count: number;
@@ -1872,6 +1986,11 @@ export interface components {
         ProposalDecision: {
             content: {
                 "application/json": components["schemas"]["ProposalDecision"];
+            };
+        };
+        ProposalSnooze: {
+            content: {
+                "application/json": components["schemas"]["ProposalSnoozeRequest"];
             };
         };
         ReviewFix: {

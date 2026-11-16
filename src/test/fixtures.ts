@@ -5,6 +5,7 @@ import type {
   ProposalDetail,
   ProposalOutcome,
   ProposalPage,
+  ProposalSnoozeReceipt,
   QuarantineItem,
   QuarantinePage,
   QuarantineReviewOutcome,
@@ -101,6 +102,7 @@ export function reviewReport(
     dueReviews: [],
     proposals,
     pendingCount: proposals.length,
+    snoozedCount: 0,
     quarantinedCount: 0,
     findingsTruncated: false,
     dueReviewsTruncated: false,
@@ -243,6 +245,20 @@ export function proposalOutcome(
     already: false,
     dismissed: false,
     dryRun: false,
+    ...overrides,
+  };
+}
+
+export function proposalSnoozeReceipt(
+  overrides: Partial<ProposalSnoozeReceipt> = {},
+): ProposalSnoozeReceipt {
+  return {
+    projectId: "lv24",
+    proposalId: "prop-1",
+    status: "pending",
+    snoozed: true,
+    snoozedUntil: timestamp,
+    updatedAt: timestamp,
     ...overrides,
   };
 }

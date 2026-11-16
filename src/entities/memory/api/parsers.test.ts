@@ -207,6 +207,7 @@ describe("memory response parsers", () => {
       ],
       proposals: {
         pending_count: 1,
+        snoozed_count: 0,
         items: [
           {
             id: "prop-1",
@@ -292,7 +293,7 @@ describe("memory response parsers", () => {
           source: "default",
         },
       ],
-      proposals: { pending_count: 0, items: [] },
+      proposals: { pending_count: 0, snoozed_count: 0, items: [] },
       quarantined_count: 4,
       findings_truncated: true,
       due_reviews_truncated: true,

@@ -82,6 +82,7 @@ export interface MemoryRecord {
   projectId: string;
   kind: RecordKind;
   title: string;
+  tags?: string[];
   status?: string;
   path: string;
   permalink?: string;
@@ -304,6 +305,8 @@ export interface Proposal {
   sourceOrphan: boolean;
   localOnly: boolean;
   sourceHealth?: string;
+  snoozed?: boolean;
+  snoozedUntil?: string;
   /** Redacted candidate text; present only with include_body=true. */
   body?: string;
   bodyTruncated?: boolean;
@@ -332,6 +335,7 @@ export interface ProposalPage extends PageInfo {
 
 export interface ProposalListQuery {
   statuses?: ProposalStatus[];
+  includeSnoozed?: boolean;
   kind?: ProposalKind;
   limit?: number;
   cursor?: string;
@@ -348,6 +352,7 @@ export interface ReviewReport {
   dueReviews: DueReview[];
   proposals: Proposal[];
   pendingCount: number;
+  snoozedCount: number;
   quarantinedCount: number;
   findingsTruncated: boolean;
   dueReviewsTruncated: boolean;
@@ -434,6 +439,15 @@ export interface ProposalOutcome {
   already: boolean;
   dismissed: boolean;
   dryRun: boolean;
+}
+
+export interface ProposalSnoozeReceipt {
+  projectId: string;
+  proposalId: string;
+  status: string;
+  snoozed: boolean;
+  snoozedUntil?: string;
+  updatedAt?: string;
 }
 
 export interface JournalEntry {

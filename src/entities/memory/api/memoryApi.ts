@@ -4,6 +4,7 @@ import {
   parseProposalDetail,
   parseProposalOutcome,
   parseProposalPage,
+  parseProposalSnoozeReceipt,
   parseMemoryRecord,
   parseQuarantinePage,
   parseQuarantineReview,
@@ -21,6 +22,7 @@ import type {
   ProposalListQuery,
   ProposalOutcome,
   ProposalPage,
+  ProposalSnoozeReceipt,
   QuarantinePage,
   QuarantineQuery,
   QuarantineReviewOutcome,
@@ -39,6 +41,12 @@ import type {
 export interface RecordDetailOptions {
   history?: boolean;
   maxTokens?: number;
+}
+
+export interface ProposalSnoozeInput {
+  until?: string | Date | null;
+  expectedUpdatedAt?: string;
+  expected_updated_at?: string;
 }
 
 export interface CatchupOptions {
@@ -104,6 +112,36 @@ export interface MemorySource {
     proposalId: string,
     decision: ProposalDecision,
   ): Promise<ProposalOutcome>;
+  snoozeProposal?(
+    projectId: string,
+    proposalId: string,
+    request?: ProposalSnoozeInput | string | Date | null,
+  ): Promise<ProposalSnoozeReceipt>;
+  snooze?(
+    projectId: string,
+    proposalId: string,
+    request?: ProposalSnoozeInput | string | Date | null,
+  ): Promise<ProposalSnoozeReceipt>;
+  clearProposalSnooze?(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: string | { expectedUpdatedAt?: string; expected_updated_at?: string },
+  ): Promise<ProposalSnoozeReceipt>;
+  clearSnooze?(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: string | { expectedUpdatedAt?: string; expected_updated_at?: string },
+  ): Promise<ProposalSnoozeReceipt>;
+  unsnoozeProposal?(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: string | { expectedUpdatedAt?: string; expected_updated_at?: string },
+  ): Promise<ProposalSnoozeReceipt>;
+  unsnooze?(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: string | { expectedUpdatedAt?: string; expected_updated_at?: string },
+  ): Promise<ProposalSnoozeReceipt>;
   catchup(projectId: string, options?: CatchupOptions): Promise<CatchupReport>;
 }
 
@@ -297,6 +335,7 @@ export const memoryApi: MemorySource = {
           limit: query.limit,
           cursor: query.cursor,
           include_body: query.includeBody || undefined,
+          include_snoozed: query.includeSnoozed || undefined,
           max_tokens: query.maxTokens,
         },
       },
@@ -351,6 +390,30 @@ export const memoryApi: MemorySource = {
     return parseProposalOutcome(data);
   },
 
+  async snoozeProposal(projectId, proposalId, request = {}) {
+    return snoozeProposalRequest(projectId, proposalId, request);
+  },
+
+  async snooze(projectId, proposalId, request = {}) {
+    return snoozeProposalRequest(projectId, proposalId, request);
+  },
+
+  async clearProposalSnooze(projectId, proposalId, expectedUpdatedAt) {
+    return clearSnoozeRequest(projectId, proposalId, expectedUpdatedAt);
+  },
+
+  async clearSnooze(projectId, proposalId, expectedUpdatedAt) {
+    return clearSnoozeRequest(projectId, proposalId, expectedUpdatedAt);
+  },
+
+  async unsnoozeProposal(projectId, proposalId, expectedUpdatedAt) {
+    return clearSnoozeRequest(projectId, proposalId, expectedUpdatedAt);
+  },
+
+  async unsnooze(projectId, proposalId, expectedUpdatedAt) {
+    return clearSnoozeRequest(projectId, proposalId, expectedUpdatedAt);
+  },
+
   async catchup(projectId, options = {}) {
     const { data, error, response } = await apiClient.GET("/v1/catchup", {
       params: {
@@ -395,4 +458,102 @@ export function recordEditBody(patch: RecordEditPatch) {
 /** Trash and restore return a record row without body, links or history. */
 function parseRecordRow(value: unknown): MemoryRecord {
   return parseMemoryRecord(value, "record");
+}
+
+function normalizeSnoozeUntil(value: unknown): { until: string | null; clear: boolean } {
+  if (value === null || value === undefined) {
+    return { until: null, clear: true };
+  }
+  if (value instanceof Date) {
+    return { until: value.toISOString(), clear: false };
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "" || trimmed.toLowerCase() === "null") {
+      return { until: null, clear: true };
+    }
+    return { until: trimmed, clear: false };
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    if ("until" in obj) {
+      return normalizeSnoozeUntil(obj.until);
+    }
+  }
+  return { until: null, clear: false };
+}
+
+function normalizeExpectedUpdatedAt(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  if (typeof value === "string") {
+    return value.trim() || undefined;
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidate =
+      obj.expectedUpdatedAt ?? obj.expected_updated_at ?? obj.updatedAt ?? obj.updated_at;
+    if (typeof candidate === "string") {
+      return candidate.trim() || undefined;
+    }
+  }
+  return undefined;
+}
+
+async function snoozeProposalRequest(
+  projectId: string,
+  proposalId: string,
+  request: unknown,
+): Promise<ProposalSnoozeReceipt> {
+  let untilInput: unknown = null;
+  let expectedUpdatedAt: string | undefined;
+  if (typeof request === "string" || request instanceof Date || request === null) {
+    untilInput = request;
+  } else if (typeof request === "object" && request !== null) {
+    const obj = request as Record<string, unknown>;
+    untilInput = Object.prototype.hasOwnProperty.call(obj, "until")
+      ? obj.until
+      : obj;
+    expectedUpdatedAt = normalizeExpectedUpdatedAt(obj);
+  }
+  const normalized = normalizeSnoozeUntil(untilInput);
+  const body: Record<string, unknown> = { until: normalized.until };
+  if (expectedUpdatedAt) {
+    body.expected_updated_at = expectedUpdatedAt;
+  }
+  const { data, error, response } = await apiClient.POST(
+    "/v1/proposals/{project}/{id}/snooze",
+    {
+      params: { path: { project: projectId, id: proposalId } },
+      body: body as any,
+    },
+  );
+  if (error) {
+    throw toApiError(response, error);
+  }
+  return parseProposalSnoozeReceipt(data);
+}
+
+async function clearSnoozeRequest(
+  projectId: string,
+  proposalId: string,
+  expectedUpdatedAt: unknown,
+): Promise<ProposalSnoozeReceipt> {
+  const expected = normalizeExpectedUpdatedAt(expectedUpdatedAt);
+  const body: Record<string, unknown> = { until: null };
+  if (expected) {
+    body.expected_updated_at = expected;
+  }
+  const { data, error, response } = await apiClient.POST(
+    "/v1/proposals/{project}/{id}/snooze",
+    {
+      params: { path: { project: projectId, id: proposalId } },
+      body: body as any,
+    },
+  );
+  if (error) {
+    throw toApiError(response, error);
+  }
+  return parseProposalSnoozeReceipt(data);
 }

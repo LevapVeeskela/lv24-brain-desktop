@@ -232,6 +232,15 @@ export const RecordDetailPage = observer(function RecordDetailPage({
                 </Notice>
               ) : null}
               <RecordBody body={detail.body} />
+              {detail.tags && detail.tags.length > 0 ? (
+                <div className="badge-row" aria-label={t("memory.editFieldTags")}>
+                  {detail.tags.map((tag) => (
+                    <Badge key={tag} tone="neutral">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              ) : null}
               <p className="muted small">
                 {t("memory.tokens", { count: detail.bodyTokens })} ·{" "}
                 {detail.projectId} ·{" "}

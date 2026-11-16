@@ -69,13 +69,14 @@ export class RecordEditor {
     this.projectId = detail.projectId;
     this.recordId = detail.id;
     this.kind = detail.kind;
+    const tags = (detail.tags ?? []).join(", ");
     this.title = detail.title;
     this.body = detail.body;
-    this.tags = "";
+    this.tags = tags;
     this.baseline = {
       title: detail.title,
       body: detail.body,
-      tags: "",
+      tags,
     };
     this.expectedUpdatedAt = detail.updatedAt;
     this.saving = false;
@@ -138,14 +139,15 @@ export class RecordEditor {
     try {
       const detail = await this.api.editRecord(projectId, recordId, patch);
       runInAction(() => {
+        const savedTags = (detail.tags ?? []).join(", ");
         this.baseline = {
           title: detail.title,
           body: detail.body,
-          tags: "",
+          tags: savedTags,
         };
         this.title = detail.title;
         this.body = detail.body;
-        this.tags = "";
+        this.tags = savedTags;
         this.expectedUpdatedAt = detail.updatedAt;
         this.allowDuplicate = false;
         this.open = false;

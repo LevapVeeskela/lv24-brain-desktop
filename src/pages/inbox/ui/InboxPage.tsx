@@ -89,6 +89,9 @@ export const InboxPage = observer(function InboxPage({
   const [force, setForce] = useState(false);
   const [localYes, setLocalYes] = useState(false);
   const [applyFixOpen, setApplyFixOpen] = useState(false);
+  const [snoozeOpen, setSnoozeOpen] = useState(false);
+  const [snoozePreset, setSnoozePreset] = useState<"7d" | "30d" | "custom">("7d");
+  const [snoozeDate, setSnoozeDate] = useState("");
   const proposals = sortProposals(review.proposals);
   const active = proposals.find((proposal) => proposal.id === selectedId) ?? proposals[0] ?? null;
   const preview = review.previewId === active?.id ? review.preview : null;
@@ -198,6 +201,36 @@ export const InboxPage = observer(function InboxPage({
     if (outcome) {
       notify(t("inbox.dismissed"), "success");
       setChecked((current) => current.filter((id) => id !== proposal.id));
+    } else {
+      notify(t("inbox.actionFailed"), "error");
+    }
+  };
+
+  const snoozeProposalAction = async (
+    proposal: Proposal,
+    until: string,
+  ): Promise<void> => {
+    const targetProject = proposal.projectId || projectId;
+    if (!targetProject || !engine.isRunning || review.isBusy(proposal.id)) {
+      return;
+    }
+    const outcome = await review.snooze(targetProject, proposal.id, until, proposal.updatedAt);
+    if (outcome) {
+      notify(t("inbox.snoozed"), "success");
+      setSnoozeOpen(false);
+    } else {
+      notify(t("inbox.actionFailed"), "error");
+    }
+  };
+
+  const unsnoozeProposalAction = async (proposal: Proposal): Promise<void> => {
+    const targetProject = proposal.projectId || projectId;
+    if (!targetProject || !engine.isRunning || review.isBusy(proposal.id)) {
+      return;
+    }
+    const outcome = await review.unsnooze(targetProject, proposal.id, proposal.updatedAt);
+    if (outcome) {
+      notify(t("inbox.unsnooze"), "success");
     } else {
       notify(t("inbox.actionFailed"), "error");
     }
@@ -507,6 +540,16 @@ export const InboxPage = observer(function InboxPage({
                     <RecordKindBadge kind={active.kind} />
                     <ConfidenceBadge confidence={active.confidence} />
                     <Badge>{t(`inbox.status.${active.status}` as MessageKey)}</Badge>
+                    {active.snoozed ? (
+                      <Badge tone="warning">
+                        {t("inbox.snoozed")}
+                        {active.snoozedUntil
+                          ? ` ${t("inbox.snoozedUntil", {
+                              date: new Date(active.snoozedUntil).toLocaleDateString(),
+                            })}`
+                          : ""}
+                      </Badge>
+                    ) : null}
                     <SourceHealthBadges proposal={active} />
                     {review.allProjects ? (
                       <Badge tone="neutral">{active.projectId}</Badge>
@@ -583,6 +626,44 @@ export const InboxPage = observer(function InboxPage({
                   {!confirmFlags(active) ? (
                     <p className="muted small">{t("inbox.acceptBlocked")}</p>
                   ) : null}
+                  {snoozeOpen && !active.snoozed ? (
+                    <div className="field-row">
+                      <select
+                        className="input"
+                        value={snoozePreset}
+                        onChange={(event) =>
+                          setSnoozePreset(event.target.value as "7d" | "30d" | "custom")
+                        }
+                      >
+                        <option value="7d">{t("inbox.snooze7d")}</option>
+                        <option value="30d">{t("inbox.snooze30d")}</option>
+                        <option value="custom">{t("inbox.snoozeCustom")}</option>
+                      </select>
+                      {snoozePreset === "custom" ? (
+                        <input
+                          type="date"
+                          className="input"
+                          value={snoozeDate}
+                          onChange={(event) => setSnoozeDate(event.target.value)}
+                        />
+                      ) : null}
+                      <Button
+                        variant="secondary"
+                        disabled={
+                          review.isBusy(active.id) ||
+                          (snoozePreset === "custom" && !snoozeDate)
+                        }
+                        onClick={() =>
+                          void snoozeProposalAction(
+                            active,
+                            snoozePreset === "custom" ? snoozeDate : snoozePreset,
+                          )
+                        }
+                      >
+                        {t("inbox.snoozeConfirm")}
+                      </Button>
+                    </div>
+                  ) : null}
                   <div className="form-actions">
                     <Button
                       variant="primary"
@@ -605,6 +686,22 @@ export const InboxPage = observer(function InboxPage({
                     >
                       {t("inbox.dismiss")}
                     </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={review.isBusy(active.id) || !engine.isRunning}
+                      onClick={() => setSnoozeOpen((current) => !current)}
+                    >
+                      {t("inbox.snooze")}
+                    </Button>
+                    {active.snoozed ? (
+                      <Button
+                        variant="ghost"
+                        disabled={review.isBusy(active.id) || !engine.isRunning}
+                        onClick={() => void unsnoozeProposalAction(active)}
+                      >
+                        {t("inbox.unsnooze")}
+                      </Button>
+                    ) : null}
                   </div>
                 </Card>
               ) : null}

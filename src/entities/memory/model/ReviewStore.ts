@@ -27,6 +27,7 @@ export class ReviewStore {
   /** Reads every project the agent allowlist serves instead of one project. */
   allProjects = false;
   report: ReviewReport | null = null;
+  includeSnoozed = false;
   loading = false;
   loaded = false;
   error: string | null = null;
@@ -81,6 +82,10 @@ export class ReviewStore {
 
   get pendingCount(): number {
     return this.report?.pendingCount ?? 0;
+  }
+
+  get snoozedCount(): number {
+    return this.report?.snoozedCount ?? 0;
   }
 
   get quarantinedCount(): number {
@@ -368,6 +373,155 @@ export class ReviewStore {
     decision: ProposalDecision = {},
   ): Promise<ProposalOutcome | null> {
     return this.decide(projectId, proposalId, decision, "dismiss");
+  }
+
+  private resolveApiFn(...names: string[]): ((...args: any[]) => any) | null {
+    const api = this.api as unknown as Record<string, unknown>;
+    for (const name of names) {
+      const candidate = api[name];
+      if (typeof candidate === "function") {
+        return candidate as (...args: any[]) => any;
+      }
+    }
+    return null;
+  }
+
+  private normalizeSnoozeArgs(
+    untilOrRequest: unknown,
+    expectedUpdatedAt: unknown,
+  ): { until: unknown; expectedUpdatedAt: unknown } {
+    if (
+      typeof untilOrRequest === "object" &&
+      untilOrRequest !== null &&
+      !(untilOrRequest instanceof Date)
+    ) {
+      const obj = untilOrRequest as Record<string, unknown>;
+      if (
+        Object.prototype.hasOwnProperty.call(obj, "until") ||
+        Object.prototype.hasOwnProperty.call(obj, "expectedUpdatedAt") ||
+        Object.prototype.hasOwnProperty.call(obj, "expected_updated_at")
+      ) {
+        return {
+          until: Object.prototype.hasOwnProperty.call(obj, "until")
+            ? obj.until
+            : untilOrRequest,
+          expectedUpdatedAt:
+            obj.expectedUpdatedAt ??
+            obj.expected_updated_at ??
+            expectedUpdatedAt,
+        };
+      }
+    }
+    return { until: untilOrRequest, expectedUpdatedAt };
+  }
+
+  async snooze(
+    projectId: string,
+    proposalId: string,
+    untilOrRequest?: unknown,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, untilOrRequest, expectedUpdatedAt, false);
+  }
+
+  async snoozeProposal(
+    projectId: string,
+    proposalId: string,
+    untilOrRequest?: unknown,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, untilOrRequest, expectedUpdatedAt, false);
+  }
+
+  async unsnooze(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, null, expectedUpdatedAt, true);
+  }
+
+  async clearSnooze(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, null, expectedUpdatedAt, true);
+  }
+
+  async clearProposalSnooze(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, null, expectedUpdatedAt, true);
+  }
+
+  async unsnoozeProposal(
+    projectId: string,
+    proposalId: string,
+    expectedUpdatedAt?: unknown,
+  ): Promise<unknown> {
+    return this.performSnooze(projectId, proposalId, null, expectedUpdatedAt, true);
+  }
+
+  private async performSnooze(
+    projectId: string,
+    proposalId: string,
+    untilOrRequest: unknown,
+    expectedUpdatedAt: unknown,
+    clear: boolean,
+  ): Promise<unknown> {
+    const { until, expectedUpdatedAt: expected } = this.normalizeSnoozeArgs(
+      untilOrRequest,
+      expectedUpdatedAt,
+    );
+    const finalUntil = clear ? null : until;
+    const api = this.api as Record<string, any>;
+    const fn =
+      (clear
+        ? this.resolveApiFn(
+            "clearProposalSnooze",
+            "clearSnooze",
+            "unsnoozeProposal",
+            "unsnooze",
+            "snoozeProposal",
+            "snooze",
+          )
+        : this.resolveApiFn("snoozeProposal", "snooze")) ?? null;
+    if (!fn) {
+      return null;
+    }
+    const before = this.report;
+    runInAction(() => {
+      this.actionError = null;
+      this.busyIds = [...this.busyIds, proposalId];
+      if (this.report) {
+        this.report = removePending(this.report, [proposalId]);
+      }
+    });
+    try {
+      const requestPayload =
+        fn === api.snoozeProposal || fn === api.snooze
+          ? { until: finalUntil, expectedUpdatedAt: expected }
+          : expected;
+      const outcome =
+        fn === api.snoozeProposal || fn === api.snooze
+          ? await fn.call(api, projectId, proposalId, requestPayload)
+          : await fn.call(api, projectId, proposalId, expected);
+      void this.refresh();
+      return outcome;
+    } catch (cause) {
+      runInAction(() => {
+        this.report = before;
+        this.actionError = errorMessage(cause);
+      });
+      return null;
+    } finally {
+      runInAction(() => {
+        this.busyIds = this.busyIds.filter((id) => id !== proposalId);
+      });
+    }
   }
 
   /**
