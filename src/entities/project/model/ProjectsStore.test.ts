@@ -69,6 +69,39 @@ describe("ProjectsStore", () => {
     expect(store.saving).toBe(false);
   });
 
+  it("marks the state reviewed with the chosen trust", async () => {
+    const store = new ProjectsStore(projectsSource());
+    await store.loadState("lv24");
+    const done = await store.reviewState("lv24", {
+      reviewed: true,
+      trust: "stated",
+    });
+    expect(done).toBe(true);
+    expect(store.state?.provenance.reviewed).toBe(true);
+    expect(store.state?.provenance.trust).toBe("stated");
+    expect(store.reviewing).toBe(false);
+    expect(store.reviewError).toBeNull();
+  });
+
+  it("keeps the optimistic state on a state review CAS conflict", async () => {
+    const store = new ProjectsStore(
+      projectsSource({
+        reviewState: async () => {
+          throw new LocalApiError(409, "conflict", "stale", "rev-2");
+        },
+      }),
+    );
+    await store.loadState("lv24");
+    const done = await store.reviewState("lv24", {
+      reviewed: true,
+      expectedRevision: "rev-1",
+    });
+    expect(done).toBe(false);
+    expect(store.stateConflict).toBe(true);
+    expect(store.conflictRevision).toBe("rev-2");
+    expect(store.reviewError).toBeTruthy();
+  });
+
   it("drops the previous project state when the selection changes", async () => {
     const store = new ProjectsStore(projectsSource());
     await store.loadState("lv24");

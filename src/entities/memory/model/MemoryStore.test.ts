@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { LocalApiError } from "@/shared/api/client";
 import { deferred, memorySource } from "@/test/api";
 import {
   catchupReport,
@@ -203,6 +204,95 @@ describe("MemoryStore", () => {
     expect(store.lastTrashed).toBeNull();
     expect(store.recordActionError).toBe("protected");
     expect(store.recordAction).toBeNull();
+  });
+
+  it("marks a reviewed record through the review adapter and merges provenance", async () => {
+    const reviewed = memoryRecord({
+      id: "note-q1",
+      provenance: {
+        origin: "connector",
+        trust: "verified",
+        reviewed: true,
+        quarantined: false,
+        needsReview: false,
+      },
+    });
+    const reviewRecord = vi.fn(async () => reviewed);
+    const store = new MemoryStore(memorySource({ reviewRecord }));
+    store.detail = recordDetail({ id: "note-q1" });
+
+    const done = await store.review("lv24", "note-q1", {
+      reviewed: true,
+      trust: "verified",
+    });
+    expect(done).toBe(true);
+    expect(reviewRecord).toHaveBeenCalledWith("lv24", "note-q1", {
+      reviewed: true,
+      trust: "verified",
+    });
+    expect(store.detail?.provenance.reviewed).toBe(true);
+    expect(store.detail?.provenance.trust).toBe("verified");
+    expect(store.recordAction).toBeNull();
+  });
+
+  it("keeps the optimistic detail on a failed review and reports the error", async () => {
+    const store = new MemoryStore(
+      memorySource({
+        reviewRecord: async () => Promise.reject(new Error("denied")),
+      }),
+    );
+    store.detail = recordDetail({
+      id: "note-q1",
+      provenance: {
+        origin: "human",
+        trust: "stated",
+        reviewed: false,
+        quarantined: false,
+        needsReview: true,
+      },
+    });
+
+    const done = await store.review("lv24", "note-q1", { reviewed: true });
+    expect(done).toBe(false);
+    expect(store.detail?.provenance.reviewed).toBe(false);
+    expect(store.recordActionError).toBe("denied");
+    expect(store.recordAction).toBeNull();
+  });
+
+  it("rolls back the optimistic detail and reloads on a review CAS conflict", async () => {
+    const reviewRecord = vi.fn(async () => {
+      throw new LocalApiError(409, "conflict", "stale", "rev-2");
+    });
+    const getRecord = vi.fn(async () => recordDetail({
+      id: "note-q1",
+      provenance: {
+        origin: "human",
+        trust: "stated",
+        reviewed: false,
+        quarantined: false,
+        needsReview: true,
+      },
+    }));
+    const store = new MemoryStore(memorySource({ reviewRecord, getRecord }));
+    store.detail = recordDetail({
+      id: "note-q1",
+      provenance: {
+        origin: "human",
+        trust: "stated",
+        reviewed: false,
+        quarantined: false,
+        needsReview: true,
+      },
+    });
+
+    const done = await store.review("lv24", "note-q1", {
+      reviewed: true,
+      expectedUpdatedAt: "2026-11-16T05:30:00Z",
+    });
+    expect(done).toBe(false);
+    expect(store.detail?.provenance.reviewed).toBe(false);
+    expect(store.recordActionError).toBeTruthy();
+    await vi.waitFor(() => expect(getRecord).toHaveBeenCalled());
   });
 
   it("loads the project summary and catchup report", async () => {

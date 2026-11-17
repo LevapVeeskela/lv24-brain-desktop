@@ -119,7 +119,8 @@ export class QuarantineStore {
   /**
    * Marks one record reviewed with an optional trust override. A reviewed row
    * leaves the inbox; an unknown origin can stay quarantined, so the list is
-   * refreshed after the call instead of being trusted blindly.
+   * refreshed after the call instead of being trusted blindly. The write goes
+   * through the same record review adapter as the record detail action.
    */
   async review(
     projectId: string,
@@ -137,7 +138,10 @@ export class QuarantineStore {
       this.items = this.items.filter((item) => item.id !== recordId);
     });
     try {
-      await this.api.reviewQuarantine(projectId, recordId, trust);
+      await this.api.reviewRecord(projectId, recordId, {
+        reviewed: true,
+        trust,
+      });
       runInAction(() => {
         this.lastReviewed = target;
       });

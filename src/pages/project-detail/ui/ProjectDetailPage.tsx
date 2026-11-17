@@ -1,23 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link, useParams } from "react-router-dom";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { MemoryStore } from "@/entities/memory/model/MemoryStore";
-import { RecordKindBadge } from "@/entities/memory/ui/MemoryBadges";
+import {
+  ProvenanceBadges,
+  RecordKindBadge,
+} from "@/entities/memory/ui/MemoryBadges";
+import { TRUST_LEVELS, type TrustLevel } from "@/entities/memory/model/types";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import type {
   ProjectState,
   ProjectStatePatch,
 } from "@/entities/project/model/types";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
+import { Select } from "@/shared/ui/Select";
 import { Table } from "@/shared/ui/Table";
 import { useFeedback } from "@/shared/ui/Feedback";
+
+const trustKeys: Record<TrustLevel, MessageKey> = {
+  verified: "record.trust.verified",
+  stated: "record.trust.stated",
+  inferred: "record.trust.inferred",
+};
 
 interface StateDraft {
   revision: string;
@@ -85,6 +97,9 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
   const [draft, setDraft] = useState<StateDraft | null>(() =>
     state ? draftFrom(state) : null,
   );
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [trust, setTrust] = useState<TrustLevel | "">("");
+  const reviewSelectId = useId();
   const recent =
     memory.recentProjectId === projectId ? memory.recentItems : [];
   const handoff =
@@ -124,6 +139,24 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
     const result = await projects.saveState(projectId, patchFrom(draft));
     if (result === "saved") {
       notify(t("projectDetail.saved"), "success");
+    }
+  };
+
+  const confirmReview = async (): Promise<void> => {
+    if (!reviewOpen || !projectId || !state) {
+      return;
+    }
+    const done = await projects.reviewState(projectId, {
+      reviewed: true,
+      trust: trust || undefined,
+      expectedRevision: state.revision,
+    });
+    setReviewOpen(false);
+    if (done) {
+      notify(t("projectDetail.reviewStateDone"), "success");
+      void projects.loadState(projectId, { force: true });
+    } else {
+      notify(projects.reviewError ?? t("projectDetail.saveError"), "error");
     }
   };
 
@@ -228,6 +261,12 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
         </Notice>
       ) : null}
 
+      {state && !state.provenance.reviewed ? (
+        <Notice variant="warning">
+          <span>{t("projectDetail.stateQuarantined")}</span>
+        </Notice>
+      ) : null}
+
       <Card>
         <div className="card-header">
           <div>
@@ -241,6 +280,16 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
                   }`
                 : t("common.none")}
             </p>
+            {state ? (
+              <div className="badge-row">
+                <ProvenanceBadges
+                  origin={state.provenance.origin}
+                  quarantined={state.provenance.quarantined}
+                  needsReview={state.provenance.needsReview}
+                  reviewed={state.provenance.reviewed}
+                />
+              </div>
+            ) : null}
           </div>
         </div>
         {!projects.stateLoaded && projects.stateLoading ? (
@@ -322,6 +371,16 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
                 {projects.saving ? t("projectDetail.saving") : t("projectDetail.save")}
               </Button>
               <Button
+                variant="primary"
+                disabled={
+                  !engine.isRunning || !state || projects.reviewing || projects.saving
+                }
+                loading={projects.reviewing}
+                onClick={() => setReviewOpen(true)}
+              >
+                {t("projectDetail.reviewState")}
+              </Button>
+              <Button
                 type="button"
                 disabled={!state || !isDirty(state, draft) || projects.saving}
                 onClick={() => state && setDraft(draftFrom(state))}
@@ -337,6 +396,33 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
           <p className="muted">{t("common.none")}</p>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={reviewOpen}
+        title={t("projectDetail.reviewStateTitle")}
+        confirmLabel={t("projectDetail.reviewState")}
+        cancelLabel={t("common.cancel")}
+        busy={projects.reviewing}
+        onConfirm={() => void confirmReview()}
+        onCancel={() => setReviewOpen(false)}
+      >
+        <p>{t("projectDetail.reviewStateBody")}</p>
+        <label className="field" htmlFor={reviewSelectId}>
+          <span>{t("record.reviewTrust")}</span>
+          <Select
+            id={reviewSelectId}
+            value={trust}
+            onChange={(event) => setTrust(event.target.value as TrustLevel | "")}
+          >
+            <option value="">{t("record.keepTrust")}</option>
+            {TRUST_LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {t(trustKeys[level])}
+              </option>
+            ))}
+          </Select>
+        </label>
+      </ConfirmDialog>
 
       <div className="project-grid">
         <Card>

@@ -8,7 +8,6 @@ import type {
   ProposalSnoozeReceipt,
   QuarantineItem,
   QuarantinePage,
-  QuarantineReviewOutcome,
   RecordDetail,
   RecordPage,
   ReviewFixResult,
@@ -158,22 +157,6 @@ export function quarantinePage(
   };
 }
 
-export function quarantineReview(
-  overrides: Partial<QuarantineReviewOutcome> = {},
-): QuarantineReviewOutcome {
-  return {
-    record: memoryRecord({ id: "note-q1" }),
-    provenance: {
-      origin: "connector",
-      trust: "verified",
-      reviewed: true,
-      quarantined: false,
-      needsReview: false,
-    },
-    ...overrides,
-  };
-}
-
 export function reviewFixResult(
   overrides: Partial<ReviewFixResult> = {},
 ): ReviewFixResult {
@@ -196,6 +179,13 @@ export function projectState(overrides: Partial<ProjectState> = {}): ProjectStat
     openQuestions: [],
     updatedAt: timestamp,
     revision: "rev-1",
+    provenance: {
+      origin: "human",
+      trust: "verified",
+      reviewed: true,
+      quarantined: false,
+      needsReview: false,
+    },
     ...overrides,
   };
 }

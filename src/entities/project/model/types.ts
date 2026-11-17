@@ -1,6 +1,14 @@
+import type { Provenance, TrustLevel } from "@/entities/memory/model/types";
+
 export interface Project {
   id: string;
   name: string;
+}
+
+export interface StateReviewRequest {
+  reviewed?: boolean;
+  trust?: TrustLevel;
+  expectedRevision?: string;
 }
 
 export interface ProjectState {
@@ -13,6 +21,7 @@ export interface ProjectState {
   updatedAt?: string;
   freshUntil?: string;
   revision: string;
+  provenance: Provenance;
 }
 
 /** Omitted fields keep the stored value; empty arrays/strings clear it. */

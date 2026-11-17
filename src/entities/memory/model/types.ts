@@ -77,6 +77,28 @@ export interface ReviewState {
   due: boolean;
 }
 
+/**
+ * Body of `POST /v1/records/{id}/review`. `reviewed` must be true when present:
+ * a review clears a quarantine and never re-arms one. `expectedUpdatedAt` is the
+ * `updated_at` the client read; a stale value is a 409 compare-and-swap conflict.
+ */
+export interface RecordReviewRequest {
+  reviewed?: boolean;
+  trust?: TrustLevel;
+  expectedUpdatedAt?: string;
+}
+
+/**
+ * Body of `POST /v1/projects/{id}/state/review`. `reviewed` must be true when
+ * present; `expectedRevision` is the state revision the client read and a stale
+ * value is a 409 compare-and-swap conflict.
+ */
+export interface StateReviewRequest {
+  reviewed?: boolean;
+  trust?: TrustLevel;
+  expectedRevision?: string;
+}
+
 export interface MemoryRecord {
   id: string;
   projectId: string;
@@ -411,11 +433,6 @@ export interface QuarantinePage extends PageInfo {
 export interface QuarantineQuery {
   limit?: number;
   cursor?: string;
-}
-
-export interface QuarantineReviewOutcome {
-  record: MemoryRecord;
-  provenance: Provenance;
 }
 
 export interface ProposalDecision {

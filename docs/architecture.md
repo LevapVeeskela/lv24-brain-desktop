@@ -86,12 +86,12 @@ record's own project.
 | --- | --- |
 | `/` | dashboard, engine and connection health |
 | `/memory` | filters, all-projects toggle, paginated record table and preview pane |
-| `/memory/:kind/:id?project=` | record detail: body, provenance, links/backlinks, relations (target-kind deep links), validity, history, inline edit with CAS and trash |
+| `/memory/:kind/:id?project=` | record detail: body, provenance, links/backlinks, relations (target-kind deep links), validity, history, inline edit with CAS and trash, review with trust choice and CAS (clears quarantine) |
 | `/inbox` | proposal queue with confidence/source-health badges, bounded body preview, accept/dismiss/edit-title, bulk and keyboard actions; safe-fix dry run/apply; review findings and due reviews |
 | `/inbox/proposal/:project/:id` | read-only proposal body (2000-token bound) and truncation notice |
 | `/quarantine` | quarantine inbox: reason, origin, trust and age, project filter, review with trust choice and cursor paging |
 | `/projects` | registered projects |
-| `/projects/:projectId` | editable state with CAS save, latest handoff, recent records and CLI hint |
+| `/projects/:projectId` | editable state with CAS save and review with trust choice and CAS (provenance-only, revision does not move) |
 | `/search` | full ranked results with filters, explain data, all-projects toggle and cursor paging |
 | `/activity` | runs plus catchup memory events, grouped by day and project, filtered All/Me/Agents/Connections; run rows show `project_ids` when present; the existing SSE log panel is the run drawer |
 | `/connections`, `/settings` | unchanged management screens |
@@ -101,10 +101,10 @@ searches curated records and offers navigation actions; Enter opens the record
 or page, arrows move and Escape closes. `/search?q=…` lets "show all results"
 hand the query to the full page.
 
-Writes are explicit: project-state CAS saves, proposal promotion/dismissal,
-record text edit (title/body/tags for notes, with `expected_updated_at`),
-reversible record trash/restore, quarantine review, and the safe `review/fix`
-set after a dry-run preview. Destructive actions use `ConfirmDialog`; a trashed
+Writes are explicit: project-state CAS saves, record text edit (title/body/tags for notes, with `expected_updated_at`),
+reversible record trash/restore, record review with trust choice and `expected_updated_at`
+CAS, state review with trust choice and `expected_revision` CAS, quarantine review, and the
+safe `review/fix` set after a dry-run preview. Destructive actions use `ConfirmDialog`; a trashed
 record stays recoverable from the Memory page's undo banner. Proposal snooze
 uses the engine snooze route with CAS; the inbox merges snoozed candidates
 through include_snoozed and filters them as All/Pending/Snoozed. The record
@@ -160,9 +160,11 @@ Memory adapters call the frozen memory routes added in engine 0.18:
 `GET/PUT /v1/projects/{id}/state` (PUT uses `expected_revision` CAS),
 `GET /v1/records`, `GET /v1/records/{id}`,
 `PATCH /v1/records/{id}` (edit, `expected_updated_at` CAS),
+`POST /v1/records/{id}/review` (review, `expected_updated_at` CAS),
 `POST /v1/records/{id}/trash`, `POST /v1/records/{id}/restore`,
 `GET /v1/search`, `GET /v1/review`, `POST /v1/review/fix`,
-`GET /v1/quarantine`, `POST /v1/quarantine/{id}/review`,
+`GET /v1/quarantine`,
+`POST /v1/projects/{id}/state/review`,
 `GET /v1/proposals`, `GET /v1/proposals/{project}/{id}`,
 `POST /v1/proposals/{project}/{id}/promote`,
 `POST /v1/proposals/{project}/{id}/dismiss` and `GET /v1/catchup`. Records,

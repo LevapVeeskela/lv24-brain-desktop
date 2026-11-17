@@ -44,7 +44,6 @@ import {
   type ProposalSnoozeReceipt,
   type QuarantineItem,
   type QuarantinePage,
-  type QuarantineReviewOutcome,
   type RecordDetail,
   type RecordHistory,
   type RecordLink,
@@ -56,7 +55,6 @@ import {
   type SearchExplain,
   type SearchHit,
   type SearchPage,
-  type TrustLevel,
 } from "../model/types";
 
 export function parsePageInfo(value: unknown, what: string): PageInfo {
@@ -524,46 +522,6 @@ function parseQuarantineItem(value: unknown, what: string): QuarantineItem {
     trust: asOptionalString(item.trust, `${what}.trust`),
     createdAt: asOptionalTimestamp(item.created_at, `${what}.created_at`),
     ageSeconds: asNumber(item.age_seconds, `${what}.age_seconds`),
-  };
-}
-
-export function parseQuarantineReview(
-  value: unknown,
-): QuarantineReviewOutcome {
-  const review = asObject(value, "quarantine review");
-  const provenance = asObject(
-    review.provenance,
-    "quarantine review.provenance",
-  );
-  return {
-    record: parseMemoryRecord(review.record, "quarantine review.record"),
-    provenance: {
-      origin: asEnum(
-        provenance.origin,
-        PROVENANCE_ORIGINS,
-        "quarantine review.provenance.origin",
-      ),
-      trust: asEnum(
-        provenance.trust,
-        TRUST_LEVELS,
-        "quarantine review.provenance.trust",
-      ) as TrustLevel,
-      reviewed:
-        asOptionalBoolean(
-          provenance.reviewed,
-          "quarantine review.provenance.reviewed",
-        ) ?? false,
-      quarantined:
-        asOptionalBoolean(
-          provenance.quarantined,
-          "quarantine review.provenance.quarantined",
-        ) ?? false,
-      needsReview:
-        asOptionalBoolean(
-          provenance.needs_review,
-          "quarantine review.provenance.needs_review",
-        ) ?? false,
-    },
   };
 }
 

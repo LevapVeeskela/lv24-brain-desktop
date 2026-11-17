@@ -632,6 +632,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{id}/state/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Marks the project state reviewed and optionally replaces its trust, like brain state review. Provenance-only: the state revision does not move, so a repeated call with the same expected_revision is an idempotent no-op. expected_revision makes the write a compare-and-swap inside the store's atomic state update; a stale value returns 409 with error.current_revision and writes nothing. reviewed must be true when present. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["StateReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description The state with its revision after review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["State"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/records": {
         parameters: {
             query?: never;
@@ -855,6 +902,56 @@ export interface paths {
                 };
                 400: components["responses"]["Error"];
                 404: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/records/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Marks one record reviewed and optionally replaces its trust, like brain record review. Provenance-only: body, ID, kind, classification and review date are untouched and the write is journalled. The record id is unambiguous inside its project; project is optional when the API serves exactly one project. expected_updated_at makes the write a compare-and-swap; a stale value returns 409 with error.current_revision and writes nothing. reviewed must be true when present. */
+        post: {
+            parameters: {
+                query?: {
+                    /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+                    project?: components["parameters"]["ProjectOptional"];
+                };
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["RecordReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description The record summary after review, with its cleared quarantine */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Record"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
             };
         };
         delete?: never;
@@ -1698,6 +1795,38 @@ export interface components {
             /** Format: date-time */
             fresh_until?: string;
             revision: string;
+            provenance: components["schemas"]["Provenance"];
+        };
+        RecordReviewRequest: {
+            /**
+             * @description Must be true when present: a review clears a quarantine and never re-arms one.
+             * @default true
+             */
+            reviewed: boolean;
+            /**
+             * @description Optional replacement trust; omit to keep the stored one.
+             * @enum {string}
+             */
+            trust?: "verified" | "stated" | "inferred";
+            /**
+             * Format: date-time
+             * @description The updated_at the client read; omit for a last-write-wins review.
+             */
+            expected_updated_at?: string;
+        };
+        StateReviewRequest: {
+            /**
+             * @description Must be true when present: a review clears a quarantine and never re-arms one.
+             * @default true
+             */
+            reviewed: boolean;
+            /**
+             * @description Optional replacement trust; omit to keep the stored one.
+             * @enum {string}
+             */
+            trust?: "verified" | "stated" | "inferred";
+            /** @description The state revision the client read; omit for a last-write-wins review. */
+            expected_revision?: string;
         };
         StateWrite: {
             goal?: string;

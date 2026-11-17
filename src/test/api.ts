@@ -1,7 +1,9 @@
 import type { MemorySource } from "@/entities/memory/api/memoryApi";
 import type { ProjectsSource } from "@/entities/project/api/projectApi";
+import type { RecordReviewRequest } from "@/entities/memory/model/types";
 import {
   catchupReport,
+  memoryRecord,
   proposalDetail,
   proposalOutcome,
   proposalPage,
@@ -9,7 +11,6 @@ import {
   project,
   projectState,
   quarantinePage,
-  quarantineReview,
   recordDetail,
   recordPage,
   reviewFixResult,
@@ -27,8 +28,12 @@ export function memorySource(overrides: Partial<MemorySource> = {}): MemorySourc
     search: async () => searchPage(),
     review: async () => reviewReport(),
     reviewFix: async () => reviewFixResult(),
+    reviewRecord: async (
+      _projectId: string,
+      _recordId: string,
+      _request: RecordReviewRequest,
+    ) => memoryRecord(),
     listQuarantine: async () => quarantinePage(),
-    reviewQuarantine: async () => quarantineReview(),
     listProposals: async () => proposalPage(),
     getProposal: async () => proposalDetail(),
     promote: async () => proposalOutcome(),
@@ -56,6 +61,17 @@ export function projectsSource(
         nextAction: patch.nextAction ?? "Write tests",
         active: patch.active ?? ["memory UI"],
         revision: "rev-2",
+      }),
+    reviewState: async (_projectId, request) =>
+      projectState({
+        provenance: {
+          origin: "human",
+          trust: request.trust ?? "verified",
+          reviewed: true,
+          quarantined: false,
+          needsReview: false,
+        },
+        ...(request.expectedRevision ? { revision: request.expectedRevision } : {}),
       }),
     ...overrides,
   };

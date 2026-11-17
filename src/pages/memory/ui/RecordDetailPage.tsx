@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { observer } from "mobx-react-lite";
 import {
   Link,
@@ -11,10 +11,12 @@ import type { MemoryStore } from "@/entities/memory/model/MemoryStore";
 import { recordPath } from "@/entities/memory/model/links";
 import {
   RECORD_KINDS,
+  TRUST_LEVELS,
   type MemoryRecord,
   type RecordDetail,
   type RecordKind,
   type RecordLink,
+  type TrustLevel,
 } from "@/entities/memory/model/types";
 import {
   ProvenanceBadges,
@@ -25,7 +27,7 @@ import {
   TrustBadge,
 } from "@/entities/memory/ui/MemoryBadges";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
-import { useI18n } from "@/shared/i18n";
+import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
@@ -34,10 +36,17 @@ import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
+import { Select } from "@/shared/ui/Select";
 import { Tabs } from "@/shared/ui/Tabs";
 import { useFeedback } from "@/shared/ui/Feedback";
 import { RecordBody } from "./RecordBody";
 import { RecordEditForm } from "./RecordEditForm";
+
+const trustKeys: Record<TrustLevel, MessageKey> = {
+  verified: "record.trust.verified",
+  stated: "record.trust.stated",
+  inferred: "record.trust.inferred",
+};
 
 function isRecordKind(value: string | undefined): value is RecordKind {
   return value !== undefined && RECORD_KINDS.includes(value as RecordKind);
@@ -63,6 +72,9 @@ export const RecordDetailPage = observer(function RecordDetailPage({
   const recordId = params.id;
   const [trashOpen, setTrashOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [trust, setTrust] = useState<TrustLevel | "">("");
+  const reviewSelectId = useId();
 
   useEffect(() => {
     void projects.load();
@@ -105,6 +117,23 @@ export const RecordDetailPage = observer(function RecordDetailPage({
     if (done) {
       notify(t("memory.trashed"), "success");
       navigate("/memory");
+    } else if (memory.recordActionError) {
+      notify(memory.recordActionError, "error");
+    }
+  };
+
+  const confirmReview = async (): Promise<void> => {
+    if (!reviewOpen || !projectId || !recordId || !detail) {
+      return;
+    }
+    const done = await memory.review(projectId, recordId, {
+      reviewed: true,
+      trust: trust || undefined,
+      expectedUpdatedAt: detail.updatedAt,
+    });
+    setReviewOpen(false);
+    if (done) {
+      notify(t("record.reviewedDone"), "success");
     } else if (memory.recordActionError) {
       notify(memory.recordActionError, "error");
     }
@@ -175,6 +204,16 @@ export const RecordDetailPage = observer(function RecordDetailPage({
               {t("memory.trash")}
             </Button>
           ) : null}
+          {detail && !detail.provenance.reviewed ? (
+            <Button
+              variant="primary"
+              disabled={!engine.isRunning || Boolean(memory.recordAction)}
+              loading={memory.recordAction === "review"}
+              onClick={() => setReviewOpen(true)}
+            >
+              {t("record.reviewAction")}
+            </Button>
+          ) : null}
           {detail?.permalink && !memory.editor.open ? (
             <Button onClick={() => void copyPermalink(detail.permalink ?? "")}>
               {t("memory.copyPermalink")}
@@ -186,6 +225,12 @@ export const RecordDetailPage = observer(function RecordDetailPage({
       {!engine.isRunning ? (
         <Notice variant="info">
           <span>{t("errors.engineUnavailable")}</span>
+        </Notice>
+      ) : null}
+
+      {detail && !detail.provenance.reviewed ? (
+        <Notice variant="warning">
+          <span>{t("record.quarantineWarning")}</span>
         </Notice>
       ) : null}
 
@@ -337,6 +382,33 @@ export const RecordDetailPage = observer(function RecordDetailPage({
         onCancel={() => setDiscardOpen(false)}
       >
         <p>{t("memory.editDiscardBody")}</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={reviewOpen}
+        title={t("record.reviewTitle")}
+        confirmLabel={t("record.reviewAction")}
+        cancelLabel={t("common.cancel")}
+        busy={memory.recordAction === "review"}
+        onConfirm={() => void confirmReview()}
+        onCancel={() => setReviewOpen(false)}
+      >
+        <p>{t("record.reviewBody", { title: detail?.title ?? recordId })}</p>
+        <label className="field" htmlFor={reviewSelectId}>
+          <span>{t("record.reviewTrust")}</span>
+          <Select
+            id={reviewSelectId}
+            value={trust}
+            onChange={(event) => setTrust(event.target.value as TrustLevel | "")}
+          >
+            <option value="">{t("record.keepTrust")}</option>
+            {TRUST_LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {t(trustKeys[level])}
+              </option>
+            ))}
+          </Select>
+        </label>
       </ConfirmDialog>
     </div>
   );

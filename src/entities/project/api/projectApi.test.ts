@@ -20,6 +20,13 @@ describe("project parser", () => {
         blocked: [],
         open_questions: ["Which theme?"],
         revision: "rev-1",
+        provenance: {
+          origin: "human",
+          trust: "verified",
+          reviewed: true,
+          quarantined: false,
+          needs_review: false,
+        },
         unknown: "dropped",
       }),
     ).toEqual({
@@ -30,6 +37,13 @@ describe("project parser", () => {
       blocked: [],
       openQuestions: ["Which theme?"],
       revision: "rev-1",
+      provenance: {
+        origin: "human",
+        trust: "verified",
+        reviewed: true,
+        quarantined: false,
+        needsReview: false,
+      },
     });
     expect(() => parseProjectState({ project_id: "lv24" })).toThrow(/revision/);
   });

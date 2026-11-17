@@ -5,7 +5,6 @@ import {
   parseProposalOutcome,
   parseProposalPage,
   parseQuarantinePage,
-  parseQuarantineReview,
   parseRecordDetail,
   parseRecordPage,
   parseReview,
@@ -459,33 +458,6 @@ describe("memory response parsers", () => {
       }),
     ).toThrow(/reason/);
 
-    const reviewed = parseQuarantineReview({
-      record: {
-        id: "note-q1",
-        project_id: "lv24",
-        kind: "note",
-        title: "External note",
-        path: "projects/lv24/notes/note-q1.md",
-        validity: { current: true },
-        provenance: {
-          origin: "connector",
-          trust: "verified",
-          reviewed: true,
-          quarantined: false,
-          needs_review: false,
-        },
-        review: { due: false },
-      },
-      provenance: {
-        origin: "connector",
-        trust: "verified",
-        reviewed: true,
-        quarantined: false,
-        needs_review: false,
-      },
-    });
-    expect(reviewed.record.id).toBe("note-q1");
-    expect(reviewed.provenance.reviewed).toBe(true);
   });
 
   it("parses catchup with the project state snapshot", () => {
@@ -498,6 +470,13 @@ describe("memory response parsers", () => {
         revision: "rev-1",
         goal: "Ship",
         active: [],
+        provenance: {
+          origin: "human",
+          trust: "verified",
+          reviewed: true,
+          quarantined: false,
+          needs_review: false,
+        },
       },
       notes: [record],
       decisions: [],

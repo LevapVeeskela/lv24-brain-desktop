@@ -10,7 +10,7 @@ on:
         description: "LV24 Brain engine version to bundle (for example 0.14.0)"
         required: false
         type: string
-        default: "0.14.0"
+        default: "0.20.0"
       signed:
         description: "Create updater artifacts and signatures (requires TAURI_SIGNING_PRIVATE_KEY)"
         required: false

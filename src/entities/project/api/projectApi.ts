@@ -1,15 +1,19 @@
 import { apiClient, toApiError } from "@/shared/api/client";
 import {
   asArray,
+  asEnum,
   asObject,
+  asOptionalBoolean,
   asOptionalString,
   asOptionalTimestamp,
   asString,
 } from "@/shared/api/validate";
+import { PROVENANCE_ORIGINS, TRUST_LEVELS, type Provenance } from "@/entities/memory/model/types";
 import type {
   Project,
   ProjectState,
   ProjectStatePatch,
+  StateReviewRequest,
 } from "../model/types";
 
 export interface ProjectsSource {
@@ -19,6 +23,10 @@ export interface ProjectsSource {
     projectId: string,
     patch: ProjectStatePatch,
     expectedRevision?: string,
+  ): Promise<ProjectState>;
+  reviewState(
+    projectId: string,
+    request: StateReviewRequest,
   ): Promise<ProjectState>;
 }
 
@@ -67,6 +75,27 @@ export const projectApi: ProjectsSource = {
     }
     return parseProjectState(data);
   },
+
+  async reviewState(
+    projectId: string,
+    request: StateReviewRequest,
+  ): Promise<ProjectState> {
+    const { data, error, response } = await apiClient.POST(
+      "/v1/projects/{id}/state/review",
+      {
+        params: { path: { id: projectId } },
+        body: {
+          reviewed: true,
+          trust: request.trust,
+          expected_revision: request.expectedRevision,
+        },
+      },
+    );
+    if (error) {
+      throw toApiError(response, error);
+    }
+    return parseProjectState(data);
+  },
 };
 
 export function parseProjects(value: unknown): Project[] {
@@ -105,6 +134,24 @@ export function parseProjectState(value: unknown): ProjectState {
     updatedAt: asOptionalTimestamp(state.updated_at, "state.updated_at"),
     freshUntil: asOptionalTimestamp(state.fresh_until, "state.fresh_until"),
     revision: asString(state.revision, "state.revision"),
+    provenance: parseProvenance(
+      state.provenance,
+      "state.provenance",
+    ),
+  };
+}
+
+function parseProvenance(
+  value: unknown,
+  what: string,
+): Provenance {
+  const provenance = asObject(value, what);
+  return {
+    origin: asEnum(provenance.origin, PROVENANCE_ORIGINS, `${what}.origin`),
+    trust: asEnum(provenance.trust, TRUST_LEVELS, `${what}.trust`),
+    reviewed: asOptionalBoolean(provenance.reviewed, `${what}.reviewed`) ?? false,
+    quarantined: asOptionalBoolean(provenance.quarantined, `${what}.quarantined`) ?? false,
+    needsReview: asOptionalBoolean(provenance.needs_review, `${what}.needs_review`) ?? false,
   };
 }
 

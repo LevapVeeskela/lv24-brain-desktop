@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { memorySource } from "@/test/api";
-import { quarantineItem, quarantinePage, quarantineReview } from "@/test/fixtures";
+import { memoryRecord, quarantineItem, quarantinePage } from "@/test/fixtures";
 import { QuarantineStore } from "./QuarantineStore";
 
 describe("QuarantineStore", () => {
@@ -36,18 +36,17 @@ describe("QuarantineStore", () => {
       .fn()
       .mockResolvedValueOnce(quarantinePage([quarantineItem()]))
       .mockResolvedValueOnce(quarantinePage([]));
-    const reviewQuarantine = vi.fn(async () => quarantineReview());
+    const reviewRecord = vi.fn(async () => memoryRecord());
     const store = new QuarantineStore(
-      memorySource({ listQuarantine, reviewQuarantine }),
+      memorySource({ listQuarantine, reviewRecord }),
     );
     await store.load("lv24");
     const done = await store.review("lv24", "note-q1", "verified");
     expect(done).toBe(true);
-    expect(reviewQuarantine).toHaveBeenCalledWith(
-      "lv24",
-      "note-q1",
-      "verified",
-    );
+    expect(reviewRecord).toHaveBeenCalledWith("lv24", "note-q1", {
+      reviewed: true,
+      trust: "verified",
+    });
     expect(store.items).toEqual([]);
     expect(store.lastReviewed?.id).toBe("note-q1");
     await vi.waitFor(() => expect(listQuarantine).toHaveBeenCalledTimes(2));
@@ -57,7 +56,7 @@ describe("QuarantineStore", () => {
     const store = new QuarantineStore(
       memorySource({
         listQuarantine: async () => quarantinePage([quarantineItem()]),
-        reviewQuarantine: async () => Promise.reject(new Error("denied")),
+        reviewRecord: async () => Promise.reject(new Error("denied")),
       }),
     );
     await store.load("lv24");

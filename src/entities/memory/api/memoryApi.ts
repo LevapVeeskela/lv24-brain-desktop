@@ -7,7 +7,6 @@ import {
   parseProposalSnoozeReceipt,
   parseMemoryRecord,
   parseQuarantinePage,
-  parseQuarantineReview,
   parseRecordDetail,
   parseRecordPage,
   parseReview,
@@ -25,17 +24,16 @@ import type {
   ProposalSnoozeReceipt,
   QuarantinePage,
   QuarantineQuery,
-  QuarantineReviewOutcome,
   RecordDetail,
   RecordEditPatch,
   RecordListQuery,
   RecordPage,
+  RecordReviewRequest,
   ReviewFixRequest,
   ReviewFixResult,
   ReviewReport,
   SearchPage,
   SearchRequest,
-  TrustLevel,
 } from "../model/types";
 
 export interface RecordDetailOptions {
@@ -84,15 +82,15 @@ export interface MemorySource {
     projectId: string,
     request: ReviewFixRequest,
   ): Promise<ReviewFixResult>;
+  reviewRecord(
+    projectId: string,
+    recordId: string,
+    request: RecordReviewRequest,
+  ): Promise<MemoryRecord>;
   listQuarantine(
     projectId: string,
     query?: QuarantineQuery,
   ): Promise<QuarantinePage>;
-  reviewQuarantine(
-    projectId: string,
-    recordId: string,
-    trust?: TrustLevel,
-  ): Promise<QuarantineReviewOutcome>;
   listProposals(
     projectId: string,
     query?: ProposalListQuery,
@@ -308,21 +306,25 @@ export const memoryApi: MemorySource = {
     return parseQuarantinePage(data);
   },
 
-  async reviewQuarantine(projectId, recordId, trust) {
+  async reviewRecord(
+    projectId: string,
+    recordId: string,
+    request: RecordReviewRequest,
+  ): Promise<MemoryRecord> {
     const { data, error, response } = await apiClient.POST(
-      "/v1/quarantine/{id}/review",
+      "/v1/records/{id}/review",
       {
         params: {
           path: { id: recordId },
           query: { project: projectId },
         },
-        body: trust ? { trust } : {},
+        body: recordReviewBody(request),
       },
     );
     if (error) {
       throw toApiError(response, error);
     }
-    return parseQuarantineReview(data);
+    return parseMemoryRecord(data, "record review");
   },
 
   async listProposals(projectId, query = {}) {
@@ -452,6 +454,15 @@ export function recordEditBody(patch: RecordEditPatch) {
     tags: patch.tags,
     expected_updated_at: patch.expectedUpdatedAt,
     allow_duplicate: patch.allowDuplicate || undefined,
+  };
+}
+
+/** The wire contract is snake_case even though the UI uses camelCase. */
+export function recordReviewBody(request: RecordReviewRequest) {
+  return {
+    reviewed: request.reviewed ?? true,
+    trust: request.trust,
+    expected_updated_at: request.expectedUpdatedAt,
   };
 }
 

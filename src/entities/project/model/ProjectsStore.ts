@@ -6,6 +6,7 @@ import type {
   Project,
   ProjectState,
   ProjectStatePatch,
+  StateReviewRequest,
   StateSaveResult,
 } from "./types";
 
@@ -25,6 +26,8 @@ export class ProjectsStore {
   saveError: string | null = null;
   stateConflict = false;
   conflictRevision: string | null = null;
+  reviewing = false;
+  reviewError: string | null = null;
 
   private readonly api: ProjectsSource;
   private inFlight: Promise<void> | null = null;
@@ -138,6 +141,78 @@ export class ProjectsStore {
     this.stateConflict = false;
     this.conflictRevision = null;
     this.saveError = null;
+  }
+
+  /**
+   * Marks one project state reviewed with an optional trust override. The
+   * write is provenance-only and a compare-and-swap on the revision the client
+   * read, so a stale value is a 409 conflict that writes nothing. The state
+   * flips to reviewed optimistically and settles from the response or reload.
+   */
+  async reviewState(
+    projectId: string,
+    request: StateReviewRequest,
+  ): Promise<boolean> {
+    if (this.reviewing) {
+      return false;
+    }
+    const before = this.state;
+    const optimistic =
+      before && before.provenance
+        ? {
+            ...before,
+            provenance: {
+              ...before.provenance,
+              reviewed: true,
+              trust: request.trust ?? before.provenance.trust,
+            },
+          }
+        : before;
+    runInAction(() => {
+      this.reviewing = true;
+      this.reviewError = null;
+      this.saveError = null;
+      this.stateConflict = false;
+      if (optimistic) {
+        this.state = optimistic;
+      }
+    });
+    try {
+      const next = await this.api.reviewState(projectId, {
+        ...request,
+        reviewed: true,
+      });
+      runInAction(() => {
+        this.state = next;
+        this.stateProjectId = projectId;
+        this.stateLoaded = true;
+        this.stateConflict = false;
+        this.conflictRevision = null;
+        this.reviewError = null;
+      });
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.reviewError = errorMessage(cause);
+        this.state = before;
+        if (cause instanceof LocalApiError && cause.status === 409) {
+          this.stateConflict = true;
+          this.conflictRevision = cause.currentRevision ?? null;
+        }
+      });
+      if (
+        cause instanceof LocalApiError &&
+        cause.status === 409 &&
+        this.state?.projectId === projectId
+      ) {
+        void this.loadState(projectId, { force: true });
+      }
+      return false;
+    } finally {
+      runInAction(() => {
+        this.reviewing = false;
+      });
+    }
   }
 
   dismissError(): void {

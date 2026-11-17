@@ -2,6 +2,7 @@ import { makeAutoObservable, runInAction } from "mobx";
 import { LocalApiError } from "@/shared/api/client";
 import { errorMessage } from "@/shared/lib/errors";
 import type { MemorySource } from "../api/memoryApi";
+import type { RecordReviewRequest } from "./types";
 import { RecordEditor } from "./RecordEditor";
 import {
   emptyRecordFilters,
@@ -64,7 +65,7 @@ export class MemoryStore {
   catchupLoading = false;
   catchupError: string | null = null;
 
-  recordAction: "trash" | "restore" | null = null;
+  recordAction: "trash" | "restore" | "review" | null = null;
   recordActionId: string | null = null;
   recordActionError: string | null = null;
   lastTrashed: MemoryRecord | null = null;
@@ -328,6 +329,78 @@ export class MemoryStore {
   restoreLast(): Promise<boolean> {
     const trashed = this.lastTrashed;
     return trashed ? this.restore(trashed.projectId, trashed.id) : Promise.resolve(false);
+  }
+
+  /**
+   * Marks one unreviewed record reviewed with a trust override. The write is
+   * provenance-only and a compare-and-swap on the `updated_at` the client read,
+   * so a stale value is a 409 conflict that writes nothing. The open detail and
+   * the list row flip to reviewed optimistically and settle from the response.
+   */
+  async review(
+    projectId: string,
+    recordId: string,
+    request: RecordReviewRequest,
+  ): Promise<boolean> {
+    if (this.recordAction) {
+      return false;
+    }
+    const before = this.detail;
+    const optimistic =
+      before && before.id === recordId
+        ? {
+            ...before,
+            provenance: {
+              ...before.provenance,
+              reviewed: true,
+              trust: request.trust ?? before.provenance.trust,
+            },
+          }
+        : before;
+    runInAction(() => {
+      this.recordAction = "review";
+      this.recordActionId = recordId;
+      this.recordActionError = null;
+      if (optimistic) {
+        this.detail = optimistic;
+      }
+    });
+    try {
+      const reviewed = await this.api.reviewRecord(projectId, recordId, {
+        ...request,
+        reviewed: true,
+      });
+      runInAction(() => {
+        this.recordAction = null;
+        this.recordActionId = null;
+      });
+      if (this.detail && this.detail.id === recordId) {
+        this.detail = {
+          ...this.detail,
+          provenance: reviewed.provenance,
+          review: reviewed.review,
+        };
+      }
+      this.reloadActiveList(projectId);
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.recordAction = null;
+        this.recordActionId = null;
+        this.recordActionError = errorMessage(cause);
+        if (before) {
+          this.detail = before;
+        }
+      });
+      if (
+        cause instanceof LocalApiError &&
+        cause.status === 409 &&
+        this.detail?.id === recordId
+      ) {
+        void this.loadDetail(projectId, recordId, { force: true });
+      }
+      return false;
+    }
   }
 
   async loadProjectSummary(projectId: string, limit = 8): Promise<void> {
