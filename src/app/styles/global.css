@@ -1317,6 +1317,7 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 .data-table th, .data-table td { overflow-wrap: anywhere; }
 .data-table th { font-size: var(--text-xs); text-transform: none; letter-spacing: 0; }
 .data-table tbody tr:hover { background: var(--surface-hover); }
+.data-table tbody tr.is-link-row { cursor: pointer; }
 .table-link { display: inline-flex; align-items: center; min-height: var(--control-min); max-width: 100%; text-decoration: underline; }
 .row-actions { align-items: flex-start; }
 .run-status { white-space: normal; }

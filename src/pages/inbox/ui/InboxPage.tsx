@@ -68,6 +68,78 @@ function proposalDetailPath(proposal: Proposal): string {
   return `/inbox/proposal/${encodeURIComponent(proposal.projectId)}/${encodeURIComponent(proposal.id)}`;
 }
 
+interface ShortcutTargetLike {
+  tagName?: string;
+  isContentEditable?: boolean;
+  closest?: (selector: string) => unknown;
+}
+
+const TYPING_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+// A/D change stored memory; a click may leave focus on one of these controls.
+const ACTION_TAGS = new Set(["BUTTON", "INPUT", "TEXTAREA", "SELECT", "A"]);
+const ACTION_BLOCKING_SELECTOR = [
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "a[href]",
+  "[role='button']",
+  "[role='menuitem']",
+  "dialog",
+  "[role='dialog']",
+  "[aria-modal='true']",
+  "[contenteditable='true']",
+].join(", ");
+
+function asShortcutTarget(target: unknown): ShortcutTargetLike | null {
+  return target && typeof target === "object"
+    ? (target as ShortcutTargetLike)
+    : null;
+}
+
+/** Typing targets keep their keystrokes; no global shortcut should steal them. */
+export function isTypingTarget(target: unknown): boolean {
+  const element = asShortcutTarget(target);
+  if (!element) {
+    return false;
+  }
+  return (
+    TYPING_TAGS.has(element.tagName?.toUpperCase() ?? "") ||
+    Boolean(element.isContentEditable)
+  );
+}
+
+/**
+ * A/D promote or dismiss the selected proposal, so a held key or a focused
+ * button, field or dialog must not trigger them.
+ */
+export function isInboxActionBlocked(event: {
+  key: string;
+  repeat?: boolean;
+  target?: unknown;
+}): boolean {
+  const key = event.key.toLowerCase();
+  if (key !== "a" && key !== "d") {
+    return false;
+  }
+  if (event.repeat) {
+    return true;
+  }
+  const element = asShortcutTarget(event.target);
+  if (!element) {
+    return false;
+  }
+  if (ACTION_TAGS.has(element.tagName?.toUpperCase() ?? "")) {
+    return true;
+  }
+  if (element.isContentEditable) {
+    return true;
+  }
+  return typeof element.closest === "function"
+    ? Boolean(element.closest(ACTION_BLOCKING_SELECTOR))
+    : false;
+}
+
 export const InboxPage = observer(function InboxPage({
   review,
   projects,
@@ -304,17 +376,13 @@ export const InboxPage = observer(function InboxPage({
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      const target = event.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT" ||
-          target.isContentEditable)
-      ) {
+      if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
-      if (event.metaKey || event.ctrlKey || event.altKey) {
+      if (isTypingTarget(event.target)) {
+        return;
+      }
+      if (isInboxActionBlocked(event)) {
         return;
       }
       switch (event.key.toLowerCase()) {

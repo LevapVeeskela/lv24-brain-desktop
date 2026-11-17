@@ -1,4 +1,4 @@
-name: desktop
+﻿name: desktop
 
 # Manual only. Builds may run at any time, but a GitHub release is published
 # only when the owner explicitly sets publish_release=true. Publishing also
@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       engine_version:
-        description: "LV24 Brain engine version to bundle (for example 0.14.0)"
+        description: "LV24 Brain engine version to bundle (for example 0.25.0)"
         required: false
         type: string
-        default: "0.20.0"
+        default: "0.25.0"
       signed:
         description: "Create updater artifacts and signatures (requires TAURI_SIGNING_PRIVATE_KEY)"
         required: false
@@ -69,6 +69,64 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      # Fail before any build minutes are spent when the manual inputs are
+      # inconsistent: the bundled engine must not be older than the newest
+      # pinned checksum, and a supplied release tag must name package.json's
+      # version (the release job re-checks the full tag/version chain).
+      - name: Validate engine version and tag
+        shell: bash
+        env:
+          ENGINE_VERSION: ${{ inputs.engine_version }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+          const pins = JSON.parse(
+            fs.readFileSync("scripts/engine-checksums.json", "utf8"),
+          );
+          const engine = (process.env.ENGINE_VERSION || "").trim();
+          const tag = (process.env.TAG_INPUT || "").trim();
+          if (!/^\d+\.\d+\.\d+$/.test(engine)) {
+            console.error(`::error::invalid engine_version '${engine}'; expected X.Y.Z`);
+            process.exit(1);
+          }
+          const parse = (v) => v.split(".").map((part) => Number(part));
+          const cmp = (a, b) => {
+            const left = parse(a);
+            const right = parse(b);
+            for (let i = 0; i < 3; i += 1) {
+              const diff = (left[i] || 0) - (right[i] || 0);
+              if (diff !== 0) return diff;
+            }
+            return 0;
+          };
+          const keys = Object.keys(pins);
+          if (keys.length === 0) {
+            console.error("::error::scripts/engine-checksums.json has no pinned engines");
+            process.exit(1);
+          }
+          const highest = keys.reduce((best, key) => (cmp(key, best) > 0 ? key : best));
+          if (cmp(engine, highest) < 0) {
+            console.error(
+              `::error::engine_version ${engine} is older than the pinned floor ${highest}; ` +
+                "bundle a newer engine or add its checksums to scripts/engine-checksums.json",
+            );
+            process.exit(1);
+          }
+          if (tag && tag !== `v${pkg.version}`) {
+            console.error(
+              `::error::tag ${tag} does not match v${pkg.version} from package.json`,
+            );
+            process.exit(1);
+          }
+          console.log(
+            `engine ${engine} >= pinned floor ${highest}; ` +
+              `tag ${tag || "(none)"} is consistent with package.json ${pkg.version}`,
+          );
+          NODE
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -421,3 +479,5 @@ jobs:
           else
             gh release edit "$TAG" --draft=false --prerelease=false --latest
           fi
+
+

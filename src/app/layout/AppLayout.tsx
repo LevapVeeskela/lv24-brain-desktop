@@ -11,7 +11,8 @@ import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Notice } from "@/shared/ui/Notice";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 
-function routeTitleKey(pathname: string): MessageKey {
+/** Section titles for the app bar and window title, keyed by the first path segment. */
+export function routeTitleKey(pathname: string): MessageKey {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) {
     return "nav.dashboard";
@@ -31,6 +32,8 @@ function routeTitleKey(pathname: string): MessageKey {
       return "nav.memory";
     case "inbox":
       return "nav.inbox";
+    case "quarantine":
+      return "quarantine.title";
     case "search":
       return "nav.search";
     default:

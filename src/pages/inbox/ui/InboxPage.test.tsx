@@ -11,7 +11,11 @@ import {
   reviewReport,
 } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
-import { InboxPage } from "./InboxPage";
+import {
+  InboxPage,
+  isInboxActionBlocked,
+  isTypingTarget,
+} from "./InboxPage";
 
 function stores() {
   const projects = new ProjectsStore(projectsSource());
@@ -152,6 +156,32 @@ describe("InboxPage", () => {
     );
     expect(html).toContain(">beta<");
     expect(html).toContain("Select one project to preview and apply safe fixes.");
+  });
+
+  it("blocks A/D on key repeat or a focused control", () => {
+    const button = { tagName: "BUTTON", closest: () => null };
+    expect(isInboxActionBlocked({ key: "a", repeat: true, target: button })).toBe(
+      true,
+    );
+    expect(isInboxActionBlocked({ key: "D", target: button })).toBe(true);
+    expect(
+      isInboxActionBlocked({
+        key: "d",
+        target: { tagName: "DIV", closest: () => null },
+      }),
+    ).toBe(false);
+
+    const dialogChild = {
+      tagName: "SPAN",
+      closest: (selector: string) =>
+        selector.includes("[role='dialog']") ? {} : null,
+    };
+    expect(isInboxActionBlocked({ key: "a", target: dialogChild })).toBe(true);
+    expect(isInboxActionBlocked({ key: "j", repeat: true, target: button })).toBe(
+      false,
+    );
+    expect(isTypingTarget({ tagName: "INPUT" })).toBe(true);
+    expect(isTypingTarget({ tagName: "DIV" })).toBe(false);
   });
 
   it("renders inbox zero and load errors", () => {

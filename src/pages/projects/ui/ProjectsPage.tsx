@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, type MouseEvent } from "react";
 import { observer } from "mobx-react-lite";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
@@ -16,6 +16,37 @@ export const ProjectsPage = observer(function ProjectsPage({
   projects: ProjectsStore;
 }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedParam = searchParams.get("project") ?? projects.selectedId;
+
+  const detailPath = (projectId: string): string => {
+    const base = `/projects/${encodeURIComponent(projectId)}`;
+    return selectedParam
+      ? `${base}?project=${encodeURIComponent(selectedParam)}`
+      : base;
+  };
+
+  const openRow = (
+    event: MouseEvent<HTMLTableRowElement>,
+    projectId: string,
+  ): void => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("a, button, input, select, textarea, label")) {
+      return;
+    }
+    navigate(detailPath(projectId));
+  };
 
   const machinePaths = new Map<string, number>();
   for (const project of projects.items) {
@@ -65,9 +96,18 @@ export const ProjectsPage = observer(function ProjectsPage({
               </thead>
               <tbody>
                 {projects.items.map((project) => (
-                  <tr key={project.id}>
+                  <tr
+                    key={project.id}
+                    className="is-link-row"
+                    onClick={(event) => openRow(event, project.id)}
+                  >
                     <td data-label={t("projects.id")}>
-                      <code>{project.id}</code>
+                      <Link
+                        className="table-link"
+                        to={detailPath(project.id)}
+                      >
+                        <code>{project.id}</code>
+                      </Link>
                     </td>
                     <td data-label={t("common.name")}>{project.name || t("common.none")}</td>
                     <td data-label={t("projects.paths")}>

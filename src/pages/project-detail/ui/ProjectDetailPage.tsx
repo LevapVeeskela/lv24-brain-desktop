@@ -15,6 +15,7 @@ import type {
 } from "@/entities/project/model/types";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
+import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -77,6 +78,12 @@ function isDirty(state: ProjectState, draft: StateDraft): boolean {
     (patch.blocked ?? []).join("\n") !== state.blocked.join("\n") ||
     (patch.openQuestions ?? []).join("\n") !== state.openQuestions.join("\n")
   );
+}
+
+/** A missing or unparsable freshness timestamp is not treated as expired. */
+function isFreshnessExpired(value: string, now = Date.now()): boolean {
+  const time = Date.parse(value);
+  return !Number.isNaN(time) && time <= now;
 }
 
 export const ProjectDetailPage = observer(function ProjectDetailPage({
@@ -280,6 +287,18 @@ export const ProjectDetailPage = observer(function ProjectDetailPage({
                   }`
                 : t("common.none")}
             </p>
+            {state?.freshUntil ? (
+              <p className="muted small">
+                {t("memory.validTo")}{" "}
+                {formatDateTime(state.freshUntil, locale)}
+                {isFreshnessExpired(state.freshUntil) ? (
+                  <>
+                    {" "}
+                    <Badge tone="warning">{t("inbox.status.stale")}</Badge>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
             {state ? (
               <div className="badge-row">
                 <ProvenanceBadges

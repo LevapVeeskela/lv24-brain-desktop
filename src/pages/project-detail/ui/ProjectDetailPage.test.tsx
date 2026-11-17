@@ -79,4 +79,22 @@ describe("ProjectDetailPage", () => {
     expect(html).toContain("reapply your changes and save again");
     expect(html).toContain("latest revision was loaded");
   });
+
+  it("shows fresh_until and flags an expired state as stale", () => {
+    const fresh = stores();
+    fresh.projects.state = projectState({
+      freshUntil: "2999-01-01T00:00:00Z",
+    });
+    const freshHtml = render(fresh);
+    expect(freshHtml).toContain("Valid until");
+    expect(freshHtml).not.toContain(">Stale<");
+
+    const stale = stores();
+    stale.projects.state = projectState({
+      freshUntil: "2020-01-01T00:00:00Z",
+    });
+    const staleHtml = render(stale);
+    expect(staleHtml).toContain("Valid until");
+    expect(staleHtml).toContain(">Stale<");
+  });
 });
