@@ -10,6 +10,7 @@ use crate::deep_link;
 use crate::engine::cli::AuthOutcome;
 use crate::engine::{EngineStatus, Supervisor};
 use crate::lifecycle::{self, Event};
+use crate::watchdog::UiWatchdog;
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,6 +73,13 @@ fn make_status(app: &AppHandle) -> ShellStatus {
 #[tauri::command]
 pub fn shell_status(app: AppHandle) -> Result<ShellStatus, String> {
     Ok(make_status(&app))
+}
+
+/// First IPC handshake from the webview. If this never reaches Rust, the
+/// watchdog restarts the process once; a reachable UI cancels the marker.
+#[tauri::command]
+pub fn ui_ready(watchdog: tauri::State<'_, Arc<UiWatchdog>>) {
+    watchdog.mark_ready();
 }
 
 #[tauri::command]

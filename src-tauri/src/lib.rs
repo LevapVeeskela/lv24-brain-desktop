@@ -7,6 +7,7 @@ mod error;
 mod lifecycle;
 mod settings;
 mod tray;
+mod watchdog;
 
 use std::sync::Arc;
 
@@ -38,6 +39,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             commands::shell_status,
+            commands::ui_ready,
             commands::engine_start,
             commands::engine_pause,
             commands::engine_sync_all,
@@ -61,6 +63,11 @@ pub fn run() {
             ));
             let settings = settings::SettingsStore::load(paths.config_dir.join("settings.json"))?;
             let supervisor = Arc::new(Supervisor::new(app.handle().clone(), paths, settings)?);
+            let watchdog = watchdog::UiWatchdog::new(
+                supervisor.config_dir().join("ipc-restart.flag"),
+            );
+            app.manage(watchdog.clone());
+            watchdog::spawn(app.handle().clone(), watchdog);
             app.manage(supervisor.clone());
             app.manage(api::RunLogState::default());
             app.manage(deep_link::DeepLinkState::default());

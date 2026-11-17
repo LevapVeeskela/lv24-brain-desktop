@@ -18,6 +18,10 @@ pub fn create(app: &AppHandle, supervisor: Arc<Supervisor>) -> tauri::Result<()>
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main_window(app),
+            "restart" => {
+                crate::lifecycle::record(app, crate::lifecycle::Event::TrayQuit, None);
+                app.restart();
+            }
             "quit" => {
                 crate::lifecycle::record(app, crate::lifecycle::Event::TrayQuit, None);
                 crate::commands::request_quit(app.clone());
@@ -111,10 +115,11 @@ fn build_menu(app: &AppHandle, status: &EngineStatus) -> tauri::Result<Menu<taur
     let pause = MenuItem::with_id(app, pause_id, pause_label, true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let open = MenuItem::with_id(app, "open", "Open LV24 Brain", true, None::<&str>)?;
+    let restart = MenuItem::with_id(app, "restart", "Restart app", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     Menu::with_items(
         app,
-        &[&status_item, &sync, &pause, &separator, &open, &quit],
+        &[&status_item, &sync, &pause, &separator, &open, &restart, &quit],
     )
 }
 

@@ -1,4 +1,4 @@
-# LV24 Brain Desktop
+﻿# LV24 Brain Desktop
 
 [![ci](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml)
 
@@ -6,7 +6,7 @@ The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/l
 built with Tauri v2. See connection results, investigate failed runs and manage
 the background agent, schedules and credentials from one offline-first interface.
 
-**Status: v1.5.1, Tauri IPC startup recovery.** The dashboard, connections
+**Status: v1.5.2, native IPC watchdog and restart action.** The dashboard, connections
 list, add connection wizard, connection detail (schedule, credentials, runs,
 received logs), activity, projects, settings, memory and review screens are
 implemented. Desktop 1.2 adds the record browser and detail (body, provenance,
@@ -84,19 +84,19 @@ See [the source and asset checks](docs/neuro-brand.md).
 ## Architecture
 
 ```
-┌──────────────────────────────┐
-│ Webview (React + TS)         │
-│  invoke("shell_status")      │
-│  invoke("api_request", ...)  │──┐  no token, no port
-└──────────────────────────────┘  │
-                                  ▼
-┌──────────────────────────────┐   ┌──────────────────────────────┐
-│ Rust shell                   │   │ brain agent (sidecar/PATH)   │
-│  supervisor ─────────────────┼──▶│  loopback API + scheduler    │
-│  proxy (bearer token) ───────┼──▶│  agent/runtime.json (0600)   │
-│  tray / autostart / updater  │   └──────────────────────────────┘
-│  deep-link router            │
-└──────────────────────────────┘
+в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚ Webview (React + TS)         в”‚
+в”‚  invoke("shell_status")      в”‚
+в”‚  invoke("api_request", ...)  в”‚в”Ђв”Ђв”ђ  no token, no port
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”  в”‚
+                                  в–ј
+в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ   в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
+в”‚ Rust shell                   в”‚   в”‚ brain agent (sidecar/PATH)   в”‚
+в”‚  supervisor в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”јв”Ђв”Ђв–¶в”‚  loopback API + scheduler    в”‚
+в”‚  proxy (bearer token) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”јв”Ђв”Ђв–¶в”‚  agent/runtime.json (0600)   в”‚
+в”‚  tray / autostart / updater  в”‚   в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
+в”‚  deep-link router            в”‚
+в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
 ```
 
 See [docs/architecture.md](docs/architecture.md) and
@@ -246,3 +246,4 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+

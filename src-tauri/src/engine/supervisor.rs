@@ -158,6 +158,10 @@ impl Supervisor {
         &self.inner.paths.log_dir
     }
 
+    pub fn config_dir(&self) -> &std::path::Path {
+        &self.inner.paths.config_dir
+    }
+
     pub fn engine_config(&self) -> AppResult<EngineConfig> {
         let settings = self.inner.settings.get();
         paths::resolve_config(&self.inner.app, settings.config_path.as_deref())
