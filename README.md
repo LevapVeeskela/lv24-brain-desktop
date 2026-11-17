@@ -84,21 +84,16 @@ See [the source and asset checks](docs/neuro-brand.md).
 ## Architecture
 
 ```
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚ Webview (React + TS)         в”‚
-в”‚  invoke("shell_status")      в”‚
-в”‚  invoke("api_request", ...)  в”‚в”Ђв”Ђв”ђ  no token, no port
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”  в”‚
-                                  в–ј
-в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ   в”Њв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”ђ
-в”‚ Rust shell                   в”‚   в”‚ brain agent (sidecar/PATH)   в”‚
-в”‚  supervisor в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”јв”Ђв”Ђв–¶в”‚  loopback API + scheduler    в”‚
-в”‚  proxy (bearer token) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”јв”Ђв”Ђв–¶в”‚  agent/runtime.json (0600)   в”‚
-в”‚  tray / autostart / updater  в”‚   в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
-в”‚  deep-link router            в”‚
-в””в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”
++-------------------------------+        +-------------------------------+
+| Webview (React + TS)          |        | Rust shell                    |
+|  invoke("shell_status")       |  IPC   |  supervisor ------------------+--> brain agent
+|  invoke("api_request", ...)   |------->|  proxy (adds bearer token) ---+    (sidecar/PATH)
+|                               |        |  tray / autostart / updater   |    loopback API
++-------------------------------+        |  deep-link router             |    agent/runtime.json (0600)
+                                         +-------------------------------+
 ```
 
+The webview never sees the bearer token or the loopback port.
 See [docs/architecture.md](docs/architecture.md) and
 [docs/security.md](docs/security.md).
 
@@ -107,7 +102,7 @@ See [docs/architecture.md](docs/architecture.md) and
 - Node.js 22+ (CI uses 24) and npm.
 - Rust 1.90+ with the platform toolchain (MSVC on Windows).
 - Tauri v2 system prerequisites for your OS.
-- The LV24 Brain engine `0.14.0` or newer, initialized with `brain init` and
+- The LV24 Brain engine `0.22.2` or newer, initialized with `brain init` and
   selected with `brain config use <path>` (or `BRAIN_CONFIG`).
 
 The engine sidecar is fetched per target during packaging CI; see
