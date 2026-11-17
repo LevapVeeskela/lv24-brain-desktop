@@ -786,7 +786,12 @@ const ConnectionDetailView = observer(function ConnectionDetailView({
       {descriptor?.configFields.some((field) => field.secret) ? (
         <Card>
           <h3 id={`${formId}-credentials-section`} tabIndex={-1}>{t("detail.credentials")}</h3>
-          <p className="muted small">{t("detail.credentialsNote")}</p>
+          <p className="muted small">
+            {t("detail.credentialsNote")}
+            {engine.status?.machine
+              ? ` ${t("detail.credentialsMachine", { machine: engine.status.machine })}`
+              : ""}
+          </p>
           {secretsLoading ? <Loading label={t("detail.credentials")} /> : null}
           {secretsError ? (
             <Notice variant="error" action={<Button variant="link" disabled={!engineReady || secretsLoading} onClick={() => setSecretsVersion((version) => version + 1)}>{t("actions.retry")}</Button>}>

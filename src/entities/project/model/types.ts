@@ -3,6 +3,8 @@ import type { Provenance, TrustLevel } from "@/entities/memory/model/types";
 export interface Project {
   id: string;
   name: string;
+  paths: string[];
+  pathProvenance: Record<string, string>;
 }
 
 export interface StateReviewRequest {

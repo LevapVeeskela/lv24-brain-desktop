@@ -35,6 +35,7 @@ function shellStatus(
     updating: false,
     autostart: { enabled: false, supported: true },
     desktopVersion: "1.1.0",
+    machine: "TEST-MACHINE",
     deepLinkScheme: "lv24brain",
     logDir: "C:/logs",
     previousSessionUnclean: false,

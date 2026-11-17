@@ -74,6 +74,8 @@ export const SettingsPage = observer(function SettingsPage({
         <Card>
           <h3>{t("settings.paths")}</h3>
           <dl className="details paths">
+            <dt>{t("settings.machine")}</dt>
+            <dd><code>{engine.status?.machine || t("paths.notResolved")}</code></dd>
             <dt>{t("settings.dataDir")}</dt>
             <dd>
               <code>{status?.dataDir ?? t("paths.notResolved")}</code>

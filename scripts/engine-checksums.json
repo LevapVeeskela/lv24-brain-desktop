@@ -78,5 +78,13 @@
     "brain_0.22.2_linux_arm64": "a3704979be658e7a76fe7982396d4330680adfe1f2ca129a20de74ea620ea1bf",
     "brain_0.22.2_windows_amd64.exe": "396130a6d6f6d35ac4369749fe4b8c5b8b3d6d013282d20be03c189b94ae5430",
     "brain_0.22.2_windows_arm64.exe": "da3ba12e3e8fa8bbbd04ecc3ec5b6cdfa0f3ec1ed5b915bdb307060d23017ac4"
+  },
+  "0.23.0": {
+    "brain_0.23.0_darwin_amd64": "a896a9deef742a529242f81cb1a03a6c73ce4395ba7a7db125c32299e9c03435",
+    "brain_0.23.0_darwin_arm64": "d68bb20749e38b0bb081b18bcd5d6f645b0456ef65a5b202a02eb3eb0fe973c0",
+    "brain_0.23.0_linux_amd64": "c1a92411a1536c2650adf6c8568ce639044f74d88cf29e3845effd5a979635d4",
+    "brain_0.23.0_linux_arm64": "3fddf33cab1381981706e66240d67eab2e84dc63298ab3cb984a7638d6ba32e7",
+    "brain_0.23.0_windows_amd64.exe": "daed4b92118bd3fd2eeb117643302e1738d0a86588e23ed2fff521f9e390b273",
+    "brain_0.23.0_windows_arm64.exe": "f52426071618438e79f371f92fac08ecba0d70057d11d8f2a1f9a6cd1e202d07"
   }
 }

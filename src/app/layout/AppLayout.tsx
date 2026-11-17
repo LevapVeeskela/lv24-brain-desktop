@@ -25,6 +25,8 @@ function routeTitleKey(pathname: string): MessageKey {
       return "nav.projects";
     case "settings":
       return "nav.settings";
+    case "sync":
+      return "nav.gitSync";
     case "memory":
       return "nav.memory";
     case "inbox":
@@ -80,9 +82,9 @@ export const AppLayout = observer(function AppLayout({
       >
         {t("app.skipToContent")}
       </a>
-      <AppHeader engine={engine} />
-      <div className="shell-body">
-        <AppRail store={store} />
+      <AppRail store={store} />
+      <div className="shell-main">
+        <AppHeader engine={engine} section={routeTitleKey(location.pathname)} />
         <main
           id="main-content"
           className="content"

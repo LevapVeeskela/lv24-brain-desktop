@@ -6,7 +6,7 @@ The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/l
 built with Tauri v2. See connection results, investigate failed runs and manage
 the background agent, schedules and credentials from one offline-first interface.
 
-**Status: v1.5.3, postMessage IPC fallback and native watchdog.** The dashboard, connections
+**Status: v1.6.0, Git sync UI, machine provenance, and SEO-style shell.** The dashboard, connections
 list, add connection wizard, connection detail (schedule, credentials, runs,
 received logs), activity, projects, settings, memory and review screens are
 implemented. Desktop 1.2 adds the record browser and detail (body, provenance,
@@ -241,5 +241,6 @@ release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
+
 
 

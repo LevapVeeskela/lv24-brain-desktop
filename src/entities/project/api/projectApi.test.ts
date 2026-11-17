@@ -2,9 +2,25 @@ import { describe, expect, it } from "vitest";
 import { parseProjectState, parseProjects } from "./projectApi";
 
 describe("project parser", () => {
-  it("keeps id and name and rejects malformed entries", () => {
-    expect(parseProjects([{ id: "lv24", name: "LV24" }])).toEqual([
-      { id: "lv24", name: "LV24" },
+  it("keeps id, name and machine path provenance", () => {
+    expect(
+      parseProjects([
+        {
+          id: "lv24",
+          name: "LV24",
+          paths: ["C:\\0project\\lv24"],
+          path_provenance: { "C:\\0project\\lv24": "DESKTOP-F5INSH6" },
+        },
+        { id: "plain", name: "Plain" },
+      ]),
+    ).toEqual([
+      {
+        id: "lv24",
+        name: "LV24",
+        paths: ["C:\\0project\\lv24"],
+        pathProvenance: { "C:\\0project\\lv24": "DESKTOP-F5INSH6" },
+      },
+      { id: "plain", name: "Plain", paths: [], pathProvenance: {} },
     ]);
     expect(() => parseProjects({})).toThrow(/non-array/);
     expect(() => parseProjects([{ id: 1, name: "x" }])).toThrow(/invalid/);

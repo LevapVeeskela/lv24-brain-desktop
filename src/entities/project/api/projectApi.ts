@@ -7,6 +7,7 @@ import {
   asOptionalString,
   asOptionalTimestamp,
   asString,
+  asStringMap,
 } from "@/shared/api/validate";
 import { PROVENANCE_ORIGINS, TRUST_LEVELS, type Provenance } from "@/entities/memory/model/types";
 import type {
@@ -105,9 +106,19 @@ export function parseProjects(value: unknown): Project[] {
   return value.map((item, index) => {
     try {
       const project = asObject(item, `projects[${index}]`);
+      const rawProvenance = project.path_provenance;
+      const pathProvenance =
+        rawProvenance === undefined || rawProvenance === null
+          ? {}
+          : asStringMap(rawProvenance, `projects[${index}].path_provenance`);
       return {
         id: asString(project.id, `projects[${index}].id`),
         name: asString(project.name, `projects[${index}].name`),
+        paths:
+          project.paths === undefined || project.paths === null
+            ? []
+            : asArray(project.paths, `projects[${index}].paths`, asString),
+        pathProvenance,
       };
     } catch (cause) {
       throw new Error(

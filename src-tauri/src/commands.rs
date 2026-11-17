@@ -22,6 +22,7 @@ pub struct ShellStatus {
     pub desktop_version: String,
     pub deep_link_scheme: String,
     pub log_dir: String,
+    pub machine: String,
     pub previous_session_unclean: bool,
     pub session_diagnostics_available: bool,
 }
@@ -65,6 +66,7 @@ fn make_status(app: &AppHandle) -> ShellStatus {
         desktop_version: env!("CARGO_PKG_VERSION").to_string(),
         deep_link_scheme: deep_link::SCHEME.to_string(),
         log_dir: supervisor.log_dir().display().to_string(),
+        machine: machine_name(),
         previous_session_unclean: recovery.previous_unclean,
         session_diagnostics_available: recovery.diagnostics_available,
     }
@@ -80,6 +82,12 @@ pub fn shell_status(app: AppHandle) -> Result<ShellStatus, String> {
 #[tauri::command]
 pub fn ui_ready(watchdog: tauri::State<'_, Arc<UiWatchdog>>) {
     watchdog.mark_ready();
+}
+
+fn machine_name() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_default()
 }
 
 #[tauri::command]

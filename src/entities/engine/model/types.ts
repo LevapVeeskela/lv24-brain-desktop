@@ -45,6 +45,7 @@ export interface ShellStatus {
   desktopVersion: string;
   deepLinkScheme: string;
   logDir: string;
+  machine: string;
   previousSessionUnclean: boolean;
   sessionDiagnosticsAvailable: boolean;
 }

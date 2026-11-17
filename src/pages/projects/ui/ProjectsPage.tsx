@@ -17,6 +17,16 @@ export const ProjectsPage = observer(function ProjectsPage({
 }) {
   const { t } = useI18n();
 
+  const machinePaths = new Map<string, number>();
+  for (const project of projects.items) {
+    for (const path of project.paths) {
+      const machine = project.pathProvenance[path];
+      if (machine) {
+        machinePaths.set(machine, (machinePaths.get(machine) ?? 0) + 1);
+      }
+    }
+  }
+
   useEffect(() => {
     void projects.load();
   }, [projects]);
@@ -50,6 +60,7 @@ export const ProjectsPage = observer(function ProjectsPage({
                 <tr>
                   <th scope="col">{t("projects.id")}</th>
                   <th scope="col">{t("common.name")}</th>
+                  <th scope="col">{t("projects.paths")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -59,12 +70,47 @@ export const ProjectsPage = observer(function ProjectsPage({
                       <code>{project.id}</code>
                     </td>
                     <td data-label={t("common.name")}>{project.name || t("common.none")}</td>
+                    <td data-label={t("projects.paths")}>
+                      {project.paths.length > 0 ? (
+                        <ul className="plain-list">
+                          {project.paths.map((path) => {
+                            const machine = project.pathProvenance[path];
+                            return (
+                              <li key={path}>
+                                <code>{path}</code>
+                                {machine ? (
+                                  <span className="muted small"> · {machine}</span>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : (
+                        t("common.none")
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </Table>
         ) : null}
       </Card>
+
+      {machinePaths.size > 0 ? (
+        <Card>
+          <h3>{t("projects.machineProvenance")}</h3>
+          <ul className="plain-list">
+            {[...machinePaths.entries()].map(([machine, count]) => (
+              <li key={machine}>
+                <strong>{machine}</strong>
+                <span className="muted">
+                  {" "}— {t("projects.machinePaths", { count })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   );
 });

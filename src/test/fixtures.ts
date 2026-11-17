@@ -191,7 +191,7 @@ export function projectState(overrides: Partial<ProjectState> = {}): ProjectStat
 }
 
 export function project(overrides: Partial<Project> = {}): Project {
-  return { id: "lv24", name: "LV24", ...overrides };
+  return { id: "lv24", name: "LV24", paths: [], pathProvenance: {}, ...overrides };
 }
 
 export function searchPage(

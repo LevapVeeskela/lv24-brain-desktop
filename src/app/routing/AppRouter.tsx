@@ -6,6 +6,7 @@ import { ConnectionDetailPage } from "@/pages/connection-detail";
 import { ConnectionWizardPage } from "@/pages/connection-wizard";
 import { ConnectionsPage } from "@/pages/connections";
 import { DashboardPage } from "@/pages/dashboard";
+import { GitSyncPage } from "@/pages/git-sync";
 import { InboxPage, ProposalDetailPage } from "@/pages/inbox";
 import { MemoryPage, RecordDetailPage } from "@/pages/memory";
 import { NotFoundPage } from "@/pages/not-found";
@@ -150,6 +151,10 @@ export function AppRouter({ store }: { store: RootStore }) {
                 engine={store.engine}
               />
             }
+          />
+          <Route
+            path="sync"
+            element={<GitSyncPage gitSync={store.gitSync} />}
           />
           <Route
             path="settings"

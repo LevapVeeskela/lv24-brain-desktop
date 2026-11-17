@@ -2,6 +2,7 @@ import { reaction } from "mobx";
 import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import { EngineStore } from "@/entities/engine/model/EngineStore";
+import { GitSyncStore } from "@/entities/git-sync/model/GitSyncStore";
 import { memoryApi } from "@/entities/memory/api/memoryApi";
 import { MemoryStore } from "@/entities/memory/model/MemoryStore";
 import { QuarantineStore } from "@/entities/memory/model/QuarantineStore";
@@ -19,6 +20,7 @@ export class RootStore {
   readonly engine: EngineStore;
   readonly connections: ConnectionsStore;
   readonly sync: SyncStore;
+  readonly gitSync: GitSyncStore;
   readonly settings: SettingsStore;
   readonly runs: RunsStore;
   readonly projects: ProjectsStore;
@@ -38,6 +40,7 @@ export class RootStore {
     this.settings = new SettingsStore();
     this.connections = new ConnectionsStore(connectionApi, this.engine);
     this.sync = new SyncStore(connectionApi, this.engine, this.connections);
+    this.gitSync = new GitSyncStore();
     this.runs = new RunsStore(connectionApi);
     this.projects = new ProjectsStore(projectApi);
     this.providers = new ProvidersStore(providerApi);

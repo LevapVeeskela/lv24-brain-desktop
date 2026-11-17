@@ -1,6 +1,7 @@
 import { observer } from "mobx-react-lite";
 import { NavLink } from "react-router-dom";
 import type { RootStore } from "@/app/model/RootStore";
+import { BrandMark } from "@/shared/brand/BrandMark";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 
 const primaryLinks: Array<{
@@ -45,15 +46,29 @@ const primaryLinks: Array<{
     key: "nav.connections",
     icon: "M8 8l8 8 M7 12a5 5 0 115-5 M12 17a5 5 0 115-5",
   },
+  {
+    to: "/sync",
+    key: "nav.gitSync",
+    icon: "M4 12a8 8 0 0114-5 M20 12a8 8 0 01-14 5 M18 4v4h-4 M6 20v-4h4",
+  },
 ];
 
 export const AppRail = observer(function AppRail({ store }: { store: RootStore }) {
   const { t } = useI18n();
   const projects = store.projects;
   const pending = store.review.pendingCount;
+  const engine = store.engine;
 
   return (
     <aside className="app-rail" aria-label={t("shell.navLabel")}>
+      <div className="rail-brand">
+        <BrandMark className="logo" />
+        <div className="rail-brand-copy">
+          <strong>LV24 <span className="brand-accent">Brain</span></strong>
+          <span>{t("app.subtitle")}</span>
+        </div>
+      </div>
+
       <div className="rail-project">
         <label className="rail-project-label" htmlFor="rail-project">
           {t("shell.project")}
@@ -79,6 +94,7 @@ export const AppRail = observer(function AppRail({ store }: { store: RootStore }
       </div>
 
       <nav className="rail-nav" aria-label={t("shell.navLabel")}>
+        <p className="rail-nav-label">{t("shell.navLabel")}</p>
         {primaryLinks.map((link) => (
           <NavLink
             key={link.to}
@@ -136,6 +152,12 @@ export const AppRail = observer(function AppRail({ store }: { store: RootStore }
           </svg>
           <span>{t("nav.settings")}</span>
         </NavLink>
+        <div className="rail-versions">
+          <span>{t("footer.desktop", { version: engine.desktopVersion })}</span>
+          {engine.version ? (
+            <span>{t("footer.engine", { version: engine.version })}</span>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

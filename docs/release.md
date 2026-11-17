@@ -1,4 +1,4 @@
-﻿# Packaging and release (v1.5.3)
+﻿# Packaging and release (v1.6.0)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -123,5 +123,6 @@ Tray glyphs distinguish paused/stopped when their palette colors match.
 The design refresh keeps versions, installer names, release overrides, updater
 key and signing requirements. Local verification and the native smoke checklist
 are recorded in [design-refresh/report.md](design-refresh/report.md).
+
 
 

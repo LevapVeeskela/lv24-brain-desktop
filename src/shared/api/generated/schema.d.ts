@@ -546,12 +546,14 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Registered project IDs and names */
+                /** @description Registered project IDs, names, checkout paths and path provenance */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Project"][];
+                    };
                 };
             };
         };
@@ -1620,6 +1622,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Reads the git sync state of the agent's data repository, including divergence, dirty files and conflict records. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current git sync state */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncView"];
+                    };
+                };
+                401: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** @description Commits local changes, pulls with rebase and optionally pushes. A content conflict returns 409 sync_conflict and changes nothing else; refresh GET /v1/sync for the conflict paths. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["SyncRequest"];
+                };
+            };
+            responses: {
+                /** @description Sync completed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SyncView"];
+                    };
+                };
+                401: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2069,6 +2136,38 @@ export interface components {
             journal: components["schemas"]["JournalEntry"][];
             quarantined_count: number;
             include_unreviewed: boolean;
+        };
+        SyncRevision: {
+            kind: string;
+            value: string;
+            /** Format: date-time */
+            at: string;
+        };
+        SyncView: {
+            provider?: string;
+            branch?: string;
+            ahead: number;
+            behind: number;
+            changed: number;
+            dirty: boolean;
+            unmerged: boolean;
+            conflicts: string[];
+            conflict_records: string[];
+            recovered: boolean;
+            reindexed: boolean;
+            last_synced_revision?: components["schemas"]["SyncRevision"];
+        };
+        SyncRequest: {
+            /** @default false */
+            push: boolean;
+        };
+        Project: {
+            id: string;
+            name: string;
+            paths?: string[];
+            path_provenance?: {
+                [key: string]: string;
+            };
         };
     };
     responses: {
