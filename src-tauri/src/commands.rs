@@ -84,10 +84,34 @@ pub fn ui_ready(watchdog: tauri::State<'_, Arc<UiWatchdog>>) {
     watchdog.mark_ready();
 }
 
+/// Host name shown in the app bar. It must match the engine's machine id
+/// (`machine_id` in brain.yaml, else os.Hostname) because path provenance uses
+/// that id: on Windows os.Hostname is COMPUTERNAME, on unix it is
+/// gethostname(2). A GUI app on macOS has no HOSTNAME environment variable, so
+/// the syscall is the reliable source there.
 fn machine_name() -> String {
-    std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_default()
+    #[cfg(windows)]
+    {
+        if let Ok(name) = std::env::var("COMPUTERNAME") {
+            if !name.trim().is_empty() {
+                return name.trim().to_string();
+            }
+        }
+    }
+    #[cfg(unix)]
+    {
+        let mut buf = [0u8; 256];
+        // SAFETY: buf is a valid, writable buffer of the length passed.
+        let rc = unsafe { libc::gethostname(buf.as_mut_ptr().cast(), buf.len()) };
+        if rc == 0 {
+            let end = buf.iter().position(|byte| *byte == 0).unwrap_or(buf.len());
+            let name = String::from_utf8_lossy(&buf[..end]).trim().to_string();
+            if !name.is_empty() {
+                return name;
+            }
+        }
+    }
+    std::env::var("HOSTNAME").unwrap_or_default().trim().to_string()
 }
 
 #[tauri::command]
