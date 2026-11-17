@@ -60,7 +60,7 @@ export const EngineOverview = observer(function EngineOverview({
       <EngineControls engine={engine} sync={sync} />
       </div>
       {engine.statusError || engine.engine?.lastError ? (
-        <Notice variant="error" action={<Button variant="link" disabled={engine.busy !== null || engine.isUpdating} onClick={() => void engine.refresh()}>{t("actions.retry")}</Button>}>
+        <Notice variant="error" action={<Button variant="link" disabled={engine.busy !== null || engine.isUpdating} onClick={() => (engine.ipcUnavailable ? engine.reloadIpc() : void engine.refresh())}>{t(engine.ipcUnavailable ? "actions.reload" : "actions.retry")}</Button>}>
           <span>{engine.statusError ?? engine.engine?.lastError}</span>
         </Notice>
       ) : null}

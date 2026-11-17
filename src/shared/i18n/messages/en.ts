@@ -56,6 +56,7 @@ export const en = {
   "actions.dismiss": "Dismiss",
   "actions.quit": "Quit",
   "actions.retry": "Retry",
+  "actions.reload": "Reload",
   "notices.attention": "Something needs attention.",
   "notices.syncQueued": "Queued {queued} of {total} connections.",
   "notices.syncAccepted": "Every configured connection accepted the run request.",

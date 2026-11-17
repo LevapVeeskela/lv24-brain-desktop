@@ -58,6 +58,7 @@ export const zh: Messages = {
   "actions.dismiss": "忽略",
   "actions.quit": "退出",
   "actions.retry": "重试",
+  "actions.reload": "重新加载",
   "notices.attention": "需要注意。",
   "notices.syncQueued": "已排队 {queued}/{total} 个连接。",
   "notices.syncAccepted": "所有连接都已接受运行请求。",

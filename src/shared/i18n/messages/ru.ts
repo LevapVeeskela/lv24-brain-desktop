@@ -58,6 +58,7 @@ export const ru: Messages = {
   "actions.dismiss": "Скрыть",
   "actions.quit": "Выйти",
   "actions.retry": "Повторить",
+  "actions.reload": "Перезагрузить",
   "notices.attention": "Нужно внимание.",
   "notices.syncQueued": "В очередь поставлено {queued} из {total} подключений.",
   "notices.syncAccepted": "Все подключения приняли запрос.",

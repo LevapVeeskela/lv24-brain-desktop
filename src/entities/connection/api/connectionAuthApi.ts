@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { tauriInvoke } from "@/shared/api/tauri";
 
 export interface AuthLine {
   connectionId: string;
@@ -14,7 +14,7 @@ export interface AuthOutcome {
 
 export const connectionAuthApi = {
   start: (connectionId: string, clientId?: string) =>
-    invoke<AuthOutcome>("engine_connection_auth", {
+    tauriInvoke<AuthOutcome>("engine_connection_auth", {
       connectionId,
       clientId: clientId?.trim() || null,
     }),

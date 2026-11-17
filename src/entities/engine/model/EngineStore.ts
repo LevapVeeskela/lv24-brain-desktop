@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { makeAutoObservable, runInAction } from "mobx";
+import { isMissingOriginError, recoverMissingOriginIpc } from "@/shared/api/ipc";
 import { errorMessage } from "@/shared/lib/errors";
 import { engineApi } from "../api/engineApi";
 import type {
@@ -11,6 +12,11 @@ import type {
 } from "./types";
 
 const POLL_INTERVAL_MS = 4000;
+
+export interface EngineStoreOptions {
+  /** Test seam and explicit reload policy for the Tauri IPC recovery. */
+  recoverIpc?: (error: unknown) => boolean;
+}
 
 export class EngineStore {
   status: ShellStatus | null = null;
@@ -28,8 +34,10 @@ export class EngineStore {
   private statusRefreshFailed = false;
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribers: Array<() => void> = [];
+  private readonly recoverIpc: (error: unknown) => boolean;
 
-  constructor() {
+  constructor(options: EngineStoreOptions = {}) {
+    this.recoverIpc = options.recoverIpc ?? recoverMissingOriginIpc;
     makeAutoObservable(this, {}, { autoBind: true });
   }
 
@@ -48,6 +56,14 @@ export class EngineStore {
 
   get isRunning(): boolean {
     return this.status?.engine.running ?? false;
+  }
+
+  /**
+   * True when the last status failure is Tauri's missing-Origin IPC error.
+   * The agent may be healthy; only the webview transport is broken.
+   */
+  get ipcUnavailable(): boolean {
+    return isMissingOriginError(this.statusError);
   }
 
   get isPaused(): boolean {
@@ -149,6 +165,16 @@ export class EngineStore {
         this.statusRefreshFailed = false;
       });
     } catch (cause) {
+      // A missing-Origin failure is a webview IPC race, not an engine state.
+      // Reload once before showing "engine unavailable"; the reloading page
+      // owns the pending status call.
+      if (this.recoverIpc(cause)) {
+        runInAction(() => {
+          this.statusError = null;
+          this.statusRefreshFailed = false;
+        });
+        return;
+      }
       // Poll failures are background state, not the outcome of a user action.
       // Keeping them apart lets Dismiss hide the banner without losing a
       // start/pause/autostart error and without faking an initializing phase.
@@ -158,6 +184,13 @@ export class EngineStore {
       });
     } finally {
       this.refreshInFlight = false;
+    }
+  }
+
+  /** Explicit recovery from a persistent missing-Origin IPC failure. */
+  reloadIpc(): void {
+    if (typeof window !== "undefined") {
+      window.location.reload();
     }
   }
 

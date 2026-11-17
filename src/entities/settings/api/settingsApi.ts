@@ -1,8 +1,8 @@
-import { invoke } from "@tauri-apps/api/core";
+import { tauriInvoke } from "@/shared/api/tauri";
 import type { UpdateInfo } from "../model/types";
 
 export const settingsApi = {
-  checkUpdate: () => invoke<UpdateInfo>("update_check"),
-  installUpdate: () => invoke<void>("update_install"),
-  secretNames: () => invoke<string[]>("engine_secrets"),
+  checkUpdate: () => tauriInvoke<UpdateInfo>("update_check"),
+  installUpdate: () => tauriInvoke<void>("update_install"),
+  secretNames: () => tauriInvoke<string[]>("engine_secrets"),
 };

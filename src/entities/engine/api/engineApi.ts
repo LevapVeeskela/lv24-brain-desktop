@@ -1,13 +1,13 @@
-import { invoke } from "@tauri-apps/api/core";
+import { tauriInvoke } from "@/shared/api/tauri";
 import type { ShellStatus } from "../model/types";
 
 /** Commands implemented by the Rust shell supervisor. */
 export const engineApi = {
-  status: () => invoke<ShellStatus>("shell_status"),
-  start: () => invoke<ShellStatus>("engine_start"),
-  pause: () => invoke<ShellStatus>("engine_pause"),
+  status: () => tauriInvoke<ShellStatus>("shell_status"),
+  start: () => tauriInvoke<ShellStatus>("engine_start"),
+  pause: () => tauriInvoke<ShellStatus>("engine_pause"),
   setAutostart: (enabled: boolean) =>
-    invoke<ShellStatus>("autostart_set", { enabled }),
-  quit: () => invoke<void>("app_quit"),
-  takeDeepLink: () => invoke<string | null>("deep_link_take"),
+    tauriInvoke<ShellStatus>("autostart_set", { enabled }),
+  quit: () => tauriInvoke<void>("app_quit"),
+  takeDeepLink: () => tauriInvoke<string | null>("deep_link_take"),
 };

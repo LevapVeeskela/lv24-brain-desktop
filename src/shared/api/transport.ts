@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { tauriInvoke } from "./tauri";
 import {
   LOCAL_API_ORIGIN,
   type ApiResponse,
@@ -24,7 +24,7 @@ export function localPathFromUrl(input: RequestInfo | URL): string {
  * openapi-fetch transport: the webview sees a normal fetch/Response, while
  * the bearer token and loopback port stay in the Rust `api_request` command.
  */
-export function createTauriFetch(invokeFn: InvokeFn = invoke): typeof fetch {
+export function createTauriFetch(invokeFn: InvokeFn = tauriInvoke): typeof fetch {
   return async (input, init) => {
     const request = new Request(input, init);
     const path = localPathFromUrl(request.url);

@@ -63,6 +63,33 @@ describe("EngineStore", () => {
     expect(store.statusError).toContain("shell offline");
   });
 
+  it("auto-recovers a missing-Origin IPC failure without faking engine state", async () => {
+    vi.mocked(engineApi.status).mockRejectedValue(
+      new Error("missing Origin header"),
+    );
+    const recoverIpc = vi.fn(() => true);
+    const store = new EngineStore({ recoverIpc });
+
+    await store.refresh();
+
+    expect(recoverIpc).toHaveBeenCalledTimes(1);
+    expect(store.statusError).toBeNull();
+    expect(store.status).toBeNull();
+    expect(store.phase).toBe("initializing");
+  });
+
+  it("marks a persistent missing-Origin failure as an IPC error", async () => {
+    vi.mocked(engineApi.status).mockRejectedValue(
+      new Error("missing Origin header"),
+    );
+    const store = new EngineStore({ recoverIpc: () => false });
+
+    await store.refresh();
+
+    expect(store.ipcUnavailable).toBe(true);
+    expect(store.statusError).toContain("missing Origin header");
+  });
+
   it("keeps poll failures out of the action error and stays unavailable after dismiss", async () => {
     vi.mocked(engineApi.status).mockRejectedValue(new Error("shell offline"));
     const store = new EngineStore();

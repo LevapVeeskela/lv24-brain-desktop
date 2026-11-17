@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { tauriInvoke } from "@/shared/api/tauri";
 
 export interface RunLogEvent {
   streamId: string;
@@ -14,9 +14,9 @@ export interface RunLogEnd {
 
 export const runApi = {
   openLog: (runId: string) =>
-    invoke<string>("run_log_open", { runId }),
+    tauriInvoke<string>("run_log_open", { runId }),
   closeLog: (streamId: string) =>
-    invoke<void>("run_log_close", { streamId }),
+    tauriInvoke<void>("run_log_close", { streamId }),
   onLog: (listener: (event: RunLogEvent) => void): Promise<UnlistenFn> =>
     listen<RunLogEvent>("run-log", (event) => listener(event.payload)),
   onEnd: (listener: (event: RunLogEnd) => void): Promise<UnlistenFn> =>
