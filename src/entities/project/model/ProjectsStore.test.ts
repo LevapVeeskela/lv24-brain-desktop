@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { LocalApiError } from "@/shared/api/client";
 import { deferred, projectsSource } from "@/test/api";
-import { project, projectState } from "@/test/fixtures";
+import { adoptReport, project, projectState } from "@/test/fixtures";
 import { ProjectsStore } from "./ProjectsStore";
 
 describe("ProjectsStore", () => {
@@ -109,5 +109,46 @@ describe("ProjectsStore", () => {
     store.select("other");
     expect(store.state).toBeNull();
     expect(store.stateLoaded).toBe(false);
+  });
+
+  it("previews adoption, then applies it and reloads the paths", async () => {
+    const adopt = vi.fn(async (apply: boolean) =>
+      adoptReport({ applied: apply, stamped: apply ? 0 : 1 }),
+    );
+    const list = vi.fn(async () => [project()]);
+    const store = new ProjectsStore(projectsSource({ adopt, list }));
+
+    expect(await store.previewAdopt()).toBe(true);
+    expect(adopt).toHaveBeenCalledWith(false);
+    expect(store.adoptPreview?.stamped).toBe(1);
+    expect(store.adoptApplied).toBeNull();
+
+    const applied = await store.applyAdopt();
+    expect(adopt).toHaveBeenCalledWith(true);
+    expect(applied?.applied).toBe(true);
+    expect(store.adoptPreview).toBeNull();
+    expect(store.adoptApplied?.stamped).toBe(0);
+    expect(list).toHaveBeenCalled();
+  });
+
+  it("adds a path and reports a rejected write", async () => {
+    const addPath = vi.fn(async (_projectId: string, path: string) =>
+      project({ paths: [path] }),
+    );
+    const store = new ProjectsStore(projectsSource({ addPath }));
+    expect(await store.addPath("lv24", "C:\\work\\lv24")).toBe(true);
+    expect(addPath).toHaveBeenCalledWith("lv24", "C:\\work\\lv24");
+    expect(store.addingPath).toBe(false);
+
+    store.addPathError = null;
+    const rejected = new ProjectsStore(
+      projectsSource({
+        addPath: async () => {
+          throw new Error("path must be absolute");
+        },
+      }),
+    );
+    expect(await rejected.addPath("lv24", "relative")).toBe(false);
+    expect(rejected.addPathError).toContain("absolute");
   });
 });

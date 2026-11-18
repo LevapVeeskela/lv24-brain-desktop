@@ -1,14 +1,25 @@
-import { useEffect, type MouseEvent } from "react";
+import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import { observer } from "mobx-react-lite";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
+import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
+import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { Field } from "@/shared/ui/Field";
+import { Input } from "@/shared/ui/Input";
 import { Notice } from "@/shared/ui/Notice";
 import { Loading } from "@/shared/ui/Loading";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Table } from "@/shared/ui/Table";
-import { useI18n } from "@/shared/i18n";
+import { useFeedback } from "@/shared/ui/Feedback";
+import { useI18n, type MessageKey } from "@/shared/i18n";
+
+const stateKeys: Record<string, MessageKey> = {
+  owned: "projects.state.owned",
+  stamped: "projects.state.stamped",
+  missing: "projects.state.missing",
+};
 
 export const ProjectsPage = observer(function ProjectsPage({
   projects,
@@ -16,9 +27,13 @@ export const ProjectsPage = observer(function ProjectsPage({
   projects: ProjectsStore;
 }) {
   const { t } = useI18n();
+  const { notify } = useFeedback();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [adoptOpen, setAdoptOpen] = useState(false);
+  const [newPath, setNewPath] = useState("");
   const selectedParam = searchParams.get("project") ?? projects.selectedId;
+  const adoptReport = projects.adoptPreview ?? projects.adoptApplied;
 
   const detailPath = (projectId: string): string => {
     const base = `/projects/${encodeURIComponent(projectId)}`;
@@ -62,6 +77,33 @@ export const ProjectsPage = observer(function ProjectsPage({
     void projects.load();
   }, [projects]);
 
+  const applyAdopt = async (): Promise<void> => {
+    const applied = await projects.applyAdopt();
+    setAdoptOpen(false);
+    notify(
+      applied
+        ? t("projects.adoptDone", { count: applied.stamped })
+        : t("projects.adoptFailed"),
+      applied ? "success" : "error",
+    );
+  };
+
+  const submitPath = async (event: FormEvent): Promise<void> => {
+    event.preventDefault();
+    const projectId = projects.selected?.id;
+    const path = newPath.trim();
+    if (!projectId || !path) {
+      return;
+    }
+    const added = await projects.addPath(projectId, path);
+    if (!added) {
+      notify(t("projects.addPathFailed"), "error");
+      return;
+    }
+    setNewPath("");
+    notify(t("projects.addPathDone"), "success");
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -69,16 +111,122 @@ export const ProjectsPage = observer(function ProjectsPage({
           <h2>{t("projects.title")}</h2>
           <p className="muted">{t("projects.subtitle")}</p>
         </div>
-        <Button
-          variant="primary"
-          disabled={projects.loading}
-          onClick={() => void projects.load(true)}
-        >
-          {projects.loading ? t("common.loading") : t("actions.refresh")}
-        </Button>
+        <div className="row-actions">
+          <Button
+            disabled={projects.adoptLoading}
+            onClick={() => void projects.previewAdopt()}
+          >
+            {projects.adoptLoading
+              ? t("common.loading")
+              : t("projects.adopt")}
+          </Button>
+          <Button
+            variant="primary"
+            disabled={projects.loading}
+            onClick={() => void projects.load(true)}
+          >
+            {projects.loading ? t("common.loading") : t("actions.refresh")}
+          </Button>
+        </div>
       </div>
 
       {projects.error ? <Notice variant="error" action={<Button variant="link" disabled={projects.loading} onClick={() => void projects.load(true)}>{t("actions.retry")}</Button>}><span>{projects.error}</span></Notice> : null}
+
+      {projects.adoptError ? (
+        <Notice
+          variant="error"
+          action={
+            <Button variant="link" onClick={projects.dismissError}>
+              {t("actions.dismiss")}
+            </Button>
+          }
+        >
+          <span>{projects.adoptError}</span>
+        </Notice>
+      ) : null}
+
+      {adoptReport ? (
+        <Card>
+          <div className="card-header">
+            <div>
+              <h3>{t("projects.adoptPreview")}</h3>
+              <p className="muted small">{t("projects.adoptHint")}</p>
+            </div>
+            {projects.adoptPreview ? (
+              <Button
+                variant="primary"
+                disabled={
+                  projects.adoptLoading || projects.adoptPreview.stamped === 0
+                }
+                onClick={() => setAdoptOpen(true)}
+              >
+                {t("projects.adoptApply", {
+                  count: projects.adoptPreview.stamped,
+                })}
+              </Button>
+            ) : null}
+          </div>
+          <p className="muted small">
+            {t("projects.adoptMachine")}: <code>{adoptReport.machine}</code>
+          </p>
+          <div className="badge-row">
+            <Badge tone="info">
+              {t("projects.adoptStamped", { count: adoptReport.stamped })}
+            </Badge>
+            <Badge tone="success">
+              {t("projects.adoptOwned", { count: adoptReport.owned })}
+            </Badge>
+            <Badge tone="warning">
+              {t("projects.adoptMissing", { count: adoptReport.missing })}
+            </Badge>
+          </div>
+          {adoptReport.projects.length === 0 ? (
+            <p className="muted">{t("projects.adoptEmpty")}</p>
+          ) : (
+            <ul className="plain-list">
+              {adoptReport.projects.map((entry) => (
+                <li key={entry.projectId}>
+                  <strong>{entry.projectId}</strong>
+                  <ul className="plain-list">
+                    {entry.paths.map((path) => (
+                      <li key={path.path}>
+                        <code>{path.path}</code>{" "}
+                        <Badge tone={path.state === "missing" ? "warning" : "neutral"}>
+                          {stateKeys[path.state]
+                            ? t(stateKeys[path.state])
+                            : path.state}
+                        </Badge>
+                        {path.machine ? (
+                          <span className="muted small"> · {path.machine}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ) : null}
+
+      <ConfirmDialog
+        open={adoptOpen}
+        title={t("projects.adoptConfirmTitle")}
+        confirmLabel={t("projects.adoptApply", {
+          count: projects.adoptPreview?.stamped ?? 0,
+        })}
+        cancelLabel={t("common.cancel")}
+        busy={projects.adoptLoading}
+        onConfirm={() => void applyAdopt()}
+        onCancel={() => setAdoptOpen(false)}
+      >
+        <p>{t("projects.adoptConfirmBody")}</p>
+        <p className="muted small">
+          {t("projects.adoptConfirmCounts", {
+            count: projects.adoptPreview?.stamped ?? 0,
+          })}
+        </p>
+      </ConfirmDialog>
 
       <Card>
         {!projects.loaded && !projects.error ? (
@@ -149,6 +297,45 @@ export const ProjectsPage = observer(function ProjectsPage({
               </li>
             ))}
           </ul>
+        </Card>
+      ) : null}
+
+      {projects.selected ? (
+        <Card>
+          <h3>{t("projects.addPath")}</h3>
+          <p className="muted small">
+            <code>{projects.selected.id}</code>
+          </p>
+          <form noValidate onSubmit={(event) => void submitPath(event)}>
+            <Field
+              id="project-add-path"
+              label={t("projects.addPathLabel")}
+              hint={t("projects.addPathHint")}
+            >
+              <Input
+                id="project-add-path"
+                value={newPath}
+                placeholder={"C:\\0project\\lv24"}
+                onChange={(event) => setNewPath(event.target.value)}
+              />
+            </Field>
+            {projects.addPathError ? (
+              <Notice variant="error">
+                <span>{projects.addPathError}</span>
+              </Notice>
+            ) : null}
+            <div className="form-actions">
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={!newPath.trim() || projects.addingPath}
+              >
+                {projects.addingPath
+                  ? t("common.loading")
+                  : t("projects.addPathSubmit")}
+              </Button>
+            </div>
+          </form>
         </Card>
       ) : null}
     </div>

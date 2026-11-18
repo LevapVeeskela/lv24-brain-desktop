@@ -30,6 +30,40 @@ describe("i18n", () => {
     }
   });
 
+  it("has no untranslated English values outside the technical terms", () => {
+    // Values that stay identical on purpose: brand, unit-like labels, protocol
+    // names and the keyboard shortcut are not translated.
+    const intentional = new Set([
+      "LV24 Brain",
+      "PID",
+      "—",
+      "@every 1h",
+      "Ctrl+K",
+      "OAuth",
+      "OAuth PKCE",
+      "OAuth device flow",
+    ]);
+    const latinWord = /\p{Script=Latin}{3,}/u;
+    const untranslated: string[] = [];
+
+    for (const key of Object.keys(en) as Array<keyof typeof en>) {
+      const source = en[key];
+      if (!latinWord.test(source) || intentional.has(source)) {
+        continue;
+      }
+      for (const [locale, dictionary] of [
+        ["ru", ru],
+        ["zh", zh],
+      ] as const) {
+        if (dictionary[key] === source) {
+          untranslated.push(`${locale} ${key}: ${source}`);
+        }
+      }
+    }
+
+    expect(untranslated).toEqual([]);
+  });
+
   it("interpolates parameters", () => {
     expect(
       translate("en", "hero.engineOnPort", { version: "0.12.0", port: 49152 }),

@@ -14,6 +14,7 @@ export function LocaleSwitch() {
         <button
           key={item}
           type="button"
+          lang={item}
           className={`locale-option ${item === locale ? "active" : ""}`}
           aria-pressed={item === locale}
           onClick={() => setLocale(item)}

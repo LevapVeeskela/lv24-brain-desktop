@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { projectsSource } from "@/test/api";
-import { project } from "@/test/fixtures";
+import { adoptReport, project } from "@/test/fixtures";
 import { renderPage } from "@/test/render";
 import { ProjectsPage } from "./ProjectsPage";
 
@@ -28,5 +28,29 @@ describe("ProjectsPage", () => {
       "/projects",
     ]);
     expect(html).toContain('href="/projects/beta?project=lv24"');
+  });
+
+  it("shows the adoption preview with stamped, owned and missing counts", () => {
+    const projects = stores();
+    projects.adoptPreview = adoptReport();
+    const html = renderPage(<ProjectsPage projects={projects} />);
+    expect(html).toContain("Adoption preview");
+    expect(html).toContain("DESKTOP-F5INSH6");
+    expect(html).toContain("1 to stamp");
+    expect(html).toContain("1 already owned");
+    expect(html).toContain("1 missing here");
+    expect(html).toContain("C:\\0project\\lv24");
+    expect(html).toContain("Adopt 1");
+    expect(html).toContain("Adopt local paths?");
+  });
+
+  it("offers an absolute path field for the selected project", () => {
+    const projects = stores();
+    const html = renderPage(<ProjectsPage projects={projects} />);
+    expect(html).toContain("Add path");
+    expect(html).toContain('id="project-add-path"');
+    expect(html).toContain("Checkout path");
+    expect(html).toContain("Absolute path to an existing checkout on this machine.");
+    expect(html).toMatch(/disabled=""[^>]*>Add path<\/button>/);
   });
 });

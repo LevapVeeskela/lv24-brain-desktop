@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import { observer } from "mobx-react-lite";
 import { useNavigate } from "react-router-dom";
 import type { EngineStore } from "@/entities/engine/model/EngineStore";
@@ -7,6 +12,12 @@ import { SEARCH_MIN_LENGTH, type SearchHit } from "@/entities/memory/model/types
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { useI18n } from "@/shared/i18n";
 import { Badge } from "@/shared/ui/Badge";
+import {
+  PALETTE_FOCUSABLE_SELECTOR,
+  activeDescendantId,
+  paletteOptionId,
+  wrappedFocusIndex,
+} from "../lib/focusTrap";
 import {
   filterActions,
   navigationActions,
@@ -30,6 +41,7 @@ export const CommandPalette = observer(function CommandPalette({
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const paletteRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const restoreFocus = useRef<HTMLElement | null>(null);
   const query = search.query;
@@ -42,7 +54,9 @@ export const CommandPalette = observer(function CommandPalette({
     ...hits.map((hit): PaletteItem => ({ type: "hit", hit })),
     ...actions.map((action): PaletteItem => ({ type: "action", action })),
   ];
-  const active = items[Math.min(activeIndex, Math.max(0, items.length - 1))];
+  const activeIndexSafe = Math.min(activeIndex, Math.max(0, items.length - 1));
+  const active = items[activeIndexSafe];
+  const activeOptionId = activeDescendantId(activeIndexSafe, items.length);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
@@ -73,7 +87,11 @@ export const CommandPalette = observer(function CommandPalette({
       window.clearTimeout(timer);
       search.setQuery("");
       search.resetResults();
-      restoreFocus.current?.focus?.();
+      const target = restoreFocus.current;
+      if (target?.isConnected) {
+        target.focus();
+      }
+      restoreFocus.current = null;
     };
   }, [open, projects, search]);
 
@@ -84,6 +102,27 @@ export const CommandPalette = observer(function CommandPalette({
   }, [items.length]);
 
   const close = (): void => setOpen(false);
+
+  /** Keep Tab and Shift+Tab cycling inside the dialog. */
+  const trapTab = (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== "Tab") {
+      return;
+    }
+    const container = paletteRef.current;
+    if (!container) {
+      return;
+    }
+    const focusable = [
+      ...container.querySelectorAll<HTMLElement>(PALETTE_FOCUSABLE_SELECTOR),
+    ];
+    const current = focusable.indexOf(document.activeElement as HTMLElement);
+    const next = wrappedFocusIndex(focusable.length, current, event.shiftKey);
+    if (next === null) {
+      return;
+    }
+    event.preventDefault();
+    focusable[next]?.focus();
+  };
 
   const choose = (item: PaletteItem | undefined): void => {
     if (!item) {
@@ -115,10 +154,12 @@ export const CommandPalette = observer(function CommandPalette({
       }}
     >
       <div
+        ref={paletteRef}
         className="palette"
         role="dialog"
         aria-modal="true"
         aria-label={t("palette.placeholder")}
+        onKeyDown={trapTab}
       >
         <div className="palette-input-row">
           <input
@@ -130,6 +171,7 @@ export const CommandPalette = observer(function CommandPalette({
             aria-expanded={true}
             aria-controls="palette-results"
             aria-autocomplete="list"
+            aria-activedescendant={activeOptionId}
             aria-label={t("palette.placeholder")}
             placeholder={t("palette.placeholder")}
             value={query}
@@ -171,16 +213,24 @@ export const CommandPalette = observer(function CommandPalette({
           </p>
         ) : null}
 
-        <div id="palette-results" className="palette-results">
+        <div
+          id="palette-results"
+          className="palette-results"
+          role="listbox"
+          aria-label={t("palette.placeholder")}
+        >
           {hits.length > 0 ? (
-            <section aria-label={t("palette.records")}>
+            <section role="group" aria-label={t("palette.records")}>
               <h2 className="palette-group">{t("palette.records")}</h2>
-              <ul className="palette-list">
+              <ul className="palette-list" role="presentation">
                 {hits.map((hit, index) => (
-                  <li key={`${hit.projectId}-${hit.id}`}>
+                  <li key={`${hit.projectId}-${hit.id}`} role="presentation">
                     <button
                       type="button"
-                      className={`palette-item ${activeIndex === index ? "is-active" : ""}`}
+                      id={paletteOptionId(index)}
+                      role="option"
+                      aria-selected={activeIndexSafe === index}
+                      className={`palette-item ${activeIndexSafe === index ? "is-active" : ""}`}
                       onClick={() => choose({ type: "hit", hit })}
                       onMouseEnter={() => setActiveIndex(index)}
                     >
@@ -195,16 +245,19 @@ export const CommandPalette = observer(function CommandPalette({
           ) : null}
 
           {actions.length > 0 ? (
-            <section aria-label={t("palette.navigation")}>
+            <section role="group" aria-label={t("palette.navigation")}>
               <h2 className="palette-group">{t("palette.navigation")}</h2>
-              <ul className="palette-list">
+              <ul className="palette-list" role="presentation">
                 {actions.map((action, index) => {
                   const itemIndex = hits.length + index;
                   return (
-                    <li key={action.id}>
+                    <li key={action.id} role="presentation">
                       <button
                         type="button"
-                        className={`palette-item ${activeIndex === itemIndex ? "is-active" : ""}`}
+                        id={paletteOptionId(itemIndex)}
+                        role="option"
+                        aria-selected={activeIndexSafe === itemIndex}
+                        className={`palette-item ${activeIndexSafe === itemIndex ? "is-active" : ""}`}
                         onClick={() => choose({ type: "action", action })}
                         onMouseEnter={() => setActiveIndex(itemIndex)}
                       >
@@ -220,6 +273,8 @@ export const CommandPalette = observer(function CommandPalette({
           {query.trim().length >= SEARCH_MIN_LENGTH ? (
             <button
               type="button"
+              role="option"
+              aria-selected={false}
               className="palette-item palette-all"
               onClick={() => {
                 close();

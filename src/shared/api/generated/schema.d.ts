@@ -1500,6 +1500,339 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/merge/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Plans a two-phase merge without writing. The plan reports the records, the conflicts that would refuse an apply, the changed flag and an opaque plan_id for /v1/merge/apply. The apply re-verifies the plan fingerprint and refuses a stale plan with 409 merge_stale. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Merge plan */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MergePlan"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merge/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Applies a plan_id from /v1/merge/plan. Nothing is written when the records changed after the plan was shown: the response is 409 with error.code merge_stale and the client plans again. On success plan_id becomes the token for /v1/merge/rollback. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Merge applied (or nothing left to change) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MergeResult"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/merge/rollback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Restores an applied merge byte for byte and rebuilds the index. plan_id is the token returned by /v1/merge/apply (or the manifest path it reported). A file changed after the merge returns 409 merge_stale and is not overwritten. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Rollback result */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MergeRollbackResult"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/digest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Builds the morning digest (proposed decisions, open questions, blocked items, findings and activity) for one project or every project this API serves. Dry by default; write=true also saves digests/YYYY-MM-DD.md under the data directory and reports written_to. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Digest report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Digest"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Records this machine as the owner of registered checkout paths that exist locally and have no recorded owner. Dry by default; apply=true writes the path provenance. Refused while the API is limited to a project allowlist, because adoption spans every project. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Adoption report */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdoptReport"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{id}/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Registers one absolute checkout path on a project and stamps its machine owner. Re-adding a registered path is a no-op. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody: components["requestBodies"]["JSON"];
+            responses: {
+                /** @description Project after the write */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Project"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                415: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Reads the newest activity journal lines. limit is bounded; has_more proves another line exists beyond the page. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A registered project id, alias or path. Omit it (or pass all_projects=true) to read every project this API serves; a non-empty allowlist requires an explicit project unless it holds exactly one. */
+                    project?: components["parameters"]["ProjectOptional"];
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Journal page */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["JournalPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/hooks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Reports the installed, trusted and last-run state of the brain agent hooks for Claude Code, Codex and OpenCode. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One status per agent host */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HookStatus"][];
+                    };
+                };
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/settings": {
         parameters: {
             query?: never;
@@ -2168,6 +2501,131 @@ export interface components {
             path_provenance?: {
                 [key: string]: string;
             };
+        };
+        MergeRecord: {
+            kind?: string;
+            id: string;
+            title?: string;
+            /** @enum {string} */
+            state?: "live" | "tombstone";
+        };
+        MergeLink: {
+            source_kind?: string;
+            source_id?: string;
+            field?: string;
+            ref?: string;
+            old_id?: string;
+            new_id?: string;
+        };
+        MergePlan: {
+            /** @description Opaque token for /v1/merge/apply. */
+            plan_id: string;
+            project: string;
+            kind?: string;
+            survivor: components["schemas"]["MergeRecord"];
+            duplicates: components["schemas"]["MergeRecord"][];
+            already_merged?: components["schemas"]["MergeRecord"][];
+            links?: components["schemas"]["MergeLink"][];
+            merged_from?: string[];
+            conflicts: string[];
+            fingerprint: string;
+            changed: boolean;
+        };
+        MergeFile: {
+            path: string;
+            /** @enum {string} */
+            change: "survivor" | "tombstone" | "link" | "relation" | "move";
+        };
+        MergeResult: {
+            /** @description The token for /v1/merge/rollback once a manifest exists. */
+            plan_id: string;
+            project: string;
+            applied: boolean;
+            manifest?: string;
+            files: components["schemas"]["MergeFile"][];
+        };
+        MergeRollbackResult: {
+            plan_id: string;
+            manifest: string;
+            files: components["schemas"]["MergeFile"][];
+            conflicts?: string[];
+            already_rolled_back: boolean;
+            reindexed: boolean;
+        };
+        DigestDecision: {
+            id: string;
+            title: string;
+        };
+        DigestHandoff: {
+            id: string;
+            summary: string;
+            next_action?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        DigestProject: {
+            project: components["schemas"]["Project"];
+            changes: number;
+            notes: number;
+            decisions: number;
+            attempts: number;
+            handoffs: number;
+            commits: number;
+            latest_handoff?: components["schemas"]["DigestHandoff"];
+            proposed_decisions: components["schemas"]["DigestDecision"][];
+            open_questions: string[];
+            blocked: string[];
+            findings?: {
+                [key: string]: number;
+            };
+        };
+        Digest: {
+            /** Format: date-time */
+            generated_at: string;
+            /** Format: date-time */
+            since: string;
+            dry_run: boolean;
+            /** @description Data-directory-relative file written when write=true. */
+            written_to?: string;
+            projects: components["schemas"]["DigestProject"][];
+        };
+        PathOwnership: {
+            path: string;
+            machine?: string;
+            /** @enum {string} */
+            state: "owned" | "stamped" | "missing";
+        };
+        ProjectOwnership: {
+            project_id: string;
+            paths: components["schemas"]["PathOwnership"][];
+        };
+        AdoptReport: {
+            machine: string;
+            applied: boolean;
+            stamped: number;
+            owned: number;
+            missing: number;
+            projects: components["schemas"]["ProjectOwnership"][];
+        };
+        JournalPage: {
+            items: components["schemas"]["JournalEntry"][];
+            limit: number;
+            has_more: boolean;
+        };
+        HookStatus: {
+            host: string;
+            path: string;
+            installed: boolean;
+            detail: string;
+            trusted: boolean | null;
+            trust?: string;
+            trust_hash?: string;
+            trust_drift?: boolean;
+            approve?: string;
+            /** Format: date-time */
+            last_run: string | null;
+            last_event?: string;
+            last_error?: string;
         };
     };
     responses: {

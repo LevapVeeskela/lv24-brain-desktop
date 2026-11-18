@@ -7,6 +7,30 @@ export interface Project {
   pathProvenance: Record<string, string>;
 }
 
+export const PATH_OWNERSHIP_STATES = ["owned", "stamped", "missing"] as const;
+export type PathOwnershipState = (typeof PATH_OWNERSHIP_STATES)[number];
+
+export interface PathOwnership {
+  path: string;
+  machine?: string;
+  state: PathOwnershipState;
+}
+
+export interface ProjectOwnership {
+  projectId: string;
+  paths: PathOwnership[];
+}
+
+/** Dry-run or applied path-provenance adoption report. */
+export interface AdoptReport {
+  machine: string;
+  applied: boolean;
+  stamped: number;
+  owned: number;
+  missing: number;
+  projects: ProjectOwnership[];
+}
+
 export interface StateReviewRequest {
   reviewed?: boolean;
   trust?: TrustLevel;

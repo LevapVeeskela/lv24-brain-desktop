@@ -16,6 +16,7 @@ import {
   isInboxActionBlocked,
   isTypingTarget,
 } from "./InboxPage";
+import { DigestStore } from "../model/DigestStore";
 
 function stores() {
   const projects = new ProjectsStore(projectsSource());
@@ -211,4 +212,58 @@ describe("InboxPage", () => {
     expect(html).toContain('role="alert"');
     expect(html).toContain("denied");
   });
+
+  it("previews digest counts before a confirmed write", () => {
+    const { projects, review, engine } = stores();
+    review.loaded = true;
+    review.report = reviewReport([proposal()]);
+    const digest = new DigestStore({
+      digest: async () => digestReport(true),
+    });
+    digest.report = digestReport(true);
+    const html = renderPage(
+      <InboxPage
+        review={review}
+        projects={projects}
+        engine={engine}
+        digest={digest}
+      />,
+    );
+    expect(html).toContain("Generate digest");
+    expect(html).toContain("Digest preview");
+    expect(html).toContain("Nothing written yet.");
+    expect(html).toContain("Proposed: 2");
+    expect(html).toContain("Open questions: 1");
+    expect(html).toContain("Blocked: 1");
+    expect(html).toContain("Changes: 4");
+    expect(html).toContain("Save digest");
+    expect(html).toContain("Write the digest?");
+    expect(html).toContain("1 projects, 2 proposed decisions.");
+  });
 });
+
+function digestReport(dryRun: boolean) {
+  return {
+    generatedAt: "2026-11-18T06:00:00Z",
+    since: "2026-11-17T06:00:00Z",
+    dryRun,
+    writtenTo: dryRun ? undefined : "digests/2026-11-18.md",
+    projects: [
+      {
+        project: project(),
+        changes: 4,
+        notes: 2,
+        decisions: 1,
+        attempts: 1,
+        handoffs: 1,
+        commits: 3,
+        proposedDecisions: [
+          { id: "pd-1", title: "Use FTS5" },
+          { id: "pd-2", title: "Pin the engine version" },
+        ],
+        openQuestions: ["Which theme?"],
+        blocked: ["npm token"],
+      },
+    ],
+  };
+}

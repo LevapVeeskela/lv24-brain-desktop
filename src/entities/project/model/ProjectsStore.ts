@@ -3,6 +3,7 @@ import { LocalApiError } from "@/shared/api/client";
 import { errorMessage } from "@/shared/lib/errors";
 import type { ProjectsSource } from "../api/projectApi";
 import type {
+  AdoptReport,
   Project,
   ProjectState,
   ProjectStatePatch,
@@ -16,6 +17,13 @@ export class ProjectsStore {
   loaded = false;
   error: string | null = null;
   selectedId: string | null = null;
+  /** Dry-run report; applying it clears this and fills adoptApplied. */
+  adoptPreview: AdoptReport | null = null;
+  adoptApplied: AdoptReport | null = null;
+  adoptLoading = false;
+  adoptError: string | null = null;
+  addingPath = false;
+  addPathError: string | null = null;
 
   state: ProjectState | null = null;
   stateProjectId: string | null = null;
@@ -219,6 +227,89 @@ export class ProjectsStore {
     this.error = null;
     this.stateError = null;
     this.saveError = null;
+    this.adoptError = null;
+    this.addPathError = null;
+  }
+
+  /** Dry run first: apply is a separate, confirmed write. */
+  async previewAdopt(): Promise<boolean> {
+    if (this.adoptLoading) {
+      return false;
+    }
+    runInAction(() => {
+      this.adoptLoading = true;
+      this.adoptError = null;
+      this.adoptPreview = null;
+      this.adoptApplied = null;
+    });
+    try {
+      const report = await this.api.adopt(false);
+      runInAction(() => {
+        this.adoptPreview = report;
+      });
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.adoptError = errorMessage(cause);
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.adoptLoading = false;
+      });
+    }
+  }
+
+  async applyAdopt(): Promise<AdoptReport | null> {
+    if (this.adoptLoading || !this.adoptPreview) {
+      return null;
+    }
+    runInAction(() => {
+      this.adoptLoading = true;
+      this.adoptError = null;
+    });
+    try {
+      const report = await this.api.adopt(true);
+      runInAction(() => {
+        this.adoptApplied = report;
+        this.adoptPreview = null;
+      });
+      await this.load(true);
+      return report;
+    } catch (cause) {
+      runInAction(() => {
+        this.adoptError = errorMessage(cause);
+      });
+      return null;
+    } finally {
+      runInAction(() => {
+        this.adoptLoading = false;
+      });
+    }
+  }
+
+  async addPath(projectId: string, path: string): Promise<boolean> {
+    if (this.addingPath) {
+      return false;
+    }
+    runInAction(() => {
+      this.addingPath = true;
+      this.addPathError = null;
+    });
+    try {
+      await this.api.addPath(projectId, path);
+      await this.load(true);
+      return true;
+    } catch (cause) {
+      runInAction(() => {
+        this.addPathError = errorMessage(cause);
+      });
+      return false;
+    } finally {
+      runInAction(() => {
+        this.addingPath = false;
+      });
+    }
   }
 
   private async performLoad(): Promise<void> {

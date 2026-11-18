@@ -7,22 +7,53 @@ import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import { AutostartToggle } from "@/features/autostart-toggle/ui/AutostartToggle";
 import { LocaleSwitch } from "@/features/locale-switch/ui/LocaleSwitch";
 import { UpdateCheck } from "@/features/update-check/ui/UpdateCheck";
+import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
 import { Notice } from "@/shared/ui/Notice";
 import { Loading } from "@/shared/ui/Loading";
 import { EmptyState } from "@/shared/ui/EmptyState";
+import { useFeedback } from "@/shared/ui/Feedback";
 import { useI18n } from "@/shared/i18n";
+import { formatDateTime } from "@/shared/lib/format";
 import { errorMessage } from "@/shared/lib/errors";
+import { HooksStore } from "../model/HooksStore";
+
+const HOOKS_COMMAND = "brain agents sync --hooks";
+
+/** Clipboard falls back to a hidden textarea where the Async Clipboard API is absent. */
+async function copyText(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  const copied = document.execCommand("copy");
+  area.remove();
+  if (!copied) {
+    throw new Error("copy failed");
+  }
+}
 
 export const SettingsPage = observer(function SettingsPage({
   engine,
   settings,
+  hooks,
 }: {
   engine: EngineStore;
   settings: SettingsStore;
+  hooks?: HooksStore;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const { notify } = useFeedback();
+  const [fallbackHooks] = useState(() => new HooksStore());
+  const hooksStore = hooks ?? fallbackHooks;
   const [secrets, setSecrets] = useState<string[]>([]);
   const [secretsLoading, setSecretsLoading] = useState(false);
   const [secretsError, setSecretsError] = useState<string | null>(null);
@@ -49,6 +80,19 @@ export const SettingsPage = observer(function SettingsPage({
     // Secrets are read once per visit; the refresh button is explicit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    void hooksStore.load();
+  }, [hooksStore]);
+
+  const copyHooksCommand = async (): Promise<void> => {
+    try {
+      await copyText(HOOKS_COMMAND);
+      notify(t("settings.hooksCopied"), "success");
+    } catch {
+      notify(t("settings.hooksCopyFailed"), "error");
+    }
+  };
 
   const status = engine.status?.engine;
 
@@ -98,6 +142,107 @@ export const SettingsPage = observer(function SettingsPage({
             <dd>{status?.updateChannel ?? t("common.none")}</dd>
           </dl>
         </Card>      <Card>
+        <div className="card-header">
+          <div>
+            <h3>{t("settings.hooks")}</h3>
+            <p className="muted small">{t("settings.hooksHint")}</p>
+          </div>
+          <Button
+            variant="secondary"
+            disabled={hooksStore.loading}
+            aria-busy={hooksStore.loading}
+            onClick={() => void hooksStore.load(true)}
+          >
+            {hooksStore.loading
+              ? t("settings.hooksLoading")
+              : t("settings.hooksRefresh")}
+          </Button>
+        </div>
+        <p className="muted small">{t("settings.hooksSyncHint")}</p>
+        <p className="hooks-command">
+          <code>{HOOKS_COMMAND}</code>{" "}
+          <Button variant="link" onClick={() => void copyHooksCommand()}>
+            {t("settings.hooksCopy")}
+          </Button>
+        </p>
+        {hooksStore.error ? (
+          <Notice
+            variant="error"
+            action={
+              <Button variant="link" onClick={hooksStore.dismissError}>
+                {t("actions.dismiss")}
+              </Button>
+            }
+          >
+            <span>{hooksStore.error}</span>
+          </Notice>
+        ) : null}
+        {hooksStore.loading && !hooksStore.loaded ? (
+          <Loading label={t("settings.hooks")} />
+        ) : null}
+        {hooksStore.loaded && hooksStore.items.length === 0 ? (
+          <EmptyState title={t("settings.hooksEmpty")} />
+        ) : null}
+        {hooksStore.items.length > 0 ? (
+          <ul className="plain-list hook-list">
+            {hooksStore.items.map((hook) => (
+              <li key={hook.host}>
+                <div className="badge-row">
+                  <strong>{hook.host}</strong>
+                  <Badge tone={hook.installed ? "success" : "warning"}>
+                    {hook.installed
+                      ? t("settings.hooksInstalled")
+                      : t("settings.hooksMissing")}
+                  </Badge>
+                  <Badge
+                    tone={
+                      hook.trusted === null
+                        ? "neutral"
+                        : hook.trusted
+                          ? "success"
+                          : "warning"
+                    }
+                  >
+                    {hook.trusted === null
+                      ? t("settings.hooksTrustUnknown")
+                      : hook.trusted
+                        ? t("settings.hooksTrusted")
+                        : t("settings.hooksUntrusted")}
+                  </Badge>
+                  {hook.trustDrift ? (
+                    <Badge tone="warning">{t("settings.hooksDrift")}</Badge>
+                  ) : null}
+                </div>
+                <p className="muted small">
+                  <code>{hook.path}</code>
+                </p>
+                <dl className="details">
+                  <dt>{t("settings.hooksDetail")}</dt>
+                  <dd>{hook.detail}</dd>
+                  <dt>{t("settings.hooksLastRun")}</dt>
+                  <dd>
+                    {hook.lastRun
+                      ? formatDateTime(hook.lastRun, locale)
+                      : t("settings.hooksNever")}
+                  </dd>
+                  {hook.lastEvent ? (
+                    <>
+                      <dt>{t("settings.hooksLastEvent")}</dt>
+                      <dd>{hook.lastEvent}</dd>
+                    </>
+                  ) : null}
+                  {hook.lastError ? (
+                    <>
+                      <dt>{t("settings.hooksLastError")}</dt>
+                      <dd>{hook.lastError}</dd>
+                    </>
+                  ) : null}
+                </dl>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </Card>      <Card>
         <div className="card-header">
           <div>
             <h3>{t("settings.keychain")}</h3>

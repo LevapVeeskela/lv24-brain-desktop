@@ -16,6 +16,7 @@ import {
 } from "@/entities/memory/ui/MemoryBadges";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { useI18n, type MessageKey } from "@/shared/i18n";
+import { formatDateTime } from "@/shared/lib/format";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
@@ -24,6 +25,7 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { useFeedback } from "@/shared/ui/Feedback";
+import { DigestStore } from "../model/DigestStore";
 import { nextSelection, sortProposals } from "../model/queue";
 
 const PROPOSAL_PREVIEW_TOKENS = 600;
@@ -144,15 +146,20 @@ export const InboxPage = observer(function InboxPage({
   review,
   projects,
   engine,
+  digest,
 }: {
   review: ReviewStore;
   projects: ProjectsStore;
   engine: EngineStore;
+  digest?: DigestStore;
 }) {
   const { t, locale } = useI18n();
   const { notify } = useFeedback();
   const projectId = projects.selectedId;
   const dataReady = review.isReadyFor(projectId);
+  const [fallbackDigest] = useState(() => new DigestStore());
+  const digestStore = digest ?? fallbackDigest;
+  const [digestConfirmOpen, setDigestConfirmOpen] = useState(false);
   const [tab, setTab] = useState<InboxTab>("proposals");
   const [proposalFilter, setProposalFilter] = useState<
     "all" | "pending" | "snoozed"
@@ -371,6 +378,35 @@ export const InboxPage = observer(function InboxPage({
     );
   };
 
+  const generateDigest = async (): Promise<void> => {
+    if (!projectId || !engine.isRunning) {
+      return;
+    }
+    const report = await digestStore.dryRun(projectId);
+    if (!report) {
+      notify(t("inbox.digest.failed"), "error");
+    }
+  };
+
+  const saveDigest = async (): Promise<void> => {
+    if (!projectId) {
+      return;
+    }
+    const report = await digestStore.write(projectId);
+    setDigestConfirmOpen(false);
+    if (!report) {
+      notify(t("inbox.digest.failed"), "error");
+      return;
+    }
+    notify(
+      t("inbox.digest.saved", { path: report.writtenTo ?? "" }),
+      "success",
+    );
+    // The saved digest covers the same window as the inbox; reload it so the
+    // queue reflects records written since the last read.
+    void review.refresh();
+  };
+
   useEffect(() => {
     if (tab !== "proposals" || !active) {
       return;
@@ -434,6 +470,14 @@ export const InboxPage = observer(function InboxPage({
             {t("memory.allProjects")}
           </label>
           <Button
+            disabled={!projectId || !engine.isRunning || digestStore.loading || digestStore.writing}
+            onClick={() => void generateDigest()}
+          >
+            {digestStore.loading
+              ? t("inbox.digest.running")
+              : t("inbox.digest.action")}
+          </Button>
+          <Button
             disabled={!projectId || !engine.isRunning || review.loading}
             onClick={() => void review.refresh()}
           >
@@ -484,6 +528,111 @@ export const InboxPage = observer(function InboxPage({
           <span>{t("inbox.truncated")}</span>
         </Notice>
       ) : null}
+
+      {digestStore.error ? (
+        <Notice
+          variant="error"
+          action={
+            <Button variant="link" onClick={digestStore.clear}>
+              {t("actions.dismiss")}
+            </Button>
+          }
+        >
+          <span>{digestStore.error}</span>
+        </Notice>
+      ) : null}
+
+      {digestStore.report ? (
+        <Card className="digest-card">
+          <div className="card-header">
+            <div>
+              <h3>
+                {digestStore.report.dryRun
+                  ? t("inbox.digest.dryRun")
+                  : t("inbox.digest.written")}
+              </h3>
+              <p className="muted small">
+                {digestStore.report.dryRun
+                  ? t("inbox.digest.dryRunHint")
+                  : t("inbox.digest.writtenHint", {
+                      path: digestStore.report.writtenTo ?? "",
+                    })}
+              </p>
+            </div>
+            {digestStore.report.dryRun ? (
+              <Button
+                variant="primary"
+                disabled={digestStore.writing}
+                onClick={() => setDigestConfirmOpen(true)}
+              >
+                {t("inbox.digest.save")}
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={digestStore.clear}>
+                {t("common.close")}
+              </Button>
+            )}
+          </div>
+          <p className="muted small">
+            {t("inbox.digest.generatedAt", {
+              time: formatDateTime(digestStore.report.generatedAt, locale),
+            })}
+            {" · "}
+            {t("inbox.digest.since", {
+              time: formatDateTime(digestStore.report.since, locale),
+            })}
+          </p>
+          {digestStore.projectCounts.length === 0 ? (
+            <EmptyState title={t("inbox.digest.empty")} />
+          ) : (
+            <ul className="plain-list digest-projects">
+              {digestStore.projectCounts.map((entry) => (
+                <li key={entry.project.id}>
+                  <strong>{entry.project.name || entry.project.id}</strong>
+                  <span className="badge-row">
+                    <Badge tone="neutral">
+                      {t("inbox.digest.proposed", {
+                        count: entry.proposedDecisions.length,
+                      })}
+                    </Badge>
+                    <Badge tone="neutral">
+                      {t("inbox.digest.questions", {
+                        count: entry.openQuestions.length,
+                      })}
+                    </Badge>
+                    <Badge tone={entry.blocked.length > 0 ? "warning" : "neutral"}>
+                      {t("inbox.digest.blocked", {
+                        count: entry.blocked.length,
+                      })}
+                    </Badge>
+                    <span className="muted small">
+                      {t("inbox.digest.changes", { count: entry.changes })}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      ) : null}
+
+      <ConfirmDialog
+        open={digestConfirmOpen}
+        title={t("inbox.digest.confirmTitle")}
+        confirmLabel={t("inbox.digest.save")}
+        cancelLabel={t("common.cancel")}
+        busy={digestStore.writing}
+        onConfirm={() => void saveDigest()}
+        onCancel={() => setDigestConfirmOpen(false)}
+      >
+        <p>{t("inbox.digest.confirmBody")}</p>
+        <p className="muted small">
+          {t("inbox.digest.confirmCounts", {
+            projects: digestStore.projectCounts.length,
+            proposed: digestStore.proposedTotal,
+          })}
+        </p>
+      </ConfirmDialog>
 
       <div
         className="tabs-list"
@@ -669,7 +818,7 @@ export const InboxPage = observer(function InboxPage({
                         {t("inbox.snoozed")}
                         {active.snoozedUntil
                           ? ` ${t("inbox.snoozedUntil", {
-                              date: new Date(active.snoozedUntil).toLocaleDateString(),
+                              date: new Date(active.snoozedUntil).toLocaleDateString(locale),
                             })} (${relativeTime(active.snoozedUntil, locale)})`
                           : ""}
                       </Badge>

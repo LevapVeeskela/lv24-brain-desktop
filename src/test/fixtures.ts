@@ -14,7 +14,7 @@ import type {
   ReviewReport,
   SearchPage,
 } from "@/entities/memory/model/types";
-import type { Project, ProjectState } from "@/entities/project/model/types";
+import type { Project, AdoptReport, ProjectState } from "@/entities/project/model/types";
 
 export const timestamp = "2026-11-16T05:30:00Z";
 
@@ -192,6 +192,35 @@ export function projectState(overrides: Partial<ProjectState> = {}): ProjectStat
 
 export function project(overrides: Partial<Project> = {}): Project {
   return { id: "lv24", name: "LV24", paths: [], pathProvenance: {}, ...overrides };
+}
+
+export function adoptReport(overrides: Partial<AdoptReport> = {}): AdoptReport {
+  return {
+    machine: "DESKTOP-F5INSH6",
+    applied: false,
+    stamped: 1,
+    owned: 1,
+    missing: 1,
+    projects: [
+      {
+        projectId: "lv24",
+        paths: [
+          {
+            path: "C:\\0project\\lv24",
+            machine: "DESKTOP-F5INSH6",
+            state: "stamped",
+          },
+          {
+            path: "C:\\0project\\lv24-brain",
+            machine: "DESKTOP-F5INSH6",
+            state: "owned",
+          },
+          { path: "C:\\0project\\missing", state: "missing" },
+        ],
+      },
+    ],
+    ...overrides,
+  };
 }
 
 export function searchPage(

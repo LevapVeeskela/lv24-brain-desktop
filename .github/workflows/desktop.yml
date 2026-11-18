@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       engine_version:
-        description: "LV24 Brain engine version to bundle (for example 0.25.0)"
+        description: "LV24 Brain engine version to bundle (for example 0.26.0)"
         required: false
         type: string
-        default: "0.25.0"
+        default: "0.26.0"
       signed:
         description: "Create updater artifacts and signatures (requires TAURI_SIGNING_PRIVATE_KEY)"
         required: false
@@ -479,5 +479,6 @@ jobs:
           else
             gh release edit "$TAG" --draft=false --prerelease=false --latest
           fi
+
 
 

@@ -2,6 +2,7 @@ import type { MemorySource } from "@/entities/memory/api/memoryApi";
 import type { ProjectsSource } from "@/entities/project/api/projectApi";
 import type { RecordReviewRequest } from "@/entities/memory/model/types";
 import {
+  adoptReport,
   catchupReport,
   memoryRecord,
   proposalDetail,
@@ -72,6 +73,13 @@ export function projectsSource(
           needsReview: false,
         },
         ...(request.expectedRevision ? { revision: request.expectedRevision } : {}),
+      }),
+    adopt: async (apply) =>
+      adoptReport({ applied: apply, stamped: apply ? 0 : 1 }),
+    addPath: async (_projectId, path) =>
+      project({
+        paths: [path],
+        pathProvenance: { [path]: "DESKTOP-F5INSH6" },
       }),
     ...overrides,
   };

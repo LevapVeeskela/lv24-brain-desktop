@@ -64,7 +64,9 @@ export const AppRail = observer(function AppRail({ store }: { store: RootStore }
       <div className="rail-brand">
         <BrandMark className="logo" />
         <div className="rail-brand-copy">
-          <strong>LV24 <span className="brand-accent">Brain</span></strong>
+          <h1 className="rail-brand-title">
+            LV24 <span className="brand-accent">Brain</span>
+          </h1>
           <span>{t("app.subtitle")}</span>
         </div>
       </div>

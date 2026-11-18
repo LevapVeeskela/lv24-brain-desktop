@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { observer } from "mobx-react-lite";
 import { Link, useSearchParams } from "react-router-dom";
 import type { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
@@ -24,6 +24,10 @@ import {
   type ActivityFilter,
   type ActivityRow,
 } from "../model/activity";
+import { JournalStore } from "../model/JournalStore";
+import { JournalPanel } from "./JournalPanel";
+
+type ActivityView = "runs" | "journal";
 
 const actorKeys: Record<Exclude<ActivityFilter, "all">, MessageKey> = {
   me: "activity.me",
@@ -37,15 +41,20 @@ export const ActivityPage = observer(function ActivityPage({
   projects,
   connections,
   engine,
+  journal,
 }: {
   runs: RunsStore;
   memory: MemoryStore;
   projects: ProjectsStore;
   connections: ConnectionsStore;
   engine: EngineStore;
+  journal?: JournalStore;
 }) {
   const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
+  const [fallbackJournal] = useState(() => new JournalStore());
+  const journalStore = journal ?? fallbackJournal;
+  const view: ActivityView = params.get("view") === "journal" ? "journal" : "runs";
   const rawFilter = params.get("actor");
   const filter: ActivityFilter = isActivityFilter(rawFilter) ? rawFilter : "all";
   const projectId = projects.selectedId;
@@ -99,6 +108,22 @@ export const ActivityPage = observer(function ActivityPage({
     }
   }, [engine.isRunning, memory, projectId]);
 
+  useEffect(() => {
+    if (view === "journal" && projectId && engine.isRunning) {
+      void journalStore.load(projectId);
+    }
+  }, [engine.isRunning, journalStore, projectId, view]);
+
+  const setView = (next: ActivityView): void => {
+    const updated = new URLSearchParams(params);
+    if (next === "runs") {
+      updated.delete("view");
+    } else {
+      updated.set("view", next);
+    }
+    setParams(updated, { replace: true });
+  };
+
   const setFilter = (next: ActivityFilter): void => {
     const updated = new URLSearchParams(params);
     if (next === "all") {
@@ -110,11 +135,18 @@ export const ActivityPage = observer(function ActivityPage({
   };
 
   const refresh = (): void => {
+    if (view === "journal") {
+      if (projectId) {
+        void journalStore.load(projectId, { force: true });
+      }
+      return;
+    }
     void runs.load(true);
     if (projectId) {
       void memory.loadCatchup(projectId, { force: true });
     }
   };
+  const busy = view === "journal" ? journalStore.loading : runs.loading;
 
   return (
     <div className="page">
@@ -123,9 +155,34 @@ export const ActivityPage = observer(function ActivityPage({
           <h2>{t("activity.title")}</h2>
           <p className="muted">{t("activity.subtitle")}</p>
         </div>
-        <Button disabled={runs.loading} onClick={refresh}>
-          {runs.loading ? t("common.loading") : t("actions.refresh")}
+        <Button disabled={busy} onClick={refresh}>
+          {busy ? t("common.loading") : t("actions.refresh")}
         </Button>
+      </div>
+
+      <div className="tabs-list" role="tablist" aria-label={t("activity.title")}>
+        <button
+          type="button"
+          role="tab"
+          id="activity-runs-tab"
+          aria-selected={view === "runs"}
+          aria-controls="activity-runs"
+          tabIndex={view === "runs" ? 0 : -1}
+          onClick={() => setView("runs")}
+        >
+          {t("activity.tab.runs")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="activity-journal-tab"
+          aria-selected={view === "journal"}
+          aria-controls="activity-journal"
+          tabIndex={view === "journal" ? 0 : -1}
+          onClick={() => setView("journal")}
+        >
+          {t("activity.tab.journal")}
+        </button>
       </div>
 
       {!engine.isRunning ? (
@@ -134,6 +191,16 @@ export const ActivityPage = observer(function ActivityPage({
         </Notice>
       ) : null}
 
+      {view === "journal" ? (
+        <div
+          id="activity-journal"
+          role="tabpanel"
+          aria-labelledby="activity-journal-tab"
+        >
+          <JournalPanel projectId={projectId} journal={journalStore} />
+        </div>
+      ) : (
+        <div id="activity-runs" role="tabpanel" aria-labelledby="activity-runs-tab">
       <div className="activity-toolbar">
         <div className="segmented" role="group" aria-label={t("activity.filters")}>
           {ACTIVITY_FILTERS.map((value) => (
@@ -276,6 +343,8 @@ export const ActivityPage = observer(function ActivityPage({
           <RunLogPanel runs={runs} />
         </aside>
       ) : null}
+        </div>
+      )}
     </div>
   );
 });
