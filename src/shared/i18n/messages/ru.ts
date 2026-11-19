@@ -252,6 +252,7 @@ export const ru: Messages = {
   "footer.desktop": "Приложение {version}",
   "footer.engine": "движок {version}",
   "footer.engineOffline": "движок offline",
+  "footer.docs": "Документация",
   "footer.quitting": "Завершение…",
   "footer.engineStarting": "движок запускается…",
   "footer.quitConfirm": "Выйти из LV24 Brain? Фоновый агент будет остановлен.",

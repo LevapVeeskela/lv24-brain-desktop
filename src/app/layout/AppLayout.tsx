@@ -9,7 +9,19 @@ import { OAuthCallbackCard } from "@/features/oauth-callback/ui/OAuthCallbackCar
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Notice } from "@/shared/ui/Notice";
+import { tauriInvoke } from "@/shared/api/tauri";
 import { useI18n, type MessageKey } from "@/shared/i18n";
+
+// docsUrl points at the localized documentation site.
+function docsUrl(locale: string): string {
+  if (locale === "ru") {
+    return "https://brain.lv24.by/ru/";
+  }
+  if (locale === "zh") {
+    return "https://brain.lv24.by/zh/";
+  }
+  return "https://brain.lv24.by/";
+}
 
 /** Section titles for the app bar and window title, keyed by the first path segment. */
 export function routeTitleKey(pathname: string): MessageKey {
@@ -46,7 +58,7 @@ export const AppLayout = observer(function AppLayout({
 }: {
   store: RootStore;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const location = useLocation();
   const engine = store.engine;
   const mainRef = useRef<HTMLElement>(null);
@@ -123,13 +135,25 @@ export const AppLayout = observer(function AppLayout({
               {t("footer.desktop", { version: engine.desktopVersion })}
               {engine.version && <> · {t("footer.engine", { version: engine.version })}</>}
             </span>
-            <Button
-              variant="link"
-              disabled={quitDisabled}
-              onClick={() => setQuitOpen(true)}
-            >
-              {quitting ? t("actions.quitting") : t("actions.quit")}
-            </Button>
+            <div className="footer-actions">
+              <Button
+                variant="link"
+                onClick={() => {
+                  void tauriInvoke("open_external", { url: docsUrl(locale) }).catch(
+                    () => undefined,
+                  );
+                }}
+              >
+                {t("footer.docs")}
+              </Button>
+              <Button
+                variant="link"
+                disabled={quitDisabled}
+                onClick={() => setQuitOpen(true)}
+              >
+                {quitting ? t("actions.quitting") : t("actions.quit")}
+              </Button>
+            </div>
           </footer>
         </main>
       </div>

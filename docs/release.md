@@ -1,4 +1,4 @@
-﻿# Packaging and release (v1.7.0)
+﻿# Packaging and release (v1.7.1)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -13,7 +13,7 @@ Inputs:
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `engine_version` | `0.26.0` | LV24 Brain engine release to bundle. |
+| `engine_version` | `0.27.2` | LV24 Brain engine release to bundle. |
 | `signed` | `false` | Create updater artifacts and signatures. Requires repo secrets. |
 | `publish_release` | `false` | Publish a GitHub release and `latest.json`. Requires `signed=true` and a tag. |
 | `tag` | empty | Release tag, for example `v1.2.0`. Required only for publishing. |
@@ -123,6 +123,7 @@ Tray glyphs distinguish paused/stopped when their palette colors match.
 The design refresh keeps versions, installer names, release overrides, updater
 key and signing requirements. Local verification and the native smoke checklist
 are recorded in [design-refresh/report.md](design-refresh/report.md).
+
 
 
 

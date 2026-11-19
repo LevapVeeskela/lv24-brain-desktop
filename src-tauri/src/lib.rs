@@ -1,4 +1,4 @@
-mod api;
+﻿mod api;
 mod autostart;
 mod commands;
 mod deep_link;
@@ -50,6 +50,7 @@ pub fn run() {
             commands::update_check,
             commands::update_install,
             commands::app_quit,
+            commands::open_external,
             api::api_request,
             api::run_log_open,
             api::run_log_close,
@@ -128,3 +129,4 @@ pub fn run() {
         _ => {}
     });
 }
+

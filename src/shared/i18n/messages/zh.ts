@@ -252,6 +252,7 @@ export const zh: Messages = {
   "footer.desktop": "桌面 {version}",
   "footer.engine": "引擎 {version}",
   "footer.engineOffline": "引擎离线",
+  "footer.docs": "文档",
   "footer.quitting": "正在退出…",
   "footer.engineStarting": "引擎启动中…",
   "footer.quitConfirm": "退出 LV24 Brain？后台代理将停止。",

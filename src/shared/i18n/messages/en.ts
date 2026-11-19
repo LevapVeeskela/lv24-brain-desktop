@@ -250,6 +250,7 @@ export const en = {
   "footer.desktop": "Desktop {version}",
   "footer.engine": "engine {version}",
   "footer.engineOffline": "engine offline",
+  "footer.docs": "Documentation",
   "footer.quitting": "Quitting…",
   "footer.engineStarting": "engine starting…",
   "footer.quitConfirm": "Quit LV24 Brain? The background agent will stop.",

@@ -2267,3 +2267,9 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
     box-shadow: inset 0 -2px var(--accent);
   }
 }
+
+.footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}

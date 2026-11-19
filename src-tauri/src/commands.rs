@@ -266,3 +266,36 @@ pub fn request_quit(app: AppHandle) {
         }
     });
 }
+
+/// Open the documentation site in the system browser. The URL is restricted to
+/// the documentation origin so the webview cannot launch arbitrary targets.
+#[tauri::command]
+pub fn open_external(url: String) -> Result<(), String> {
+    const DOCS_ORIGIN: &str = "https://brain.lv24.by/";
+    let url = url.trim();
+    if !url.starts_with(DOCS_ORIGIN) {
+        return Err("only the documentation site can be opened".to_string());
+    }
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = std::process::Command::new("rundll32");
+        command.args(["url.dll,FileProtocolHandler", url]);
+        command
+    };
+    #[cfg(target_os = "macos")]
+    let mut command = {
+        let mut command = std::process::Command::new("open");
+        command.arg(url);
+        command
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = {
+        let mut command = std::process::Command::new("xdg-open");
+        command.arg(url);
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|err| format!("open documentation: {err}"))
+}

@@ -6,7 +6,7 @@ The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/l
 built with Tauri v2. See connection results, investigate failed runs and manage
 the background agent, schedules and credentials from one offline-first interface.
 
-**Status: v1.7.0, digest, path adoption, hooks status, journal.** The dashboard, connections
+**Status: v1.7.1, documentation link in the footer; engine 0.27.2.** The dashboard, connections
 list, add connection wizard, connection detail (schedule, credentials, runs,
 received logs), activity, projects, settings, memory and review screens are
 implemented. Desktop 1.2 adds the record browser and detail (body, provenance,
