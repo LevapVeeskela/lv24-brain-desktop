@@ -28,6 +28,7 @@ import { JournalStore } from "../model/JournalStore";
 import { JournalPanel } from "./JournalPanel";
 
 type ActivityView = "runs" | "journal";
+type ActivityScope = "all" | "project";
 
 const actorKeys: Record<Exclude<ActivityFilter, "all">, MessageKey> = {
   me: "activity.me",
@@ -57,8 +58,12 @@ export const ActivityPage = observer(function ActivityPage({
   const view: ActivityView = params.get("view") === "journal" ? "journal" : "runs";
   const rawFilter = params.get("actor");
   const filter: ActivityFilter = isActivityFilter(rawFilter) ? rawFilter : "all";
-  const projectId = projects.selectedId;
-  const catchup = memory.catchupProjectId === projectId ? memory.catchup : null;
+  const scope: ActivityScope = params.get("scope") === "project" ? "project" : "all";
+  const projectId = scope === "project" ? projects.selectedId : null;
+  const catchup =
+    projectId !== null && memory.catchupProjectId === projectId
+      ? memory.catchup
+      : null;
   const records = catchup
     ? [
         ...catchup.notes,
@@ -69,7 +74,8 @@ export const ActivityPage = observer(function ActivityPage({
     : [];
   const connectionProjects: Record<string, string | undefined> = {};
   for (const connection of connections.items) {
-    connectionProjects[connection.id] = connection.projects?.[0];
+    connectionProjects[connection.id] =
+      connection.projects?.length === 1 ? connection.projects[0] : undefined;
   }
   const projectNames: Record<string, string> = {};
   for (const project of projects.items) {
@@ -124,6 +130,16 @@ export const ActivityPage = observer(function ActivityPage({
     setParams(updated, { replace: true });
   };
 
+  const setScope = (next: ActivityScope): void => {
+    const updated = new URLSearchParams(params);
+    if (next === "all") {
+      updated.delete("scope");
+    } else {
+      updated.set("scope", next);
+    }
+    setParams(updated, { replace: true });
+  };
+
   const setFilter = (next: ActivityFilter): void => {
     const updated = new URLSearchParams(params);
     if (next === "all") {
@@ -153,7 +169,9 @@ export const ActivityPage = observer(function ActivityPage({
       <div className="page-header">
         <div>
           <h2>{t("activity.title")}</h2>
-          <p className="muted">{t("activity.subtitle")}</p>
+          <p className="muted">
+            {t(scope === "all" ? "activity.subtitleAll" : "activity.subtitle")}
+          </p>
         </div>
         <Button disabled={busy} onClick={refresh}>
           {busy ? t("common.loading") : t("actions.refresh")}
@@ -183,6 +201,30 @@ export const ActivityPage = observer(function ActivityPage({
         >
           {t("activity.tab.journal")}
         </button>
+      </div>
+
+      <div className="activity-toolbar">
+        <div className="segmented" role="group" aria-label={t("activity.scope")}>
+          <button
+            type="button"
+            className={`segment ${scope === "all" ? "active" : ""}`}
+            aria-pressed={scope === "all"}
+            onClick={() => setScope("all")}
+          >
+            {t("activity.allProjects")}
+          </button>
+          <button
+            type="button"
+            className={`segment ${scope === "project" ? "active" : ""}`}
+            aria-pressed={scope === "project"}
+            disabled={!projects.selectedId}
+            onClick={() => setScope("project")}
+          >
+            {projects.selectedId
+              ? (projectNames[projects.selectedId] ?? projects.selectedId)
+              : t("activity.selectedProject")}
+          </button>
+        </div>
       </div>
 
       {!engine.isRunning ? (

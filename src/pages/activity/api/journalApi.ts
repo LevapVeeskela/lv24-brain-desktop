@@ -18,13 +18,13 @@ export interface JournalPage {
 }
 
 export interface JournalSource {
-  read(projectId: string, limit: number): Promise<JournalPage>;
+  read(projectId: string | null, limit: number): Promise<JournalPage>;
 }
 
 export const journalApi: JournalSource = {
   async read(projectId, limit) {
     const { data, error, response } = await apiClient.GET("/v1/journal", {
-      params: { query: { project: projectId, limit } },
+      params: { query: { project: projectId ?? undefined, limit } },
     });
     if (error) {
       throw toApiError(response, error);

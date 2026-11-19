@@ -1,4 +1,4 @@
-﻿# Packaging and release (v1.7.1)
+﻿# Packaging and release (v1.7.2)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop

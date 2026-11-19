@@ -81,14 +81,9 @@ export const JournalPanel = observer(function JournalPanel({
   const { t } = useI18n();
 
   useEffect(() => {
-    if (projectId) {
-      void journal.load(projectId);
-    }
+    void journal.load(projectId);
   }, [journal, projectId]);
 
-  if (!projectId) {
-    return <EmptyState title={t("activity.journal.noProject")} />;
-  }
 
   return (
     <Card>

@@ -32,7 +32,7 @@ export class JournalStore {
     return this.hasMore && this.limit < JOURNAL_MAX_LIMIT;
   }
 
-  load(projectId: string, options: { force?: boolean } = {}): Promise<void> {
+  load(projectId: string | null, options: { force?: boolean } = {}): Promise<void> {
     if (
       this.projectId === projectId &&
       this.loaded &&
@@ -46,7 +46,7 @@ export class JournalStore {
   }
 
   loadMore(): Promise<void> {
-    if (!this.projectId || this.loading || !this.canLoadMore) {
+    if (this.loading || !this.canLoadMore) {
       return Promise.resolve();
     }
     const nextLimit = Math.min(
@@ -69,9 +69,6 @@ export class JournalStore {
 
   private async performLoad(limit: number, reset: boolean): Promise<void> {
     const projectId = this.projectId;
-    if (!projectId) {
-      return;
-    }
     const token = ++this.token;
     runInAction(() => {
       this.loading = true;

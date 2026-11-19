@@ -45,10 +45,14 @@ describe("ActivityPage journal", () => {
     expect(html).toContain("Load more");
   });
 
-  it("asks for a project when the scope is empty", () => {
+  it("renders the all-project journal when the scope is all", () => {
+    const journal = journalStore();
+    journal.projectId = null;
     const html = renderPage(
-      <JournalPanel projectId={null} journal={journalStore()} />,
+      <JournalPanel projectId={null} journal={journal} />,
     );
-    expect(html).toContain("Select a project to read its journal.");
+    expect(html).toContain("Journal");
+    expect(html).toContain("Release notes");
+    expect(html).toContain("sync");
   });
 });
