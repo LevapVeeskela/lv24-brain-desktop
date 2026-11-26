@@ -221,8 +221,11 @@ export function statusChange(
   idea: Idea,
   status: IdeaStatus,
 ): { draft: IdeaDraft; patch: IdeaUpdateInput | null } {
-  const reopening =
-    (idea.status === "done" || idea.status === "dropped") && status === "open";
+  // Reopening is judged from both sides: a status save may still be in flight,
+  // so the draft can be closed while the record is still open.
+  const draftClosed = draft.status === "done" || draft.status === "dropped";
+  const ideaClosed = idea.status === "done" || idea.status === "dropped";
+  const reopening = (draftClosed || ideaClosed) && status === "open";
   const nextDraft: IdeaDraft = {
     ...draft,
     status,

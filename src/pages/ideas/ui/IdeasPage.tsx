@@ -66,6 +66,8 @@ export const IdeasPage = observer(function IdeasPage({
       dismissedFocusRef.current = null;
       return;
     }
+    // One drawer at a time: a new ?focus is ignored while another is open,
+    // because replacing it could discard unsaved edits in the current drawer.
     const target = focusDrawerTarget({
       focusId,
       loaded: ideas.loaded,

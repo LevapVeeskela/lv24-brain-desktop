@@ -173,4 +173,21 @@ describe("idea drawer draft", () => {
     );
     expect(stillOpen.patch).toEqual({ status: "doing" });
   });
+
+  it("clears the hidden note when a done draft reopens before the save lands", () => {
+    // Record is still open, but the draft moved to done and the user typed a
+    // completion note; choosing open again must not leave that note dirty.
+    const idea = ideaFixture({ status: "open" });
+    const draft = {
+      ...toIdeaDraft(idea),
+      status: "done" as const,
+      completionNote: "Typed while closing",
+    };
+    expect(draftIsDirty(draft, idea)).toBe(true);
+    const change = statusChange(draft, idea, "open");
+    expect(change.draft.completionNote).toBe("");
+    expect(change.draft.status).toBe("open");
+    expect(change.patch).toBeNull(); // the record already says open
+    expect(draftIsDirty(change.draft, idea)).toBe(false);
+  });
 });

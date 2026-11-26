@@ -150,9 +150,10 @@ export function dueTodayCount(ideas: readonly Idea[], now: Date): number {
 }
 
 /**
- * Focus drawer opener for `?focus=`: only a loaded, known idea that was not
- * already dismissed returns a target. `dismissedFocusId` stops the same param
- * from reopening the drawer after close, before the router clears it.
+ * Focus drawer opener for `?focus=`. Only one drawer exists at a time: while
+ * any drawer is open a second focus request (notification, dashboard card) is
+ * ignored on purpose, because switching could discard unsaved edits. A consumed
+ * param is dismissed until the router clears it, so closing cannot reopen it.
  */
 export function focusDrawerTarget(input: {
   focusId: string | null;
