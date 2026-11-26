@@ -22,6 +22,7 @@ use tauri_plugin_notification::NotificationExt;
 
 use crate::engine::Supervisor;
 use crate::error::{AppError, AppResult};
+use crate::jsonfile::write_json_atomic;
 use crate::settings::{ReminderSettings, SettingsStore};
 
 pub const EVENT_FOCUS: &str = "ideas-focus";
@@ -534,23 +535,9 @@ impl ReminderFile {
     }
 
     pub fn save(&self, path: &Path) -> AppResult<()> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
         let mut file = self.clone();
         file.version = 1;
-        let raw = serde_json::to_vec_pretty(&file)?;
-        let temporary = path.with_extension("json.tmp");
-        fs::write(&temporary, raw)?;
-        #[cfg(windows)]
-        {
-            // Windows rename does not replace an existing destination.
-            if path.exists() {
-                fs::remove_file(path)?;
-            }
-        }
-        fs::rename(&temporary, path)?;
-        Ok(())
+        write_json_atomic(path, &file)
     }
 }
 
@@ -584,7 +571,6 @@ pub struct Plan {
     pub digest: Option<Vec<PendingReminder>>,
     pub notified: BTreeMap<String, i64>,
     pub today_count: u32,
-    pub open_count: u32,
 }
 
 /// Pure tick planning: no IO, no clock reads, no event emission.
@@ -641,6 +627,15 @@ pub fn plan_tick(input: PlanInput<'_>) -> Plan {
 
     // Changing the due time resets the key; completing/dropping drops it.
     notified.retain(|key, _| active_keys.contains(key));
+    // A queued digest entry is only valid while its idea is still open with the
+    // same due: done/dropped and moved due times cancel it before the morning
+    // digest (spec §5.7).
+    queued.retain(|item| {
+        active_keys.contains(&format!(
+            "{}|{}|{}",
+            item.idea_id, item.due_key, item.trigger
+        ))
+    });
     // A file written twice (or a crash between save and emit) must not duplicate.
     queued.sort_by_key(|item| item.fire_at);
     queued.dedup_by(|left, right| {
@@ -661,7 +656,6 @@ pub fn plan_tick(input: PlanInput<'_>) -> Plan {
         digest,
         notified,
         today_count,
-        open_count: input.rows.iter().filter(|row| row.is_open()).count() as u32,
     }
 }
 
@@ -864,11 +858,12 @@ pub fn open_new_idea(app: &AppHandle) {
 #[serde(rename_all = "camelCase")]
 pub struct RemindersStatus {
     pub settings: ReminderSettings,
-    /// `granted` | `denied` | `prompt` (the desktop plugin never prompts).
+    /// Live plugin state: `granted` | `denied` | `prompt` (desktop never prompts).
     pub permission: String,
     pub today_count: u32,
-    pub open_count: u32,
     pub missed: Option<MissedEvent>,
+    /// Last native-toast delivery failure, kept separate from `permission`.
+    pub delivery_error: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -879,24 +874,12 @@ pub struct TestNotificationResult {
     pub error: Option<String>,
 }
 
+#[derive(Default)]
 struct Snapshot {
     today_count: u32,
-    open_count: u32,
-    permission: PermissionState,
     missed: Option<MissedEvent>,
     last_error: Option<String>,
-}
-
-impl Default for Snapshot {
-    fn default() -> Self {
-        Self {
-            today_count: 0,
-            open_count: 0,
-            permission: PermissionState::Prompt,
-            missed: None,
-            last_error: None,
-        }
-    }
+    delivery_error: Option<String>,
 }
 
 pub struct ReminderEngine {
@@ -906,6 +889,10 @@ pub struct ReminderEngine {
     zone: Arc<dyn Zone>,
     notifier: Arc<dyn Notifier>,
     path: PathBuf,
+    /// In-memory copy of the watermark. It is the source of truth for dedupe,
+    /// so a failed disk write cannot re-notify every tick.
+    watermark: Mutex<ReminderFile>,
+    save_error: Mutex<Option<String>>,
     snapshot: Mutex<Snapshot>,
     wake: tokio::sync::Notify,
 }
@@ -918,18 +905,18 @@ impl ReminderEngine {
         app_data_dir: PathBuf,
     ) -> Arc<Self> {
         let notifier: Arc<dyn Notifier> = Arc::new(TauriNotifier { app: app.clone() });
-        let permission = notifier.permission();
+        let path = app_data_dir.join("ideas-reminders.json");
+        let watermark = ReminderFile::load(&path);
         let engine = Arc::new(Self {
             app,
             supervisor,
             settings,
             zone: Arc::new(SystemZone),
             notifier,
-            path: app_data_dir.join("ideas-reminders.json"),
-            snapshot: Mutex::new(Snapshot {
-                permission,
-                ..Snapshot::default()
-            }),
+            path,
+            watermark: Mutex::new(watermark),
+            save_error: Mutex::new(None),
+            snapshot: Mutex::new(Snapshot::default()),
             wake: tokio::sync::Notify::new(),
         });
         let runner = Arc::clone(&engine);
@@ -953,7 +940,7 @@ impl ReminderEngine {
     async fn tick(&self, launch_at: i64) {
         let settings = self.settings.get();
         if !settings.reminders.enabled {
-            self.publish_counts(0, 0);
+            self.publish_counts(0);
             return;
         }
         let client = match self.supervisor.client().await {
@@ -984,26 +971,45 @@ impl ReminderEngine {
         let now = self.zone.now();
         let local = local_from_epoch(self.zone.as_ref(), now);
         let quiet = settings.reminders.is_quiet(local.minute_of_day());
-        let mut file = ReminderFile::load(&self.path);
+        let (notified, pending) = {
+            let file = self.watermark.lock().unwrap();
+            (file.notified.clone(), file.digest.clone())
+        };
         let plan = plan_tick(PlanInput {
             now,
             launch_at,
             quiet,
             rows: &rows,
-            notified: &file.notified,
-            pending: &file.digest,
+            notified: &notified,
+            pending: &pending,
             today: local.date,
             zone: self.zone.as_ref(),
         });
 
-        file.notified = plan.notified.clone();
-        file.digest = plan.pending.clone();
-        if let Err(err) = file.save(&self.path) {
-            log::warn!("cannot save reminder watermark: {err}");
+        let save_result = {
+            let mut file = self.watermark.lock().unwrap();
+            let changed = file.notified != plan.notified || file.digest != plan.pending;
+            file.version = 1;
+            file.notified = plan.notified.clone();
+            file.digest = plan.pending.clone();
+            // Retry a previously failed write even when nothing changed, so a
+            // recovered disk catches up; the in-memory state already prevents
+            // duplicate notifications.
+            let retry = self.save_error.lock().unwrap().is_some();
+            if changed || retry {
+                Some(file.save(&self.path))
+            } else {
+                None
+            }
+        };
+        match save_result {
+            Some(Ok(())) => self.clear_save_error(),
+            Some(Err(err)) => self.record_save_error(&err.to_string()),
+            None => {}
         }
 
         self.clear_error();
-        self.publish_counts(plan.today_count, plan.open_count);
+        self.publish_counts(plan.today_count);
 
         for fire in &plan.toasts {
             self.deliver(fire, &settings.reminders);
@@ -1040,9 +1046,9 @@ impl ReminderEngine {
             kind: "reminder",
         };
         match deliver(self.notifier.as_ref(), &toast) {
-            Delivery::Native => {}
+            Delivery::Native => self.clear_delivery_error(),
             Delivery::InApp(reason) => {
-                self.mark_permission_denied(&reason);
+                self.record_delivery_error(&reason);
                 let _ = self.app.emit(
                     EVENT_IN_APP,
                     InAppReminder {
@@ -1061,17 +1067,13 @@ impl ReminderEngine {
 
     fn status(&self) -> RemindersStatus {
         let snapshot = self.snapshot.lock().unwrap();
-        let permission = if snapshot.permission == PermissionState::Denied {
-            PermissionState::Denied
-        } else {
-            self.notifier.permission()
-        };
         RemindersStatus {
             settings: self.settings.get().reminders,
-            permission: permission.to_string(),
+            // Always ask the plugin again; a delivery error is not a denial.
+            permission: self.notifier.permission().to_string(),
             today_count: snapshot.today_count,
-            open_count: snapshot.open_count,
             missed: snapshot.missed.clone(),
+            delivery_error: snapshot.delivery_error.clone(),
         }
     }
 
@@ -1102,29 +1104,32 @@ impl ReminderEngine {
             trigger: "test".to_string(),
             kind: "test",
         };
+        let permission = self.notifier.permission().to_string();
         match deliver(self.notifier.as_ref(), &toast) {
-            Delivery::Native => TestNotificationResult {
-                delivered: true,
-                permission: self.notifier.permission().to_string(),
-                error: None,
-            },
+            Delivery::Native => {
+                self.clear_delivery_error();
+                TestNotificationResult {
+                    delivered: true,
+                    permission,
+                    error: None,
+                }
+            }
             Delivery::InApp(reason) => {
-                self.mark_permission_denied(&reason);
+                self.record_delivery_error(&reason);
                 TestNotificationResult {
                     delivered: false,
-                    permission: PermissionState::Denied.to_string(),
+                    permission,
                     error: Some(reason),
                 }
             }
         }
     }
 
-    fn publish_counts(&self, today_count: u32, open_count: u32) {
+    fn publish_counts(&self, today_count: u32) {
         let changed = {
             let mut snapshot = self.snapshot.lock().unwrap();
-            let changed = snapshot.today_count != today_count || snapshot.open_count != open_count;
+            let changed = snapshot.today_count != today_count;
             snapshot.today_count = today_count;
-            snapshot.open_count = open_count;
             changed
         };
         if changed {
@@ -1136,12 +1141,35 @@ impl ReminderEngine {
         self.snapshot.lock().unwrap().missed = Some(event);
     }
 
-    fn mark_permission_denied(&self, reason: &str) {
-        let mut snapshot = self.snapshot.lock().unwrap();
-        if snapshot.permission != PermissionState::Denied {
-            snapshot.permission = PermissionState::Denied;
-            log::warn!("desktop notifications are unavailable: {reason}");
+    /// Records a failed toast separately from the permission state. The
+    /// Settings page shows this as a delivery warning, while `permission`
+    /// always reflects a fresh check.
+    fn record_delivery_error(&self, reason: &str) {
+        if self.notifier.permission() == PermissionState::Denied {
+            // The permission notice already explains the failure.
+            return;
         }
+        let mut snapshot = self.snapshot.lock().unwrap();
+        if snapshot.delivery_error.as_deref() != Some(reason) {
+            snapshot.delivery_error = Some(reason.to_string());
+            log::warn!("desktop notifications could not be delivered: {reason}");
+        }
+    }
+
+    fn clear_delivery_error(&self) {
+        self.snapshot.lock().unwrap().delivery_error = None;
+    }
+
+    fn record_save_error(&self, reason: &str) {
+        let mut error = self.save_error.lock().unwrap();
+        if error.as_deref() != Some(reason) {
+            *error = Some(reason.to_string());
+            log::warn!("cannot save reminder watermark: {reason}");
+        }
+    }
+
+    fn clear_save_error(&self) {
+        *self.save_error.lock().unwrap() = None;
     }
 
     fn note_error(&self, message: &str) {
@@ -1420,6 +1448,128 @@ mod tests {
     }
 
     #[test]
+    fn all_day_due_with_a_lead_fires_the_day_before() {
+        let zone = FixedZone { offset: 3600 };
+        let mut idea = row("idea-all-day", None, Some("2026-11-27"));
+        idea.remind_before_minutes = Some(1440);
+        let triggers = idea.triggers(&zone);
+        let due = epoch_from_local(
+            &zone,
+            CivilDate {
+                year: 2026,
+                month: 11,
+                day: 27,
+            },
+            9,
+            0,
+        );
+        assert_eq!(triggers[0].fire_at, due);
+        assert_eq!(triggers[1].fire_at, due - SECONDS_PER_DAY);
+        let lead_local = local_from_epoch(&zone, triggers[1].fire_at);
+        assert_eq!(
+            lead_local.date,
+            CivilDate {
+                year: 2026,
+                month: 11,
+                day: 26,
+            }
+        );
+        assert_eq!(lead_local.hour, 9);
+    }
+
+    #[test]
+    fn queued_digest_entries_are_cancelled_by_done_or_a_moved_due() {
+        let zone = FixedZone { offset: 0 };
+        let now = epoch(2026, 11, 28, 8, 0);
+        let pending_item = |id: &str| PendingReminder {
+            idea_id: id.to_string(),
+            title: id.to_string(),
+            due_key: "2026-11-27".to_string(),
+            trigger: "due".to_string(),
+            fire_at: epoch(2026, 11, 27, 9, 0),
+        };
+        let pending = vec![
+            pending_item("idea-done"),
+            pending_item("idea-moved"),
+            pending_item("idea-live"),
+        ];
+        let mut done = row("idea-done", None, Some("2026-11-27"));
+        done.status = "done".to_string();
+        let rows = vec![
+            done,
+            // The due moved to the next day, so the old queued key is stale.
+            row("idea-moved", None, Some("2026-11-28")),
+            row("idea-live", None, Some("2026-11-27")),
+        ];
+        let today = local_from_epoch(&zone, now).date;
+
+        let quiet = plan_tick(PlanInput {
+            now,
+            launch_at: now - 3600,
+            quiet: true,
+            rows: &rows,
+            notified: &BTreeMap::new(),
+            pending: &pending,
+            today,
+            zone: &zone,
+        });
+        assert!(quiet.digest.is_none());
+        assert_eq!(quiet.pending.len(), 1);
+        assert_eq!(quiet.pending[0].idea_id, "idea-live");
+
+        let open = plan_tick(PlanInput {
+            now,
+            launch_at: now - 3600,
+            quiet: false,
+            rows: &rows,
+            notified: &BTreeMap::new(),
+            pending: &pending,
+            today,
+            zone: &zone,
+        });
+        let digest = open.digest.expect("digest");
+        assert_eq!(digest.len(), 1);
+        assert_eq!(digest[0].idea_id, "idea-live");
+    }
+
+    #[test]
+    fn a_launch_during_quiet_hours_defers_the_digest_until_the_window_ends() {
+        let zone = FixedZone { offset: 0 };
+        let launch_at = epoch(2026, 11, 27, 21, 0);
+        let evening = epoch(2026, 11, 27, 22, 1);
+        let rows = vec![row("idea-quiet", Some("2026-11-27T22:00:00Z"), None)];
+        let evening_plan = plan_tick(PlanInput {
+            now: evening,
+            launch_at,
+            quiet: true,
+            rows: &rows,
+            notified: &BTreeMap::new(),
+            pending: &[],
+            today: local_from_epoch(&zone, evening).date,
+            zone: &zone,
+        });
+        assert!(evening_plan.toasts.is_empty());
+        assert!(evening_plan.digest.is_none());
+        assert_eq!(evening_plan.pending.len(), 1);
+
+        // 08:05 the next morning is outside the default quiet window.
+        let morning = epoch(2026, 11, 28, 8, 5);
+        let morning_plan = plan_tick(PlanInput {
+            now: morning,
+            launch_at,
+            quiet: false,
+            rows: &rows,
+            notified: &evening_plan.notified,
+            pending: &evening_plan.pending,
+            today: local_from_epoch(&zone, morning).date,
+            zone: &zone,
+        });
+        assert!(morning_plan.toasts.is_empty());
+        let digest = morning_plan.digest.expect("digest");
+        assert_eq!(missed_event(&digest).count, 1);
+    }
+
+    #[test]
     fn missed_triggers_become_one_digest_counted_per_idea() {
         let zone = FixedZone { offset: 0 };
         let now = epoch(2026, 11, 27, 12, 0);
@@ -1673,5 +1823,52 @@ mod tests {
         assert_eq!(value["quietHoursEnd"], "08:00");
         assert_eq!(value["hideTitles"], false);
         assert_eq!(value["notifySound"], true);
+    }
+
+    #[test]
+    fn emitted_events_use_camel_case_json() {
+        let focus = serde_json::to_value(FocusEvent {
+            idea_id: Some("idea-a".to_string()),
+        })
+        .unwrap();
+        assert_eq!(focus["ideaId"], "idea-a");
+
+        let missed = missed_event(&[PendingReminder {
+            idea_id: "idea-a".to_string(),
+            title: "A".to_string(),
+            due_key: "2026-11-27".to_string(),
+            trigger: "lead".to_string(),
+            fire_at: 1,
+        }]);
+        let value = serde_json::to_value(missed).unwrap();
+        assert_eq!(value["count"], 1);
+        assert_eq!(value["items"][0]["id"], "idea-a");
+        assert_eq!(value["items"][0]["title"], "A");
+
+        let fallback = serde_json::to_value(InAppReminder {
+            idea_id: Some("idea-a".to_string()),
+            title: None,
+            trigger: "lead".to_string(),
+        })
+        .unwrap();
+        assert_eq!(fallback["ideaId"], "idea-a");
+        assert!(fallback["title"].is_null());
+        assert_eq!(fallback["trigger"], "lead");
+    }
+
+    #[test]
+    fn status_json_keeps_permission_and_delivery_error_separate() {
+        let value = serde_json::to_value(RemindersStatus {
+            settings: ReminderSettings::default(),
+            permission: "granted".to_string(),
+            today_count: 2,
+            missed: None,
+            delivery_error: Some("toast failed".to_string()),
+        })
+        .unwrap();
+        assert_eq!(value["permission"], "granted");
+        assert_eq!(value["deliveryError"], "toast failed");
+        assert_eq!(value["todayCount"], 2);
+        assert!(value.get("openCount").is_none());
     }
 }

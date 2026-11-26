@@ -4,6 +4,7 @@ mod commands;
 mod deep_link;
 mod engine;
 mod error;
+mod jsonfile;
 mod lifecycle;
 mod reminders;
 mod settings;
@@ -82,13 +83,14 @@ pub fn run() {
             app.manage(supervisor.clone());
             app.manage(api::RunLogState::default());
             app.manage(deep_link::DeepLinkState::default());
+            // Register the click handler before the first tick can show a toast.
+            reminders::register_notification_actions(app.handle());
             app.manage(reminders::ReminderEngine::start(
                 app.handle().clone(),
                 supervisor.clone(),
                 settings,
                 data_dir,
             ));
-            reminders::register_notification_actions(app.handle());
 
             tray::create(app.handle(), supervisor.clone())?;
             if let Err(err) = deep_link::register(app.handle()) {

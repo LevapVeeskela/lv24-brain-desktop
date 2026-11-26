@@ -20,8 +20,8 @@ const status: RemindersStatus = {
   settings,
   permission: "granted",
   todayCount: 2,
-  openCount: 5,
   missed: null,
+  deliveryError: null,
 };
 
 function harness(overrides: Partial<RemindersApi> = {}) {
@@ -65,7 +65,6 @@ describe("RemindersStore", () => {
     expect(store.settings?.remindersEnabled).toBe(true);
     expect(store.permission).toBe("granted");
     expect(store.todayCount).toBe(2);
-    expect(store.openCount).toBe(5);
 
     events.get("ideas-focus")?.({ ideaId: "idea-01J8ZQ4T7X" });
     expect(navigations.at(-1)).toBe("#/ideas?focus=idea-01J8ZQ4T7X");
@@ -85,7 +84,7 @@ describe("RemindersStore", () => {
     expect(store.missed).toBeNull();
   });
 
-  it("keeps the in-app fallback until dismissed", async () => {
+  it("queues every in-app fallback from one tick", async () => {
     const { events, store } = harness();
     await store.start();
 
@@ -94,9 +93,38 @@ describe("RemindersStore", () => {
       title: "Fix the footer",
       trigger: "due",
     });
-    expect(store.fallback?.title).toBe("Fix the footer");
-    store.dismissFallback();
-    expect(store.fallback).toBeNull();
+    events.get("ideas-reminder")?.({
+      ideaId: "idea-b",
+      title: "Dark calendar",
+      trigger: "lead",
+    });
+    // The same trigger again must not duplicate the banner.
+    events.get("ideas-reminder")?.({
+      ideaId: "idea-a",
+      title: "Fix the footer",
+      trigger: "due",
+    });
+
+    expect(store.fallbacks.map((item) => item.title)).toEqual([
+      "Fix the footer",
+      "Dark calendar",
+    ]);
+    store.dismissFallback(0);
+    expect(store.fallbacks.map((item) => item.title)).toEqual(["Dark calendar"]);
+  });
+
+  it("keeps permission separate from a delivery error", async () => {
+    const { store } = harness({
+      status: vi.fn(async () => ({
+        ...status,
+        permission: "granted",
+        deliveryError: "toast failed",
+      })),
+    });
+    await store.start();
+
+    expect(store.permission).toBe("granted");
+    expect(store.deliveryError).toBe("toast failed");
   });
 
   it("saves optimistically and rolls back on failure", async () => {
@@ -123,7 +151,24 @@ describe("RemindersStore", () => {
     expect(store.error).toBeNull();
   });
 
-  it("reports a blocked test notification as denied", async () => {
+  it("reports a failed test notification without denying permission", async () => {
+    const { store } = harness({
+      testNotification: vi.fn(async () => ({
+        delivered: false,
+        permission: "granted",
+        error: "toast failed",
+      })),
+    });
+    await store.start();
+
+    await store.testNotification();
+
+    expect(store.testResult).toBe("failed");
+    expect(store.testError).toBe("toast failed");
+    expect(store.permission).toBe("granted");
+  });
+
+  it("reports a denied permission from the test notification", async () => {
     const { store } = harness({
       testNotification: vi.fn(async () => ({
         delivered: false,
@@ -135,7 +180,7 @@ describe("RemindersStore", () => {
 
     await store.testNotification();
 
-    expect(store.testResult).toBe("denied");
+    expect(store.testResult).toBe("failed");
     expect(store.permission).toBe("denied");
   });
 });

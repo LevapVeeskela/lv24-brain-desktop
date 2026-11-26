@@ -16,6 +16,8 @@ import {
   type ReminderSettings,
 } from "./types";
 
+const MAX_FALLBACKS = 10;
+
 const listenToTauri: ReminderEventListener = (event, handler) =>
   listen<unknown>(event, (payload) => handler(payload.payload));
 
@@ -27,6 +29,10 @@ export const defaultReminderDeps: RemindersDeps = {
   },
 };
 
+function fallbackKey(reminder: InAppReminder): string {
+  return `${reminder.ideaId ?? ""}|${reminder.trigger}|${reminder.title ?? ""}`;
+}
+
 /**
  * Reminder state shared by the AppLayout banner and the Settings section. The
  * Rust scheduler owns timing and delivery; this store only mirrors status and
@@ -36,19 +42,21 @@ export class RemindersStore {
   settings: ReminderSettings | null = null;
   permission: NotificationPermission = "prompt";
   todayCount = 0;
-  openCount = 0;
   missed: MissedDigest | null = null;
-  /** In-app fallback for a toast the OS refused to show. */
-  fallback: InAppReminder | null = null;
-  loading = false;
+  /** In-app fallbacks for toasts the OS refused; every failure is kept. */
+  fallbacks: InAppReminder[] = [];
+  /** Toast delivery failure, kept apart from the permission state. */
+  deliveryError: string | null = null;
   saving = false;
   testing = false;
   error: string | null = null;
-  testResult: "ok" | "denied" | null = null;
+  testResult: "ok" | "failed" | null = null;
+  testError: string | null = null;
 
   private readonly deps: RemindersDeps;
   private started = false;
   private loaded = false;
+  private inFlight = false;
   private persisted: ReminderSettings | null = null;
   private pendingPatch: Partial<ReminderSettings> | null = null;
   private unlisten: Array<() => void> = [];
@@ -60,10 +68,6 @@ export class RemindersStore {
       { deps: false },
       { autoBind: true },
     );
-  }
-
-  get enabled(): boolean {
-    return this.settings?.remindersEnabled ?? false;
   }
 
   /** Subscribes to scheduler events and loads the current status once. */
@@ -87,10 +91,10 @@ export class RemindersStore {
   }
 
   async load(force = false): Promise<void> {
-    if ((this.loading || this.loaded) && !force) {
+    if ((this.inFlight || this.loaded) && !force) {
       return;
     }
-    this.loading = true;
+    this.inFlight = true;
     this.error = null;
     try {
       const status = await this.deps.api.status();
@@ -104,7 +108,7 @@ export class RemindersStore {
       });
     } finally {
       runInAction(() => {
-        this.loading = false;
+        this.inFlight = false;
       });
     }
   }
@@ -151,12 +155,15 @@ export class RemindersStore {
     }
     this.testing = true;
     this.testResult = null;
+    this.testError = null;
     this.error = null;
     try {
       const result = await this.deps.api.testNotification();
       runInAction(() => {
-        this.testResult = result.delivered ? "ok" : "denied";
+        this.testResult = result.delivered ? "ok" : "failed";
+        this.testError = result.delivered ? null : (result.error ?? null);
         this.permission = normalizePermission(result.permission);
+        this.deliveryError = result.delivered ? null : (result.error ?? null);
       });
     } catch (cause) {
       runInAction(() => {
@@ -189,11 +196,17 @@ export class RemindersStore {
     }
   }
 
+  /** Queues every failed toast in a tick; duplicates from the same trigger fold. */
   applyFallback(payload: unknown): void {
     const reminder = readInAppReminder(payload);
-    if (reminder) {
-      this.fallback = reminder;
+    if (!reminder) {
+      return;
     }
+    const key = fallbackKey(reminder);
+    if (this.fallbacks.some((entry) => fallbackKey(entry) === key)) {
+      return;
+    }
+    this.fallbacks = [...this.fallbacks, reminder].slice(-MAX_FALLBACKS);
   }
 
   dismissMissed(): void {
@@ -201,8 +214,8 @@ export class RemindersStore {
     void this.deps.api.dismissDigest().catch(() => undefined);
   }
 
-  dismissFallback(): void {
-    this.fallback = null;
+  dismissFallback(index: number): void {
+    this.fallbacks = this.fallbacks.filter((_, at) => at !== index);
   }
 
   dismissError(): void {
@@ -226,7 +239,7 @@ export class RemindersStore {
     this.persisted = status.settings;
     this.permission = normalizePermission(status.permission);
     this.todayCount = status.todayCount;
-    this.openCount = status.openCount;
+    this.deliveryError = status.deliveryError ?? null;
     if (status.missed) {
       this.missed = status.missed;
     }

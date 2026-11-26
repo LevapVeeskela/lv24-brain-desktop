@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AppError, AppResult};
+use crate::jsonfile::write_json_atomic;
 
 /// Lead values offered by the settings screen (minutes before the due time).
 pub const LEAD_OPTIONS: [u32; 5] = [0, 10, 60, 180, 1440];
@@ -54,6 +55,22 @@ impl ReminderSettings {
         Ok(())
     }
 
+    /// Repairs a hand-edited file on load: snap the lead to the nearest offered
+    /// value and fall back to the default quiet window for unparsable times.
+    /// Values are persisted as-is only after the next settings write.
+    pub fn sanitized(mut self) -> Self {
+        if !LEAD_OPTIONS.contains(&self.default_lead_minutes) {
+            self.default_lead_minutes = nearest_lead(self.default_lead_minutes);
+        }
+        if parse_hhmm(&self.quiet_hours_start).is_none() {
+            self.quiet_hours_start = "22:00".to_string();
+        }
+        if parse_hhmm(&self.quiet_hours_end).is_none() {
+            self.quiet_hours_end = "08:00".to_string();
+        }
+        self
+    }
+
     pub fn quiet_start_minutes(&self) -> u32 {
         parse_hhmm(&self.quiet_hours_start).unwrap_or(22 * 60)
     }
@@ -93,6 +110,14 @@ pub fn parse_hhmm(value: &str) -> Option<u32> {
     Some(hours * 60 + minutes)
 }
 
+fn nearest_lead(value: u32) -> u32 {
+    LEAD_OPTIONS
+        .iter()
+        .copied()
+        .min_by_key(|option| option.abs_diff(value))
+        .unwrap_or(10)
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
@@ -115,7 +140,7 @@ pub struct SettingsStore {
 
 impl SettingsStore {
     pub fn load(path: PathBuf) -> AppResult<Self> {
-        let settings = match fs::read_to_string(&path) {
+        let mut settings = match fs::read_to_string(&path) {
             Ok(raw) => match serde_json::from_str::<Settings>(&raw) {
                 Ok(settings) => settings,
                 Err(err) => {
@@ -134,6 +159,7 @@ impl SettingsStore {
                 )))
             }
         };
+        settings.reminders = settings.reminders.sanitized();
         Ok(Self {
             path: Arc::new(path),
             settings: Arc::new(Mutex::new(settings)),
@@ -178,21 +204,7 @@ impl SettingsStore {
     }
 
     fn persist(&self, settings: &Settings) -> AppResult<()> {
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        let raw = serde_json::to_vec_pretty(settings)?;
-        let temporary = self.path.with_extension("json.tmp");
-        fs::write(&temporary, raw)?;
-        #[cfg(windows)]
-        {
-            // Windows rename does not replace an existing destination.
-            if self.path.exists() {
-                fs::remove_file(&*self.path)?;
-            }
-        }
-        fs::rename(&temporary, &*self.path)?;
-        Ok(())
+        write_json_atomic(&self.path, settings)
     }
 }
 
@@ -283,6 +295,35 @@ mod tests {
             ..ReminderSettings::default()
         };
         assert!(store.set_reminders(bad_end).is_err());
+    }
+
+    #[test]
+    fn loading_clamps_out_of_range_reminders_instead_of_failing() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(
+            &path,
+            r#"{"defaultLeadMinutes":200,"quietHoursStart":"25:00","quietHoursEnd":"7:0"}"#,
+        )
+        .unwrap();
+
+        let settings = SettingsStore::load(path).unwrap().get().reminders;
+        assert_eq!(settings.default_lead_minutes, 180);
+        assert_eq!(settings.quiet_hours_start, "22:00");
+        assert_eq!(settings.quiet_hours_end, "08:00");
+
+        let nearest = ReminderSettings {
+            default_lead_minutes: 15,
+            ..ReminderSettings::default()
+        }
+        .sanitized();
+        assert_eq!(nearest.default_lead_minutes, 10);
+        let nearest = ReminderSettings {
+            default_lead_minutes: 5000,
+            ..ReminderSettings::default()
+        }
+        .sanitized();
+        assert_eq!(nearest.default_lead_minutes, 1440);
     }
 
     #[test]

@@ -15,8 +15,8 @@ const status: RemindersStatus = {
   },
   permission: "granted",
   todayCount: 1,
-  openCount: 4,
   missed: null,
+  deliveryError: null,
 };
 
 function makeStore(overrides: Partial<RemindersApi> = {}): RemindersStore {
@@ -65,6 +65,40 @@ describe("RemindersSettings", () => {
     const html = renderPage(<RemindersSettings store={store} />);
 
     expect(html).toContain("System notifications are blocked.");
+  });
+
+  it("shows a delivery error without claiming the permission is denied", async () => {
+    const store = makeStore({
+      status: vi.fn(async () => ({
+        ...status,
+        permission: "granted",
+        deliveryError: "toast failed",
+      })),
+    });
+    await store.start();
+
+    const html = renderPage(<RemindersSettings store={store} />);
+
+    expect(html).toContain("Notification delivery failed:");
+    expect(html).toContain("toast failed");
+    expect(html).not.toContain("System notifications are blocked.");
+  });
+
+  it("shows the failed test result", async () => {
+    const store = makeStore({
+      testNotification: vi.fn(async () => ({
+        delivered: false,
+        permission: "granted",
+        error: "toast failed",
+      })),
+    });
+    await store.start();
+    await store.testNotification();
+
+    const html = renderPage(<RemindersSettings store={store} />);
+
+    expect(html).toContain("Test notification failed.");
+    expect(html).toContain("toast failed");
   });
 
   it("shows a loading state before the status arrives", () => {

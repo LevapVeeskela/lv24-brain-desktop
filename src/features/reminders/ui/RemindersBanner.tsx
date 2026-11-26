@@ -16,9 +16,9 @@ export const RemindersBanner = observer(function RemindersBanner({
 }) {
   const { t } = useI18n();
   const missed = store.missed;
-  const fallback = store.fallback;
+  const fallbacks = store.fallbacks;
 
-  if (!missed && !fallback) {
+  if (!missed && fallbacks.length === 0) {
     return null;
   }
 
@@ -47,8 +47,9 @@ export const RemindersBanner = observer(function RemindersBanner({
           </span>
         </Notice>
       ) : null}
-      {fallback ? (
+      {fallbacks.map((fallback, index) => (
         <Notice
+          key={`${fallback.ideaId ?? "unknown"}-${fallback.trigger}-${index}`}
           variant="warning"
           action={
             <div className="reminders-actions">
@@ -58,7 +59,10 @@ export const RemindersBanner = observer(function RemindersBanner({
               >
                 {t("reminders.fallbackOpen")}
               </Button>
-              <Button variant="link" onClick={store.dismissFallback}>
+              <Button
+                variant="link"
+                onClick={() => store.dismissFallback(index)}
+              >
                 {t("actions.dismiss")}
               </Button>
             </div>
@@ -67,7 +71,7 @@ export const RemindersBanner = observer(function RemindersBanner({
           <strong>{t("reminders.fallbackTitle")}</strong>
           <span>{fallback.title ?? t("reminders.fallbackBody")}</span>
         </Notice>
-      ) : null}
+      ))}
     </div>
   );
 });

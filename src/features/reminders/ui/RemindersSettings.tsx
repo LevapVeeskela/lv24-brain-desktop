@@ -70,6 +70,14 @@ export const RemindersSettings = observer(function RemindersSettings({
         </Notice>
       ) : null}
 
+      {store.deliveryError ? (
+        <Notice variant="warning">
+          <span>
+            {t("reminders.deliveryFailed")} {store.deliveryError}
+          </span>
+        </Notice>
+      ) : null}
+
       {!settings ? (
         <Loading label={t("reminders.loading")} />
       ) : (
@@ -187,9 +195,10 @@ export const RemindersSettings = observer(function RemindersSettings({
                 {t("reminders.testOk")}
               </span>
             ) : null}
-            {store.testResult === "denied" ? (
+            {store.testResult === "failed" ? (
               <span className="muted small" role="status">
-                {t("reminders.testDenied")}
+                {t("reminders.testFailed")}
+                {store.testError ? ` ${store.testError}` : ""}
               </span>
             ) : null}
           </div>

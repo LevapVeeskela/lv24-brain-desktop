@@ -30,8 +30,8 @@ export interface RemindersStatus {
   settings: ReminderSettings;
   permission: string;
   todayCount: number;
-  openCount: number;
   missed: MissedDigest | null;
+  deliveryError: string | null;
 }
 
 export interface TestNotificationResult {
@@ -109,8 +109,7 @@ export function readMissedEvent(payload: unknown): MissedDigest | null {
   return { count: raw.count, items };
 }
 
-export function readInAppReminder(payload: unknown): InAppReminder | null {
-  if (!payload || typeof payload !== "object") {
+export function readInAppReminder(payload: unknown): InAppReminder | null {  if (!payload || typeof payload !== "object") {
     return null;
   }
   const raw = payload as { ideaId?: unknown; title?: unknown; trigger?: unknown };
