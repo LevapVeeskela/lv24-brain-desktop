@@ -6,6 +6,8 @@ import { AppHeader } from "@/widgets/app-header/ui/AppHeader";
 import { AppRail } from "@/widgets/app-rail/ui/AppRail";
 import { CommandPalette } from "@/features/command-palette/ui/CommandPalette";
 import { OAuthCallbackCard } from "@/features/oauth-callback/ui/OAuthCallbackCard";
+import { RemindersProvider } from "@/features/reminders/model/RemindersProvider";
+import { RemindersSurface } from "@/features/reminders/ui/RemindersBanner";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { Notice } from "@/shared/ui/Notice";
@@ -130,7 +132,10 @@ export const AppLayout = observer(function AppLayout({
               </span>
             </Notice>
           ) : null}
-          <Outlet />
+          <RemindersProvider>
+            <RemindersSurface />
+            <Outlet />
+          </RemindersProvider>
           <OAuthCallbackCard engine={engine} />
           <footer className="footer">
             <span aria-live="polite">

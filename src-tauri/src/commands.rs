@@ -111,7 +111,10 @@ fn machine_name() -> String {
             }
         }
     }
-    std::env::var("HOSTNAME").unwrap_or_default().trim().to_string()
+    std::env::var("HOSTNAME")
+        .unwrap_or_default()
+        .trim()
+        .to_string()
 }
 
 #[tauri::command]
