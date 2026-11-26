@@ -112,17 +112,6 @@ export function shiftCalendarMonth(
   return calendarMonth(new Date(current.year, current.month + delta, 1));
 }
 
-/** First and last calendar day of the month, as local date keys. */
-export function monthBounds(
-  year: number,
-  month: number,
-): { firstKey: string; lastKey: string } {
-  return {
-    firstKey: localDateKey(new Date(year, month, 1)),
-    lastKey: localDateKey(new Date(year, month + 1, 0)),
-  };
-}
-
 function timeOfDay(value: Date): string {
   return `${String(value.getHours()).padStart(2, "0")}:${String(
     value.getMinutes(),
@@ -130,6 +119,8 @@ function timeOfDay(value: Date): string {
 }
 
 function calendarEntry(idea: Idea): CalendarEntry | null {
+  // `someday` is the icebox: a date on it does not schedule it. Focus shows it
+  // in Later; the calendar and the ICS export deliberately stay clear of it.
   if (!isOpenIdeaStatus(idea.status)) {
     return null;
   }
@@ -164,6 +155,24 @@ function compareEntries(left: CalendarEntry, right: CalendarEntry): number {
     return left.startMinutes - right.startMinutes;
   }
   return left.idea.title.localeCompare(right.idea.title);
+}
+
+/**
+ * Moves the just-dragged idea to the front so a crowded day still shows the
+ * result without expanding it. Returns a copy; `+N` counts stay truthful.
+ */
+export function prioritizeCalendarEntries(
+  entries: readonly CalendarEntry[],
+  ideaId: string,
+): CalendarEntry[] {
+  const index = entries.findIndex((entry) => entry.idea.id === ideaId);
+  if (index <= 0) {
+    return entries.slice();
+  }
+  const next = entries.slice();
+  const [entry] = next.splice(index, 1);
+  next.unshift(entry);
+  return next;
 }
 
 /** Buckets due ideas by local date key for the supplied grid days. */
@@ -243,8 +252,10 @@ function sortAgenda(ideas: Idea[]): Idea[] {
 }
 
 /**
- * Timed, open ideas of the visible month, grouped relative to today. All-day
- * ideas live in the grid only; the agenda is the "next at 18:00" list.
+ * Timed, open ideas of the visible six-week grid (leading and trailing days
+ * included), grouped relative to today. All-day ideas live in the grid only;
+ * the agenda is the "next at 18:00" list. Matching the grid range keeps the
+ * agenda and the chips on screen in agreement.
  */
 export function calendarAgenda(
   ideas: readonly Idea[],
@@ -252,7 +263,9 @@ export function calendarAgenda(
   year: number,
   month: number,
 ): CalendarAgendaGroup[] {
-  const bounds = monthBounds(year, month);
+  const grid = monthGridDays(year, month);
+  const firstKey = localDateKey(grid[0]);
+  const lastKey = localDateKey(grid[grid.length - 1]);
   const buckets: Record<CalendarAgendaKey, Idea[]> = {
     overdue: [],
     today: [],
@@ -267,7 +280,7 @@ export function calendarAgenda(
       continue;
     }
     const key = localDateKey(due);
-    if (key < bounds.firstKey || key > bounds.lastKey) {
+    if (key < firstKey || key > lastKey) {
       continue;
     }
     const diff = dayDifference(due, now);

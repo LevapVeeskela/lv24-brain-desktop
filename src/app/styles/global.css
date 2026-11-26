@@ -2737,7 +2737,7 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 .calendar-chips {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
   min-width: 0;
 }
 
@@ -2783,10 +2783,28 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 }
 
 .calendar-more {
-  padding-inline-start: var(--space-1);
+  align-self: flex-start;
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
   color: var(--text-muted);
+  font: inherit;
   font-size: var(--text-xs);
+  line-height: 1.5;
+  text-align: start;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.calendar-more:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.calendar-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .calendar-hint {

@@ -71,12 +71,22 @@ describe("ICS export", () => {
     expect(ics).not.toContain("TRIGGER:-PT120M");
   });
 
-  it("omits the alarm when no lead is stored", () => {
-    const ics = buildIdeasIcs(
-      [timedIdea({ remindBeforeMinutes: 0 }), allDayIdea()],
-      now,
-    );
-    expect(ics).not.toContain("BEGIN:VALARM");
+  it("fires at the due time when the lead is absent or zero", () => {
+    // Spec: absent/0 means no lead, notify at the due time only. Timed ideas
+    // use -PT0M; all-day ideas keep their 09:00-local anchor.
+    const timedZero = timedIdea({
+      title: "Zero lead",
+      remindBeforeMinutes: 0,
+    });
+    const timedAbsent = ideaFixture({
+      title: "No lead",
+      dueAt: new Date(2026, 10, 27, 20, 0, 0, 0).toISOString(),
+    });
+    const ics = buildIdeasIcs([timedZero, timedAbsent, allDayIdea()], now);
+    expect((ics.match(/TRIGGER:-PT0M/g) ?? []).length).toBe(2);
+    const anchor = new Date(2026, 10, 28, 9, 0, 0, 0);
+    expect(ics).toContain(`TRIGGER;VALUE=DATE-TIME:${utc(anchor)}`);
+    expect((ics.match(/BEGIN:VALARM/g) ?? []).length).toBe(3);
   });
 
   it("exports only open, dated ideas and sorts them by due time", () => {
@@ -99,6 +109,23 @@ describe("ICS export", () => {
       ics.indexOf("SUMMARY:Second"),
     );
     expect(ics).toContain("CATEGORIES:lv24");
+  });
+
+  it("keeps dated someday ideas out of the calendar file", () => {
+    // Product rule: a dated `someday` stays in the icebox and is shown in
+    // Focus Later; it must not become a scheduled VEVENT.
+    const ics = buildIdeasIcs(
+      [
+        ideaFixture({
+          title: "Icebox",
+          status: "someday",
+          dueDate: "2026-11-28",
+        }),
+      ],
+      now,
+    );
+    expect(ics).not.toContain("SUMMARY:Icebox");
+    expect(ics).not.toContain("BEGIN:VEVENT");
   });
 
   it("escapes separators, backslashes and newlines", () => {

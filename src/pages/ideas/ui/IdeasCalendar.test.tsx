@@ -51,7 +51,9 @@ describe("IdeasCalendar", () => {
     expect(html).toContain('data-date-key="2026-11-27"');
     expect(html).toContain('aria-current="date"');
     expect(html).toContain('tabindex="0"');
-    expect(html).toContain('aria-label="Friday, November 27. Add an idea."');
+    expect(html).toContain(
+      'aria-label="Friday, November 27. Ideas: 2. Add an idea."',
+    );
   });
 
   it("renders timed and all-day chips and hides closed or undated ideas", () => {
@@ -59,6 +61,8 @@ describe("IdeasCalendar", () => {
     expect(html).toContain("Тёмная тема для календаря");
     expect(html).toContain("18:00");
     expect(html).toContain("Продлить страховку");
+    expect(html).toContain('aria-label="Тёмная тема для календаря, 18:00"');
+    expect(html).toContain('aria-label="Продлить страховку, All day"');
     expect(html).toContain("Позвонить стоматологу");
     expect(html).toContain("Закрыть issue #1");
     expect(html).not.toContain("Починить футер");
@@ -67,7 +71,7 @@ describe("IdeasCalendar", () => {
     expect(html).toContain('draggable="true"');
   });
 
-  it("caps a day at three chips and reports the rest", () => {
+  it("caps a day at three chips and exposes the rest as a labeled button", () => {
     const crowded = Array.from({ length: 4 }, (_, index) =>
       ideaFixture({
         id: `idea-2026-11-10-crowded-${index}`,
@@ -79,7 +83,9 @@ describe("IdeasCalendar", () => {
     expect(html).toContain("Crowded 1");
     expect(html).toContain("Crowded 3");
     expect(html).not.toContain('class="calendar-chip-title">Crowded 4');
-    expect(html).toContain("+1 more");
+    expect(html).toContain('aria-label="1 more: Crowded 4"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain(">+1 more</button>");
     expect(html).toContain('title="Crowded 4"');
   });
 
@@ -94,6 +100,21 @@ describe("IdeasCalendar", () => {
     );
     // The only overdue item is all-day, so the agenda has no Overdue group.
     expect(html).not.toContain(">Overdue</h4>");
+    const labelledBy = /class="calendar-agenda" aria-labelledby="([^"]+)"/.exec(
+      html,
+    )?.[1];
+    expect(labelledBy).toBeTruthy();
+    expect(html).toContain(`id="${labelledBy}"`);
+  });
+
+  it("includes timed items on visible leading grid days in the agenda", () => {
+    const leading = ideaFixture({
+      title: "Leading Monday",
+      dueAt: new Date(2026, 9, 26, 9, 0, 0, 0).toISOString(),
+    });
+    const html = renderCalendar([leading]);
+    expect(html).toContain('data-date-key="2026-10-26"');
+    expect(html).toContain('class="calendar-agenda-title">Leading Monday');
   });
 
   it("translates the calendar into Russian and Chinese", () => {
@@ -110,10 +131,10 @@ describe("IdeasCalendar", () => {
     expect(zh).toContain("今天");
   });
 
-  it("shows a dimmed honest empty agenda when the month has no timed items", () => {
+  it("shows a dimmed honest empty agenda when the view has no timed items", () => {
     const html = renderCalendar([
       ideaFixture({ title: "All day only", dueDate: "2026-11-10" }),
     ]);
-    expect(html).toContain("No timed ideas in this month.");
+    expect(html).toContain("No timed ideas in this view.");
   });
 });

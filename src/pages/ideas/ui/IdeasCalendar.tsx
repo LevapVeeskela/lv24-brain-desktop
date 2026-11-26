@@ -1,4 +1,5 @@
 import {
+  useId,
   useReducer,
   useRef,
   useState,
@@ -23,6 +24,7 @@ import {
   groupCalendarWeeks,
   IDLE_CALENDAR_DRAG,
   isCalendarNavigationKey,
+  prioritizeCalendarEntries,
   reschedulePatch,
   shiftCalendarMonth,
   weekdayLabels,
@@ -63,7 +65,15 @@ export function IdeasCalendar({
   const [month, setMonth] = useState(() => calendarMonth(now));
   const [focusKey, setFocusKey] = useState(() => localDateKey(now));
   const [drag, dispatch] = useReducer(calendarDragReducer, IDLE_CALENDAR_DRAG);
+  const [expandedDays, setExpandedDays] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [recentMove, setRecentMove] = useState<{
+    ideaId: string;
+    dayKey: string;
+  } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const agendaTitleId = useId();
 
   const days = buildMonthGrid(month.year, month.month, ideas, now);
   const weeks = groupCalendarWeeks(days);
@@ -99,6 +109,18 @@ export function IdeasCalendar({
     const key = localDateKey(now);
     setFocusKey(key);
     focusCell(key);
+  };
+
+  const setDayExpanded = (key: string, expanded: boolean): void => {
+    setExpandedDays((current) => {
+      const next = new Set(current);
+      if (expanded) {
+        next.add(key);
+      } else {
+        next.delete(key);
+      }
+      return next;
+    });
   };
 
   const handleDayKeyDown = (
@@ -146,6 +168,7 @@ export function IdeasCalendar({
     }
     const patch = reschedulePatch(idea, day.key);
     if (patch) {
+      setRecentMove({ ideaId: idea.id, dayKey: day.key });
       onReschedule(idea.id, patch);
     }
   };
@@ -183,6 +206,15 @@ export function IdeasCalendar({
         className="calendar-grid"
         role="grid"
         aria-label={t("ideas.calendar.label")}
+        onDragLeave={(event) => {
+          // Only leaving the whole grid clears the highlight; per-cell leave
+          // arrives after the next cell's dragover and would wipe it.
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
+            dispatch({ type: "over", dateKey: null });
+          }
+        }}
       >
         <div role="row" className="calendar-weekdays">
           {weekdays.map((label, index) => (
@@ -203,8 +235,22 @@ export function IdeasCalendar({
             key={week[0]?.key ?? "week"}
           >
             {week.map((day) => {
-              const visible = day.entries.slice(0, CALENDAR_CHIP_LIMIT);
-              const hidden = day.entries.slice(CALENDAR_CHIP_LIMIT);
+              // The just-moved chip goes first so a crowded target day shows
+              // the result without expanding; the `+N` count stays truthful.
+              const ordered =
+                recentMove?.dayKey === day.key
+                  ? prioritizeCalendarEntries(day.entries, recentMove.ideaId)
+                  : day.entries;
+              const expanded = expandedDays.has(day.key);
+              const visible = expanded
+                ? ordered
+                : ordered.slice(0, CALENDAR_CHIP_LIMIT);
+              const hidden = expanded
+                ? []
+                : ordered.slice(CALENDAR_CHIP_LIMIT);
+              const hiddenTitles = hidden
+                .map((entry) => entry.idea.title)
+                .join(", ");
               const classes = ["calendar-day"];
               if (!day.inMonth) classes.push("is-outside");
               if (day.isToday) classes.push("is-today");
@@ -220,6 +266,7 @@ export function IdeasCalendar({
                   data-date-key={day.key}
                   aria-label={t("ideas.calendar.dayLabel", {
                     date: formatCalendarDate(day.key, locale),
+                    count: day.entries.length,
                   })}
                   aria-current={day.isToday ? "date" : undefined}
                   onClick={(event) => {
@@ -231,24 +278,15 @@ export function IdeasCalendar({
                   }}
                   onKeyDown={(event) => handleDayKeyDown(event, day)}
                   onDragOver={(event) => {
+                    // dragover, not dragenter: it repeats on the actually
+                    // hovered cell and cannot be cleared by the previous one.
                     if (!drag.ideaId) {
                       return;
                     }
                     event.preventDefault();
                     event.dataTransfer.dropEffect = "move";
-                  }}
-                  onDragEnter={() => {
-                    if (drag.ideaId && drag.overKey !== day.key) {
+                    if (drag.overKey !== day.key) {
                       dispatch({ type: "over", dateKey: day.key });
-                    }
-                  }}
-                  onDragLeave={(event) => {
-                    if (
-                      !event.currentTarget.contains(
-                        event.relatedTarget as Node | null,
-                      )
-                    ) {
-                      dispatch({ type: "over", dateKey: null });
                     }
                   }}
                   onDrop={(event) => handleDrop(event, day)}
@@ -271,9 +309,9 @@ export function IdeasCalendar({
                         draggable
                         title={formatIdeaDue(entry.idea, locale) ?? entry.idea.title}
                         aria-label={
-                          entry.timeLabel
+                          entry.timed && entry.timeLabel
                             ? `${entry.idea.title}, ${entry.timeLabel}`
-                            : entry.idea.title
+                            : `${entry.idea.title}, ${t("ideas.dueAllDay")}`
                         }
                         onClick={(event) => {
                           event.stopPropagation();
@@ -304,16 +342,32 @@ export function IdeasCalendar({
                         </span>
                       </button>
                     ))}
-                    {hidden.length > 0 ? (
-                      <span
+                    {hidden.length > 0 ||
+                    (expanded && ordered.length > CALENDAR_CHIP_LIMIT) ? (
+                      <button
+                        type="button"
                         className="calendar-more"
-                        title={hidden
-                          .map((entry) => entry.idea.title)
-                          .join(", ")}
-                        onClick={(event) => event.stopPropagation()}
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? t("ideas.calendar.less")
+                            : t("ideas.calendar.moreLabel", {
+                                count: hidden.length,
+                                titles: hiddenTitles,
+                              })
+                        }
+                        title={expanded ? undefined : hiddenTitles}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDayExpanded(day.key, !expanded);
+                        }}
                       >
-                        {t("ideas.calendar.more", { count: hidden.length })}
-                      </span>
+                        {expanded
+                          ? t("ideas.calendar.less")
+                          : t("ideas.calendar.more", {
+                              count: hidden.length,
+                            })}
+                      </button>
                     ) : null}
                   </div>
                 </div>
@@ -328,9 +382,9 @@ export function IdeasCalendar({
 
       <section
         className="calendar-agenda"
-        aria-labelledby="calendar-agenda-title"
+        aria-labelledby={agendaTitleId}
       >
-        <h3 id="calendar-agenda-title">{t("ideas.calendar.agenda")}</h3>
+        <h3 id={agendaTitleId}>{t("ideas.calendar.agenda")}</h3>
         {agenda.length === 0 ? (
           <p className="muted small">{t("ideas.calendar.agenda.empty")}</p>
         ) : (

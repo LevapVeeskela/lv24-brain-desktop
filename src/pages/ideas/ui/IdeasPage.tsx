@@ -37,6 +37,19 @@ function projectOptions(projects: readonly Project[]): IdeaProjectOption[] {
   }));
 }
 
+/**
+ * Default 1.8 export source: the same visible scope the calendar renders, so
+ * project/search filters are honored. WS7 swaps the fake for `/v1/ideas/ical`.
+ */
+export function createIdeasPageExportSource(
+  ideas: IdeasStore,
+): IdeaExportSource {
+  return createFakeIdeaExportSource({
+    ideas: () => ideas.scoped,
+    now: () => ideas.nowDate(),
+  });
+}
+
 export const IdeasPage = observer(function IdeasPage({
   ideas,
   projects,
@@ -56,11 +69,7 @@ export const IdeasPage = observer(function IdeasPage({
   const focusId = params.get("focus");
   const now = ideas.nowDate();
   const defaultExportSource = useMemo(
-    () =>
-      createFakeIdeaExportSource({
-        ideas: () => ideas.items,
-        now: () => ideas.nowDate(),
-      }),
+    () => createIdeasPageExportSource(ideas),
     [ideas],
   );
   const calendarExportSource = exportSource ?? defaultExportSource;

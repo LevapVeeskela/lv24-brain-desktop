@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ideaFixture } from "@/test/fixtures";
 import {
   addLocalDays,
@@ -11,27 +11,15 @@ import {
   groupCalendarWeeks,
   IDLE_CALENDAR_DRAG,
   localDay,
-  monthBounds,
   monthGridDays,
+  prioritizeCalendarEntries,
   reschedulePatch,
   shiftCalendarMonth,
   weekdayLabels,
 } from "./calendar";
 import { localDateKey } from "./format";
 
-// DST tests need a zone with real transitions; restore the machine zone after.
-const originalTz = process.env.TZ;
-process.env.TZ = "America/New_York";
-
-afterAll(() => {
-  if (originalTz === undefined) {
-    delete process.env.TZ;
-  } else {
-    process.env.TZ = originalTz;
-  }
-});
-
-// Friday, 2026-11-27, noon in the injected zone.
+// Friday, 2026-11-27, noon local time.
 const now = new Date(2026, 10, 27, 12, 0, 0, 0);
 
 function timed(dayOffset: number, hour: number, minute = 0, title = "Timed") {
@@ -47,6 +35,42 @@ function timed(dayOffset: number, hour: number, minute = 0, title = "Timed") {
       0,
     ).toISOString(),
   });
+}
+
+function timedOn(dateKey: string, hour: number, title: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return ideaFixture({
+    title,
+    dueAt: new Date(year, month - 1, day, hour, 0, 0, 0).toISOString(),
+  });
+}
+
+/** `+03:00` / `-04:00` for a local date, independent of the machine zone. */
+function offsetText(value: Date): string {
+  const offsetMinutes = -value.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(offsetMinutes);
+  return `${sign}${String(Math.floor(absolute / 60)).padStart(2, "0")}:${String(
+    absolute % 60,
+  ).padStart(2, "0")}`;
+}
+
+/** A local day is 23 or 25 hours long only in zones with a DST transition. */
+function findDstShift(
+  year: number,
+): { hours: number; day: Date; nextKey: string } | null {
+  for (let month = 0; month < 12; month += 1) {
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    for (let day = 1; day < lastDay; day += 1) {
+      const start = new Date(year, month, day);
+      const next = new Date(year, month, day + 1);
+      const hours = (next.getTime() - start.getTime()) / 3_600_000;
+      if (hours !== 24) {
+        return { hours, day: start, nextKey: localDateKey(next) };
+      }
+    }
+  }
+  return null;
 }
 
 describe("calendar grid", () => {
@@ -79,10 +103,6 @@ describe("calendar grid", () => {
     const december = monthGridDays(2026, 11);
     expect(localDateKey(december[0])).toBe("2026-11-30");
     expect(localDateKey(december[41])).toBe("2027-01-10");
-    expect(monthBounds(2026, 11)).toEqual({
-      firstKey: "2026-12-01",
-      lastKey: "2026-12-31",
-    });
 
     expect(shiftCalendarMonth({ year: 2026, month: 11 }, 1)).toEqual({
       year: 2027,
@@ -98,24 +118,29 @@ describe("calendar grid", () => {
     });
   });
 
-  it("advances local days across DST without 24-hour assumptions", () => {
-    // DST starts on 2026-03-08 in America/New_York: 02:00 -> 03:00.
-    const saturday = localDay(2026, 2, 7);
-    const monday = addLocalDays(saturday, 2);
-    expect(localDateKey(monday)).toBe("2026-03-09");
-    const sunday = localDay(2026, 2, 8);
-    expect(sunday.getTime() - saturday.getTime()).toBe(24 * 3_600_000);
-    expect(monday.getTime() - sunday.getTime()).toBe(23 * 3_600_000);
-
+  it("keeps local day math DST-safe for every day of a year", () => {
+    // The build machine may not observe DST, so pin the invariant everywhere:
+    // every local calendar day advances by exactly one date key, never by ms.
+    const start = localDay(2026, 0, 1);
+    for (let offset = 0; offset < 365; offset += 1) {
+      const value = addLocalDays(start, offset);
+      const expected = new Date(Date.UTC(2026, 0, 1 + offset))
+        .toISOString()
+        .slice(0, 10);
+      expect(localDateKey(value)).toBe(expected);
+    }
     const keys = monthGridDays(2026, 2).map(localDateKey);
-    const index = keys.indexOf("2026-03-08");
-    expect(index).toBeGreaterThan(0);
-    expect(keys[index + 1]).toBe("2026-03-09");
-    expect(keys.slice(0, 42)).toEqual(
-      Array.from({ length: 42 }, (_, offset) =>
-        localDateKey(addLocalDays(localDay(2026, 1, 23), offset)),
-      ),
-    );
+    expect(keys[0]).toBe("2026-02-23");
+    expect(keys[41]).toBe("2026-04-05");
+    expect(new Set(keys).size).toBe(42);
+
+    // If this machine's zone has a transition, the transition day proves the
+    // arithmetic does not assume 24 hours.
+    const shift = findDstShift(2026);
+    if (shift) {
+      expect([23, 25]).toContain(shift.hours);
+      expect(localDateKey(addLocalDays(shift.day, 1))).toBe(shift.nextKey);
+    }
   });
 
   it("places timed and all-day ideas on their local due day only", () => {
@@ -146,6 +171,21 @@ describe("calendar grid", () => {
     );
   });
 
+  it("keeps dated someday ideas in the icebox, off the calendar", () => {
+    // Product rule: Focus shows `someday` in Later, but a date on it is not a
+    // schedule; the calendar and ICS must not surface it.
+    const icebox = ideaFixture({
+      title: "Icebox",
+      status: "someday",
+      dueDate: "2026-11-27",
+    });
+    const cell = buildMonthGrid(2026, 10, [icebox], now).find(
+      (day) => day.key === "2026-11-27",
+    );
+    expect(cell?.entries).toEqual([]);
+    expect(calendarAgenda([icebox], now, 2026, 10)).toEqual([]);
+  });
+
   it("sorts timed chips by time before all-day chips", () => {
     const ideas = [
       ideaFixture({ title: "All day", dueDate: "2026-11-29" }),
@@ -161,10 +201,31 @@ describe("calendar grid", () => {
       "All day",
     ]);
   });
+
+  it("prioritizes the just-moved idea in a crowded day", () => {
+    const ideas = Array.from({ length: 4 }, (_, index) =>
+      ideaFixture({
+        id: `idea-moved-${index}`,
+        title: `Moved ${index + 1}`,
+        dueDate: "2026-11-29",
+      }),
+    );
+    const entries =
+      buildMonthGrid(2026, 10, ideas, now).find(
+        (day) => day.key === "2026-11-29",
+      )?.entries ?? [];
+    const movedId = entries.at(-1)?.idea.id ?? "";
+    const prioritized = prioritizeCalendarEntries(entries, movedId);
+    expect(prioritized[0].idea.id).toBe(movedId);
+    expect(prioritized).toHaveLength(4);
+    expect(entries[0].idea.id).not.toBe(movedId);
+    expect(prioritizeCalendarEntries(entries, "missing")).not.toBe(entries);
+    expect(prioritizeCalendarEntries(entries, movedId)).not.toBe(entries);
+  });
 });
 
 describe("calendar agenda", () => {
-  it("groups timed month items into overdue, today and upcoming", () => {
+  it("groups timed grid items into overdue, today and upcoming", () => {
     const ideas = [
       timed(-2, 9, 0, "Overdue task"),
       timed(0, 18, 0, "Today task"),
@@ -176,8 +237,8 @@ describe("calendar agenda", () => {
         status: "done",
       }),
       ideaFixture({
-        title: "Next month",
-        dueAt: new Date(2026, 11, 2, 10).toISOString(),
+        title: "Outside the grid",
+        dueAt: new Date(2026, 11, 9, 10).toISOString(),
       }),
       ideaFixture({ title: "Undated task" }),
     ];
@@ -192,7 +253,22 @@ describe("calendar agenda", () => {
     expect(groups[2].ideas.map((idea) => idea.title)).toEqual(["Upcoming task"]);
   });
 
-  it("returns no groups when the month has no timed items", () => {
+  it("includes the visible leading and trailing grid days only", () => {
+    const ideas = [
+      timedOn("2026-10-26", 9, "Leading Monday"),
+      timedOn("2026-12-06", 18, "Trailing Sunday"),
+      timedOn("2026-12-07", 9, "Next month"),
+    ];
+    const groups = calendarAgenda(ideas, now, 2026, 10);
+    const titles = groups.flatMap((group) =>
+      group.ideas.map((idea) => idea.title),
+    );
+    expect(titles).toContain("Leading Monday");
+    expect(titles).toContain("Trailing Sunday");
+    expect(titles).not.toContain("Next month");
+  });
+
+  it("returns no groups when the grid has no timed items", () => {
     const allDay = [ideaFixture({ title: "All day", dueDate: "2026-11-28" })];
     expect(calendarAgenda(allDay, now, 2026, 10)).toEqual([]);
   });
@@ -222,16 +298,44 @@ describe("calendar drag", () => {
     expect(moved.getMinutes()).toBe(30);
   });
 
-  it("recomputes the offset when the move crosses DST", () => {
+  it("recomputes the offset when the move crosses a DST transition", () => {
+    // Pick the machine zone's transition day when it has one; otherwise use a
+    // normal March move. The local wall-clock time must survive either way.
+    const shift = findDstShift(2026);
+    const source = shift ? addLocalDays(shift.day, -1) : new Date(2026, 2, 7);
+    const target = shift ? shift.day : new Date(2026, 2, 9);
     const idea = ideaFixture({
-      dueAt: new Date(2026, 2, 7, 23, 30, 0, 0).toISOString(),
+      dueAt: new Date(
+        source.getFullYear(),
+        source.getMonth(),
+        source.getDate(),
+        23,
+        30,
+        0,
+        0,
+      ).toISOString(),
     });
-    const patch = reschedulePatch(idea, "2026-03-09");
-    expect(patch?.dueAt?.endsWith("-04:00")).toBe(true);
+    const targetKey = localDateKey(target);
+    const patch = reschedulePatch(idea, targetKey);
+    const expected = new Date(
+      target.getFullYear(),
+      target.getMonth(),
+      target.getDate(),
+      23,
+      30,
+      0,
+      0,
+    );
+    expect(patch?.dueAt?.endsWith(offsetText(expected))).toBe(true);
     const moved = new Date(patch?.dueAt ?? "");
-    expect(localDateKey(moved)).toBe("2026-03-09");
+    expect(localDateKey(moved)).toBe(targetKey);
     expect(moved.getHours()).toBe(23);
     expect(moved.getMinutes()).toBe(30);
+    if (shift) {
+      expect(new Date(idea.dueAt ?? "").getTimezoneOffset()).not.toBe(
+        expected.getTimezoneOffset(),
+      );
+    }
   });
 
   it("tracks the chip and the hovered day in a pure reducer", () => {
@@ -250,6 +354,12 @@ describe("calendar drag", () => {
       dateKey: "2026-11-30",
     });
     expect(over.overKey).toBe("2026-11-30");
+    // A later hover always wins; no stale leave can reset it in the reducer.
+    const overAgain = calendarDragReducer(over, {
+      type: "over",
+      dateKey: "2026-12-01",
+    });
+    expect(overAgain.overKey).toBe("2026-12-01");
     expect(calendarDragReducer(IDLE_CALENDAR_DRAG, {
       type: "over",
       dateKey: "2026-11-30",

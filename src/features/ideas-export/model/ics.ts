@@ -165,16 +165,16 @@ function buildEvent(idea: Idea, stamp: string): string[] {
       .join(",")}`,
   );
 
-  if (lead > 0) {
-    if (idea.dueAt) {
-      lines.push(...alarmLines(`TRIGGER:-PT${lead}M`, idea.title));
-    } else if (idea.dueDate) {
-      const trigger = allDayAlarmTrigger(idea.dueDate, lead);
-      if (trigger) {
-        lines.push(
-          ...alarmLines(`TRIGGER;VALUE=DATE-TIME:${trigger}`, idea.title),
-        );
-      }
+  // A missing/zero lead still fires at the due time: `-PT0M` for timed ideas
+  // and the absolute 09:00-local anchor for all-day ideas.
+  if (idea.dueAt) {
+    lines.push(...alarmLines(`TRIGGER:-PT${lead}M`, idea.title));
+  } else if (idea.dueDate) {
+    const trigger = allDayAlarmTrigger(idea.dueDate, lead);
+    if (trigger) {
+      lines.push(
+        ...alarmLines(`TRIGGER;VALUE=DATE-TIME:${trigger}`, idea.title),
+      );
     }
   }
 
@@ -195,6 +195,8 @@ function dueValue(idea: Idea): number {
 }
 
 function exportable(idea: Idea): boolean {
+  // `someday` is the icebox even when it carries a date; Focus shows it in
+  // Later, but the calendar export must not schedule it.
   return isOpenIdeaStatus(idea.status) && Boolean(idea.dueAt || idea.dueDate);
 }
 
