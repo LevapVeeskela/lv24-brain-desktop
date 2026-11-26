@@ -358,6 +358,9 @@ export class FakeIdeasSource implements IdeasSource {
     if (patch.status !== undefined) {
       next.status = patch.status;
     }
+    if (patch.status === "open" && patch.completionNote === undefined) {
+      next.completionNote = undefined;
+    }
     if (patch.completedAt !== undefined) {
       next.completedAt = patch.completedAt ?? undefined;
     } else if (patch.status === "done" && !next.completedAt) {

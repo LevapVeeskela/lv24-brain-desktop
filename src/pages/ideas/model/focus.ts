@@ -150,16 +150,23 @@ export function dueTodayCount(ideas: readonly Idea[], now: Date): number {
 }
 
 /**
- * Focus drawer opener for `?focus=`: only a loaded, known idea that is not
- * already open returns a target.
+ * Focus drawer opener for `?focus=`: only a loaded, known idea that was not
+ * already dismissed returns a target. `dismissedFocusId` stops the same param
+ * from reopening the drawer after close, before the router clears it.
  */
 export function focusDrawerTarget(input: {
   focusId: string | null;
   loaded: boolean;
   ideas: readonly Idea[];
   drawerId: string | null;
+  dismissedFocusId?: string | null;
 }): string | null {
-  if (!input.focusId || !input.loaded || input.drawerId === input.focusId) {
+  if (
+    !input.focusId ||
+    !input.loaded ||
+    input.drawerId !== null ||
+    input.dismissedFocusId === input.focusId
+  ) {
     return null;
   }
   return input.ideas.some((idea) => idea.id === input.focusId)

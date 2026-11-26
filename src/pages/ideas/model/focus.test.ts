@@ -135,6 +135,10 @@ describe("idea focus grouping", () => {
     expect(focusDrawerTarget({ ...input, loaded: false })).toBeNull();
     expect(focusDrawerTarget({ ...input, focusId: "missing" })).toBeNull();
     expect(focusDrawerTarget({ ...input, drawerId: "overdue" })).toBeNull();
+    expect(focusDrawerTarget({ ...input, drawerId: "other" })).toBeNull();
+    expect(
+      focusDrawerTarget({ ...input, dismissedFocusId: "overdue" }),
+    ).toBeNull();
     expect(focusDrawerTarget({ ...input, focusId: null })).toBeNull();
   });
 

@@ -135,7 +135,7 @@ export const IDEA_TAGS_MAX = 10;
 export const IDEA_STATUS_TRANSITIONS: Record<IdeaStatus, readonly IdeaStatus[]> = {
   open: ["doing", "done", "dropped", "someday"],
   doing: ["open", "done", "dropped", "someday"],
-  someday: ["open", "doing", "done", "dropped"],
+  someday: ["open", "done", "dropped"],
   done: ["open"],
   dropped: ["open"],
 };

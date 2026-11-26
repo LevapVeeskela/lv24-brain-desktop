@@ -25,6 +25,7 @@ import {
   draftFieldPatch,
   draftIsDirty,
   draftPatch,
+  statusChange,
   toIdeaDraft,
   type IdeaDraft,
 } from "../model/draft";
@@ -63,6 +64,7 @@ export function IdeaDrawer({
   const headingId = useId();
   const titleRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  const savesInFlight = useRef(0);
   const [draft, setDraft] = useState<IdeaDraft>(() => toIdeaDraft(idea));
   const [pendingDraft, setPendingDraft] = useState<IdeaDraft | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -70,7 +72,10 @@ export function IdeaDrawer({
   const source = ideaSourceText(idea);
 
   useEffect(() => {
-    setPendingDraft(null);
+    // Keep the pending baseline while a second save is still in flight.
+    if (savesInFlight.current === 0) {
+      setPendingDraft(null);
+    }
   }, [idea]);
 
   // The drawer is modal; open on the title and hand focus back to the row.
@@ -88,10 +93,12 @@ export function IdeaDrawer({
   };
 
   const send = (patch: IdeaUpdateInput): void => {
+    savesInFlight.current += 1;
     setPendingDraft((current) =>
       applyDraftPatch(current ?? toIdeaDraft(idea), patch),
     );
     void Promise.resolve(onSave(patch)).then((ok) => {
+      savesInFlight.current = Math.max(0, savesInFlight.current - 1);
       if (!ok) {
         setPendingDraft(null);
       }
@@ -233,15 +240,14 @@ export function IdeaDrawer({
                 id="idea-status"
                 value={draft.status}
                 onChange={(event) => {
-                  const status = event.target.value as IdeaDraft["status"];
-                  update({ status });
-                  const patch = draftFieldPatch(
-                    { ...draft, status },
+                  const change = statusChange(
+                    draft,
                     idea,
-                    "status",
+                    event.target.value as IdeaDraft["status"],
                   );
-                  if (patch) {
-                    send(patch);
+                  setDraft(change.draft);
+                  if (change.patch) {
+                    send(change.patch);
                   }
                 }}
               >

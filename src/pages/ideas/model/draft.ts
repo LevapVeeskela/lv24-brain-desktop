@@ -213,6 +213,32 @@ export function draftFieldPatch(
 }
 
 /**
+ * Applies a status-select change. Reopening a done/dropped idea clears the
+ * completion note in the same patch and in the hidden draft value.
+ */
+export function statusChange(
+  draft: IdeaDraft,
+  idea: Idea,
+  status: IdeaStatus,
+): { draft: IdeaDraft; patch: IdeaUpdateInput | null } {
+  const reopening =
+    (idea.status === "done" || idea.status === "dropped") && status === "open";
+  const nextDraft: IdeaDraft = {
+    ...draft,
+    status,
+    ...(reopening ? { completionNote: "" } : {}),
+  };
+  const base = draftFieldPatch(nextDraft, idea, "status");
+  if (!base) {
+    return { draft: nextDraft, patch: null };
+  }
+  return {
+    draft: nextDraft,
+    patch: reopening ? { ...base, completionNote: null } : base,
+  };
+}
+
+/**
  * Mirrors an accepted patch into the draft so trimming/normalization does not
  * leave the drawer looking dirty after a successful save.
  */

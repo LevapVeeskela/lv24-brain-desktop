@@ -9,6 +9,7 @@ import {
   draftsEqual,
   isDraftDirty,
   normalizeTags,
+  statusChange,
   toIdeaDraft,
 } from "./draft";
 
@@ -150,5 +151,26 @@ describe("idea drawer draft", () => {
     expect(
       draftPatch({ ...changed, completionNote: "   " }, idea),
     ).toEqual({ completionNote: null });
+  });
+
+  it("clears the completion note when a closed idea reopens", () => {
+    const idea = ideaFixture({
+      status: "done",
+      completionNote: "Done the old way",
+    });
+    const draft = toIdeaDraft(idea);
+    const change = statusChange(draft, idea, "open");
+    expect(change.draft.completionNote).toBe("");
+    expect(change.patch).toEqual({ status: "open", completionNote: null });
+
+    const pending = applyDraftPatch(draft, change.patch as NonNullable<typeof change.patch>);
+    expect(draftIsDirty(change.draft, idea, pending)).toBe(false);
+
+    const stillOpen = statusChange(
+      toIdeaDraft(ideaFixture({ status: "open" })),
+      ideaFixture({ status: "open" }),
+      "doing",
+    );
+    expect(stillOpen.patch).toEqual({ status: "doing" });
   });
 });

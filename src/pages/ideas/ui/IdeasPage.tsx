@@ -47,6 +47,7 @@ export const IdeasPage = observer(function IdeasPage({
   const [quickTitle, setQuickTitle] = useState("");
   const quickRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const dismissedFocusRef = useRef<string | null>(null);
   const focusId = params.get("focus");
   const newIdeaParam = params.get("new");
   const now = ideas.nowDate();
@@ -61,11 +62,16 @@ export const IdeasPage = observer(function IdeasPage({
   }, [ideas, projects.selectedId]);
 
   useEffect(() => {
+    if (!focusId) {
+      dismissedFocusRef.current = null;
+      return;
+    }
     const target = focusDrawerTarget({
       focusId,
       loaded: ideas.loaded,
       ideas: ideas.items,
       drawerId: ideas.drawerId,
+      dismissedFocusId: dismissedFocusRef.current,
     });
     if (target) {
       ideas.openDrawer(target);
@@ -110,6 +116,7 @@ export const IdeasPage = observer(function IdeasPage({
   }, [ideas.cursorId]);
 
   const closeDrawer = (): void => {
+    dismissedFocusRef.current = focusId;
     ideas.closeDrawer();
     if (params.has("focus")) {
       const next = new URLSearchParams(params);

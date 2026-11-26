@@ -119,6 +119,19 @@ describe("fake ideas source", () => {
     await expect(source.restore(first.id)).rejects.toThrow("not in trash");
   });
 
+  it("clears the completion note when a closed idea reopens", async () => {
+    const source = createFakeIdeasSource({ now: () => now });
+    const dropped = (await source.list({})).ideas.find(
+      (idea) => idea.status === "dropped",
+    );
+    expect(dropped?.completionNote).toBeTruthy();
+    const reopened = await source.update(dropped?.id as string, {
+      status: "open",
+    });
+    expect(reopened.status).toBe("open");
+    expect(reopened.completionNote).toBeUndefined();
+  });
+
   it("returns copies so callers cannot mutate the store", async () => {
     const source = createFakeIdeasSource({ now: () => now });
     const listed = await source.list({});

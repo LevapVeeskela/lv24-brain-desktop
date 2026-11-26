@@ -24,6 +24,16 @@ describe("idea status transitions", () => {
     expect(new Set(ideaStatusOptions("doing")).size).toBe(5);
   });
 
+  it("does not offer someday -> doing", () => {
+    expect(ideaStatusOptions("someday")).toEqual([
+      "someday",
+      "open",
+      "done",
+      "dropped",
+    ]);
+    expect(ideaStatusOptions("someday")).not.toContain("doing");
+  });
+
   it("never repeats a status", () => {
     for (const status of IDEA_STATUSES) {
       const options = ideaStatusOptions(status);
