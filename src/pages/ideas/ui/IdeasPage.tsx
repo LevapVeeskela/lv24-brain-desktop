@@ -4,12 +4,18 @@ import { useSearchParams } from "react-router-dom";
 import type { Project } from "@/entities/project/model/types";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { useI18n, type MessageKey } from "@/shared/i18n";
+import { isInsideBlockingModal } from "@/shared/lib/shortcuts";
 import { Button } from "@/shared/ui/Button";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { Select } from "@/shared/ui/Select";
 import type { IdeaScope, IdeasStore, IdeasView } from "../model/IdeasStore";
+import {
+  focusDrawerTarget,
+  isNewIdeaRequest,
+  shouldClearFocusParam,
+} from "../model/focus";
 import { isTypingTarget, resolveIdeasShortcut } from "../model/keyboard";
 import { IdeaDrawer, type IdeaProjectOption } from "./IdeaDrawer";
 import { IdeaRow } from "./IdeaRow";
@@ -42,6 +48,7 @@ export const IdeasPage = observer(function IdeasPage({
   const quickRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const focusId = params.get("focus");
+  const newIdeaParam = params.get("new");
   const now = ideas.nowDate();
 
   useEffect(() => {
@@ -54,25 +61,53 @@ export const IdeasPage = observer(function IdeasPage({
   }, [ideas, projects.selectedId]);
 
   useEffect(() => {
-    if (!focusId || !ideas.loaded || ideas.drawerId === focusId) {
-      return;
+    const target = focusDrawerTarget({
+      focusId,
+      loaded: ideas.loaded,
+      ideas: ideas.items,
+      drawerId: ideas.drawerId,
+    });
+    if (target) {
+      ideas.openDrawer(target);
     }
-    if (ideas.items.some((idea) => idea.id === focusId)) {
-      ideas.openDrawer(focusId);
-    }
-  }, [focusId, ideas, ideas.loaded, ideas.items]);
+  }, [focusId, ideas, ideas.loaded, ideas.items, ideas.drawerId]);
 
   useEffect(() => {
-    if (!focusId || !ideas.loaded) {
-      return;
-    }
-    if (ideas.items.some((idea) => idea.id === focusId)) {
+    if (
+      !shouldClearFocusParam({
+        focusId,
+        loaded: ideas.loaded,
+        ideas: ideas.items,
+      })
+    ) {
       return;
     }
     const next = new URLSearchParams(params);
     next.delete("focus");
     setParams(next, { replace: true });
   }, [focusId, ideas.loaded, ideas.items, params, setParams]);
+
+  useEffect(() => {
+    if (!isNewIdeaRequest(newIdeaParam)) {
+      return;
+    }
+    const next = new URLSearchParams(params);
+    next.delete("new");
+    setParams(next, { replace: true });
+    if (!focusId) {
+      quickRef.current?.focus();
+    }
+  }, [focusId, newIdeaParam, params, setParams]);
+
+  useEffect(() => {
+    const id = ideas.cursorId;
+    if (!id) {
+      return;
+    }
+    document
+      .querySelector<HTMLElement>(`[data-idea-id="${id}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [ideas.cursorId]);
 
   const closeDrawer = (): void => {
     ideas.closeDrawer();
@@ -93,6 +128,7 @@ export const IdeasPage = observer(function IdeasPage({
         repeat: event.repeat,
         typing: isTypingTarget(event.target),
         drawerOpen: ideas.drawerOpen,
+        modalOpen: isInsideBlockingModal(event.target),
       });
       if (!command) {
         return;
@@ -409,12 +445,10 @@ export const IdeasPage = observer(function IdeasPage({
             />
           ) : (
             <EmptyState
-              title={t("ideas.empty")}
-              hint={t("ideas.emptyHint")}
-              action={
-                <Button variant="link" onClick={() => quickRef.current?.focus()}>
-                  {t("ideas.quickAddLabel")}
-                </Button>
+              title={
+                ideas.scope === "project"
+                  ? t("ideas.emptyProject")
+                  : t("ideas.empty")
               }
             />
           )

@@ -14,7 +14,6 @@ import {
   filterIdeas,
   groupIdeas,
   openIdeaCount,
-  overdueCount,
   sortIdeas,
   todayPreview,
   type IdeaGroup,
@@ -54,22 +53,46 @@ export class IdeasStore {
   actionError: string | null = null;
   lastTrashed: Idea | null = null;
   lastCompleted: Idea | null = null;
+  /** Observable clock snapshot; computeds refresh when this changes. */
+  nowAt = 0;
 
   private readonly source: IdeasSource;
   private readonly clock: () => Date;
   private listToken = 0;
   private inFlight: Promise<void> | null = null;
   private saveChain: Promise<unknown> = Promise.resolve();
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(source: IdeasSource, options: IdeasStoreOptions = {}) {
     this.source = source;
     this.clock = options.now ?? (() => new Date());
+    this.nowAt = this.clock().getTime();
     makeAutoObservable(this, {}, { autoBind: true });
   }
 
   /** Current clock value for row formatting; not a cached MobX computed. */
   nowDate(): Date {
-    return this.clock();
+    return new Date(this.nowAt);
+  }
+
+  /** Re-reads the clock so day-based computeds invalidate around midnight. */
+  refreshNow(): void {
+    this.nowAt = this.clock().getTime();
+  }
+
+  /** Minute tick while the app shell is alive; `dispose` clears it. */
+  startClock(intervalMs = 60_000): void {
+    if (this.clockTimer !== null) {
+      return;
+    }
+    this.clockTimer = setInterval(() => this.refreshNow(), intervalMs);
+  }
+
+  dispose(): void {
+    if (this.clockTimer !== null) {
+      clearInterval(this.clockTimer);
+      this.clockTimer = null;
+    }
   }
 
   /** Global count for the rail badge; ignores the page scope. */
@@ -78,11 +101,7 @@ export class IdeasStore {
   }
 
   get dueTodayCount(): number {
-    return dueTodayCount(this.items, this.clock());
-  }
-
-  get overdueCount(): number {
-    return overdueCount(this.items, this.clock());
+    return dueTodayCount(this.items, new Date(this.nowAt));
   }
 
   get scoped(): Idea[] {
@@ -95,7 +114,7 @@ export class IdeasStore {
 
   /** Focus groups, always including Done; the page owns the collapse state. */
   get groups(): IdeaGroup[] {
-    return groupIdeas(this.scoped, this.clock());
+    return groupIdeas(this.scoped, new Date(this.nowAt));
   }
 
   /** True when the Done group must be expanded without another click. */
@@ -120,7 +139,7 @@ export class IdeasStore {
   }
 
   get todayPreview(): Idea[] {
-    return todayPreview(this.items, this.clock(), 3);
+    return todayPreview(this.items, new Date(this.nowAt), 3);
   }
 
   load(options: { force?: boolean } = {}): Promise<void> {
@@ -149,6 +168,7 @@ export class IdeasStore {
     }
     this.view = view;
     this.cursorId = null;
+    this.refreshNow();
   }
 
   setScope(scope: IdeaScope): void {
@@ -158,6 +178,7 @@ export class IdeasStore {
     }
     this.scope = next;
     this.cursorId = null;
+    this.refreshNow();
   }
 
   setProject(projectId: string | null): void {
@@ -169,6 +190,7 @@ export class IdeasStore {
       this.scope = "all";
     }
     this.cursorId = null;
+    this.refreshNow();
   }
 
   setQuery(query: string): void {
@@ -177,10 +199,22 @@ export class IdeasStore {
     }
     this.query = query;
     this.cursorId = null;
+    this.refreshNow();
   }
 
   setShowDone(showDone: boolean): void {
     this.showDone = showDone;
+    if (
+      !showDone &&
+      !this.query.trim() &&
+      this.cursorId &&
+      this.items.some(
+        (idea) => idea.id === this.cursorId && isClosedIdeaStatus(idea.status),
+      )
+    ) {
+      this.cursorId = null;
+    }
+    this.refreshNow();
   }
 
   setCursor(ideaId: string | null): void {
@@ -219,6 +253,7 @@ export class IdeasStore {
     if (!value || this.quickAddBusy) {
       return false;
     }
+    this.refreshNow();
     runInAction(() => {
       this.quickAddBusy = true;
       this.quickAddError = null;
@@ -256,13 +291,14 @@ export class IdeasStore {
     if (this.action) {
       return false;
     }
+    this.refreshNow();
     const current = this.items.find((idea) => idea.id === ideaId);
     if (!current) {
       return false;
     }
     const closing = !isClosedIdeaStatus(current.status);
     const previous: Idea = { ...current, tags: [...current.tags] };
-    const stamp = this.clock().toISOString();
+    const stamp = new Date(this.nowAt).toISOString();
     const optimistic: Idea = closing
       ? { ...current, status: "done", completedAt: stamp, updatedAt: stamp }
       : {
@@ -316,7 +352,8 @@ export class IdeasStore {
     if (!previous || this.action) {
       return false;
     }
-    const stamp = this.clock().toISOString();
+    this.refreshNow();
+    const stamp = new Date(this.nowAt).toISOString();
     runInAction(() => {
       this.action = "reopen";
       this.actionId = previous.id;
@@ -370,6 +407,7 @@ export class IdeasStore {
     ideaId: string,
     patch: IdeaUpdateInput,
   ): Promise<boolean> {
+    this.refreshNow();
     runInAction(() => {
       this.action = "save";
       this.actionId = ideaId;
@@ -399,6 +437,7 @@ export class IdeasStore {
     if (this.action) {
       return false;
     }
+    this.refreshNow();
     const previous = this.items;
     const current = this.items.find((idea) => idea.id === ideaId);
     if (!current) {
@@ -445,6 +484,7 @@ export class IdeasStore {
     if (!trashed || this.action) {
       return false;
     }
+    this.refreshNow();
     runInAction(() => {
       this.action = "restore";
       this.actionId = trashed.id;
@@ -476,10 +516,6 @@ export class IdeasStore {
     this.quickAddError = null;
   }
 
-  toggleDoneCursor(): Promise<boolean> {
-    return this.cursorId ? this.toggleDone(this.cursorId) : Promise.resolve(false);
-  }
-
   private replace(idea: Idea): void {
     let found = false;
     this.items = this.items.map((item) => {
@@ -497,6 +533,7 @@ export class IdeasStore {
   private async performLoad(): Promise<void> {
     const token = ++this.listToken;
     runInAction(() => {
+      this.nowAt = this.clock().getTime();
       this.loading = true;
       this.error = null;
     });

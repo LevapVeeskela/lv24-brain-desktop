@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ideaFixture } from "@/test/fixtures";
 import { createFakeIdeasSource } from "../api/fakeIdeas";
 import { IdeasStore } from "./IdeasStore";
 
@@ -26,7 +27,6 @@ describe("IdeasStore", () => {
     expect(ideas.problems).toHaveLength(1);
     expect(ideas.openCount).toBe(5);
     expect(ideas.dueTodayCount).toBe(2);
-    expect(ideas.overdueCount).toBe(1);
     expect(ideas.error).toBeNull();
 
     await ideas.load();
@@ -171,6 +171,41 @@ describe("IdeasStore", () => {
     ideas.setCursor(null);
     ideas.moveCursor(-1);
     expect(ideas.cursorId).toBe(ideas.visible.at(-1)?.id);
+  });
+
+  it("clears the cursor when the Done group collapses", async () => {
+    const { ideas } = makeStore();
+    await ideas.load();
+    const done = ideas.items.find((idea) => idea.status === "done");
+    ideas.setShowDone(true);
+    ideas.setCursor((done as { id: string }).id);
+    expect(ideas.cursorId).toBe(done?.id);
+    ideas.setShowDone(false);
+    expect(ideas.cursorId).toBeNull();
+  });
+
+  it("refreshes day-based computeds when the clock moves past midnight", async () => {
+    let current = new Date(2026, 10, 27, 23, 59, 0, 0);
+    const items = [
+      ideaFixture({ id: "today", dueDate: "2026-11-27" }),
+      ideaFixture({ id: "tomorrow", dueDate: "2026-11-28" }),
+    ];
+    const ideas = new IdeasStore(
+      createFakeIdeasSource({ now: () => current, ideas: items }),
+      { now: () => current },
+    );
+    await ideas.load();
+    let keys = ideas.groups.map((group) => group.key);
+    expect(keys).toContain("today");
+    expect(keys).toContain("week");
+
+    current = new Date(2026, 10, 28, 0, 1, 0, 0);
+    ideas.refreshNow();
+    const byKey = Object.fromEntries(
+      ideas.groups.map((group) => [group.key, group.ideas.map((idea) => idea.id)]),
+    );
+    expect(byKey.overdue).toEqual(["today"]);
+    expect(byKey.today).toEqual(["tomorrow"]);
   });
 
   it("opens and closes the drawer only for known ideas", async () => {

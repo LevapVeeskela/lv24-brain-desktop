@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isInsideBlockingModal } from "@/shared/lib/shortcuts";
 import { isTypingTarget, resolveIdeasShortcut } from "./keyboard";
 
 describe("ideas keyboard shortcuts", () => {
@@ -23,9 +24,16 @@ describe("ideas keyboard shortcuts", () => {
   it("stands down while the drawer is open or a modifier is held", () => {
     expect(resolveIdeasShortcut({ key: "x", drawerOpen: true })).toBeNull();
     expect(resolveIdeasShortcut({ key: "n", drawerOpen: true })).toBeNull();
+    expect(resolveIdeasShortcut({ key: "Escape", drawerOpen: true })).toBeNull();
     expect(resolveIdeasShortcut({ key: "x", ctrlKey: true })).toBeNull();
     expect(resolveIdeasShortcut({ key: "j", metaKey: true })).toBeNull();
     expect(resolveIdeasShortcut({ key: "k", altKey: true })).toBeNull();
+  });
+
+  it("stands down while a dialog or the command palette owns the keyboard", () => {
+    for (const key of ["n", "/", "x", "e", "Delete", "Escape"]) {
+      expect(resolveIdeasShortcut({ key, modalOpen: true })).toBeNull();
+    }
   });
 
   it("drops repeated action keys but keeps repeatable movement", () => {
@@ -42,5 +50,18 @@ describe("ideas keyboard shortcuts", () => {
     expect(isTypingTarget({ tagName: "DIV", isContentEditable: true })).toBe(true);
     expect(isTypingTarget({ tagName: "DIV" })).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+
+  it("detects a dialog, palette or aria-modal ancestor", () => {
+    const inside = {
+      tagName: "INPUT",
+      closest: (selector: string) => (selector.includes("dialog") ? {} : null),
+    };
+    expect(isInsideBlockingModal(inside)).toBe(true);
+    expect(
+      isInsideBlockingModal({ tagName: "DIV", closest: () => null }),
+    ).toBe(false);
+    expect(isInsideBlockingModal({ tagName: "DIV" })).toBe(false);
+    expect(isInsideBlockingModal(null)).toBe(false);
   });
 });

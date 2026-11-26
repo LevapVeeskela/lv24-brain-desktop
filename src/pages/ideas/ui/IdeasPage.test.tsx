@@ -93,7 +93,15 @@ describe("IdeasPage", () => {
     ideas.items = [];
     const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
     expect(html).toContain("Ideas captured in chat appear here.");
-    expect(html).toContain("Press n to capture one");
+    expect(html).not.toContain("Press n");
+  });
+
+  it("uses the project-specific empty copy in project scope", () => {
+    const { ideas, projects } = stores();
+    ideas.setProject("lv24");
+    ideas.setScope("project");
+    const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
+    expect(html).toContain("No ideas in this project.");
   });
 
   it("shows loading, load errors and problem rows", () => {
@@ -134,22 +142,20 @@ describe("IdeasPage", () => {
     expect(html).toContain("Search ideas…");
   });
 
-  it("opens the drawer for the focused idea with editable fields", () => {
+  it("renders the drawer for an open idea with editable fields", () => {
     const { ideas, projects } = stores();
     const target = ideas.items[1];
     ideas.drawerId = target.id;
-    const html = renderPage(
-      <IdeasPage ideas={ideas} projects={projects} />,
-      "en",
-      ["/ideas?focus=missing"],
-    );
+    const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
     expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-modal="true"');
     expect(html).toContain("Idea details");
     expect(html).toContain('id="idea-title"');
     expect(html).toContain("Тёмная тема для календаря");
     expect(html).toContain('id="idea-project"');
     expect(html).toContain("All changes saved.");
     expect(html).toContain(">Delete</button>");
+    expect(html).toContain(`data-idea-id="${target.id}"`);
   });
 
   it("translates the headings and groups", () => {

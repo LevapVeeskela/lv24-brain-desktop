@@ -17,6 +17,7 @@ import {
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { formatDateTime } from "@/shared/lib/format";
+import { isTypingTarget } from "@/shared/lib/shortcuts";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
 import { Card } from "@/shared/ui/Card";
@@ -76,7 +77,6 @@ interface ShortcutTargetLike {
   closest?: (selector: string) => unknown;
 }
 
-const TYPING_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 // A/D change stored memory; a click may leave focus on one of these controls.
 const ACTION_TAGS = new Set(["BUTTON", "INPUT", "TEXTAREA", "SELECT", "A"]);
 const ACTION_BLOCKING_SELECTOR = [
@@ -99,17 +99,7 @@ function asShortcutTarget(target: unknown): ShortcutTargetLike | null {
     : null;
 }
 
-/** Typing targets keep their keystrokes; no global shortcut should steal them. */
-export function isTypingTarget(target: unknown): boolean {
-  const element = asShortcutTarget(target);
-  if (!element) {
-    return false;
-  }
-  return (
-    TYPING_TAGS.has(element.tagName?.toUpperCase() ?? "") ||
-    Boolean(element.isContentEditable)
-  );
-}
+export { isTypingTarget };
 
 /**
  * A/D promote or dismiss the selected proposal, so a held key or a focused

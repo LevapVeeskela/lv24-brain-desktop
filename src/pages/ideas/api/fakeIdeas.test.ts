@@ -122,10 +122,15 @@ describe("fake ideas source", () => {
   it("returns copies so callers cannot mutate the store", async () => {
     const source = createFakeIdeasSource({ now: () => now });
     const listed = await source.list({});
+    const session = listed.ideas.find((idea) => idea.source?.id);
+    session!.source!.id = "mutated";
     listed.ideas[0].title = "changed";
     listed.ideas[0].tags.push("x");
-    const again = (await source.list({})).ideas[0];
-    expect(again.title).not.toBe("changed");
-    expect(again.tags).not.toContain("x");
+    const again = (await source.list({})).ideas;
+    expect(again[0].title).not.toBe("changed");
+    expect(again[0].tags).not.toContain("x");
+    expect(again.find((idea) => idea.id === session?.id)?.source?.id).not.toBe(
+      "mutated",
+    );
   });
 });

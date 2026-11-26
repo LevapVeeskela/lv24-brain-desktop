@@ -67,6 +67,21 @@ describe("IdeaDrawer", () => {
     expect(html).toContain("write failed");
   });
 
+  it("offers only valid status transitions and the completion note", () => {
+    const done = renderDrawer(6);
+    expect(done).toContain('id="idea-completion-note"');
+    expect(done).toContain(">Open</option>");
+    expect(done).not.toContain(">Someday</option>");
+    expect(done).not.toContain(">Doing</option>");
+
+    const dropped = renderDrawer(7);
+    expect(dropped).toContain(
+      "Не нужно: уже есть свои токены и классы.",
+    );
+    expect(dropped).toContain(">Open</option>");
+    expect(dropped).not.toContain(">Done</option>");
+  });
+
   it("uses the transport-safe title limit and tag hint", () => {
     const html = renderDrawer(1);
     expect(html).toContain('maxLength="200"');

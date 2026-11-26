@@ -2427,6 +2427,12 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 
 .idea-row.is-done {
   opacity: .85;
+  animation: idea-done var(--motion-fast) ease-out;
+}
+
+@keyframes idea-done {
+  from { opacity: .4; }
+  to { opacity: .85; }
 }
 
 .idea-row.is-done .idea-title {
@@ -2638,6 +2644,9 @@ h1, h2, h3, h4, p { overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) {
   .idea-row {
     transition: none;
+  }
+  .idea-row.is-done {
+    animation: none;
   }
 }
 

@@ -1,13 +1,18 @@
-import { useEffect, useId, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   IDEA_PRIORITIES,
-  IDEA_STATUSES,
   IDEA_TAGS_MAX,
   IDEA_TITLE_MAX,
+  ideaStatusOptions,
   type Idea,
   type IdeaUpdateInput,
 } from "@/entities/ideas/model/types";
 import { useI18n } from "@/shared/i18n";
+import {
+  FOCUSABLE_SELECTOR,
+  restoreFocusIfConnected,
+  wrappedFocusableIndex,
+} from "@/shared/lib/focus";
 import { formatDateTime } from "@/shared/lib/format";
 import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
@@ -18,8 +23,8 @@ import { Select } from "@/shared/ui/Select";
 import {
   applyDraftPatch,
   draftFieldPatch,
+  draftIsDirty,
   draftPatch,
-  isDraftDirty,
   toIdeaDraft,
   type IdeaDraft,
 } from "../model/draft";
@@ -56,13 +61,41 @@ export function IdeaDrawer({
 }: IdeaDrawerProps) {
   const { t, locale } = useI18n();
   const headingId = useId();
+  const titleRef = useRef<HTMLInputElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
   const [draft, setDraft] = useState<IdeaDraft>(() => toIdeaDraft(idea));
+  const [pendingDraft, setPendingDraft] = useState<IdeaDraft | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
-  const dirty = isDraftDirty(draft, idea);
+  const dirty = draftIsDirty(draft, idea, pendingDraft);
   const source = ideaSourceText(idea);
+
+  useEffect(() => {
+    setPendingDraft(null);
+  }, [idea]);
+
+  // The drawer is modal; open on the title and hand focus back to the row.
+  useEffect(() => {
+    const target =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    titleRef.current?.focus();
+    return () => restoreFocusIfConnected(target);
+  }, []);
 
   const update = (patch: Partial<IdeaDraft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
+  };
+
+  const send = (patch: IdeaUpdateInput): void => {
+    setPendingDraft((current) =>
+      applyDraftPatch(current ?? toIdeaDraft(idea), patch),
+    );
+    void Promise.resolve(onSave(patch)).then((ok) => {
+      if (!ok) {
+        setPendingDraft(null);
+      }
+    });
   };
 
   const commit = (field: keyof IdeaDraft): void => {
@@ -77,7 +110,7 @@ export function IdeaDrawer({
       return;
     }
     setDraft((current) => applyDraftPatch(current, patch));
-    void onSave(patch);
+    send(patch);
   };
 
   const commitAll = (): void => {
@@ -96,7 +129,7 @@ export function IdeaDrawer({
       }
       return next;
     });
-    void onSave(patch);
+    send(patch);
   };
 
   const requestClose = (): void => {
@@ -115,25 +148,43 @@ export function IdeaDrawer({
       }
     };
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") {
-        return;
-      }
+  const onDrawerKeyDown = (event: ReactKeyboardEvent<HTMLElement>): void => {
+    if (event.key === "Escape") {
       event.preventDefault();
+      // The page also listens for Escape; one press must close one layer.
+      event.stopPropagation();
       if (discardOpen) {
         setDiscardOpen(false);
         return;
       }
-      if (isDraftDirty(draft, idea)) {
+      if (dirty) {
         setDiscardOpen(true);
         return;
       }
       onClose();
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [discardOpen, draft, idea, onClose]);
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    const container = drawerRef.current;
+    if (!container) {
+      return;
+    }
+    const focusable = [
+      ...container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ];
+    const current = focusable.indexOf(document.activeElement as HTMLElement);
+    const next = wrappedFocusableIndex(
+      focusable.length,
+      current,
+      event.shiftKey,
+    );
+    if (next !== null) {
+      event.preventDefault();
+      focusable[next]?.focus();
+    }
+  };
 
   return (
     <>
@@ -143,10 +194,12 @@ export function IdeaDrawer({
         onClick={requestClose}
       />
       <aside
+        ref={drawerRef}
         className="idea-drawer"
         role="dialog"
-        aria-modal="false"
+        aria-modal="true"
         aria-labelledby={headingId}
+        onKeyDown={onDrawerKeyDown}
       >
         <div className="idea-drawer-header">
           <div>
@@ -162,8 +215,10 @@ export function IdeaDrawer({
 
         <div className="idea-drawer-body">
           <Field id="idea-title" label={t("ideas.titleLabel")}>
-            <Input
+            <input
               id="idea-title"
+              ref={titleRef}
+              className="input"
               maxLength={IDEA_TITLE_MAX}
               value={draft.title}
               onChange={(event) => update({ title: event.target.value })}
@@ -186,11 +241,11 @@ export function IdeaDrawer({
                     "status",
                   );
                   if (patch) {
-                    void onSave(patch);
+                    send(patch);
                   }
                 }}
               >
-                {IDEA_STATUSES.map((status) => (
+                {ideaStatusOptions(draft.status).map((status) => (
                   <option key={status} value={status}>
                     {t(IDEA_STATUS_LABEL_KEYS[status])}
                   </option>
@@ -210,7 +265,7 @@ export function IdeaDrawer({
                     "priority",
                   );
                   if (patch) {
-                    void onSave(patch);
+                    send(patch);
                   }
                 }}
               >
@@ -309,6 +364,26 @@ export function IdeaDrawer({
               onBlur={() => commit("body")}
             />
           </Field>
+
+          {draft.status === "done" || draft.status === "dropped" ? (
+            <Field
+              id="idea-completion-note"
+              label={t("ideas.completionNote")}
+              hint={t("ideas.completionNoteHint")}
+            >
+              <textarea
+                id="idea-completion-note"
+                className="input idea-body-input"
+                aria-describedby="idea-completion-note-hint"
+                rows={2}
+                value={draft.completionNote}
+                onChange={(event) =>
+                  update({ completionNote: event.target.value })
+                }
+                onBlur={() => commit("completionNote")}
+              />
+            </Field>
+          ) : null}
 
           <dl className="details idea-meta">
             <dt>{t("ideas.sourceLabel")}</dt>

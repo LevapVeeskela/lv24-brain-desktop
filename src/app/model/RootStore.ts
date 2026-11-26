@@ -62,6 +62,7 @@ export class RootStore {
     this.runs.start();
     void this.projects.load();
     void this.ideas.load();
+    this.ideas.startClock();
     this.stopSelection = reaction(
       () => ({
         projectId: this.projects.selectedId,
@@ -81,6 +82,7 @@ export class RootStore {
   dispose(): void {
     this.stopSelection?.();
     this.stopSelection = null;
+    this.ideas.dispose();
     this.commandSearch.dispose();
     this.search.dispose();
     this.settings.dispose();

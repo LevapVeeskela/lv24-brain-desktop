@@ -3,10 +3,12 @@ import { ideaFixture } from "@/test/fixtures";
 import {
   dueTodayCount,
   filterIdeas,
+  focusDrawerTarget,
   groupIdeas,
+  isNewIdeaRequest,
   matchesIdeaQuery,
   openIdeaCount,
-  overdueCount,
+  shouldClearFocusParam,
   sortIdeas,
   todayPreview,
 } from "./focus";
@@ -104,10 +106,9 @@ describe("idea focus grouping", () => {
     expect(all).toHaveLength(1);
   });
 
-  it("counts open, due-today and overdue ideas globally", () => {
+  it("counts open and due-today ideas globally", () => {
     expect(openIdeaCount(ideas)).toBe(5);
     expect(dueTodayCount(ideas, now)).toBe(1);
-    expect(overdueCount(ideas, now)).toBe(1);
   });
 
   it("previews at most three overdue and today ideas for the dashboard", () => {
@@ -121,5 +122,41 @@ describe("idea focus grouping", () => {
     expect(preview).toHaveLength(3);
     expect(preview[0].id).toBe("overdue-2");
     expect(preview.every((idea) => idea.status === "open")).toBe(true);
+  });
+
+  it("resolves the ?focus drawer target only for a loaded, known idea", () => {
+    const input = {
+      focusId: "overdue",
+      loaded: true,
+      ideas,
+      drawerId: null,
+    };
+    expect(focusDrawerTarget(input)).toBe("overdue");
+    expect(focusDrawerTarget({ ...input, loaded: false })).toBeNull();
+    expect(focusDrawerTarget({ ...input, focusId: "missing" })).toBeNull();
+    expect(focusDrawerTarget({ ...input, drawerId: "overdue" })).toBeNull();
+    expect(focusDrawerTarget({ ...input, focusId: null })).toBeNull();
+  });
+
+  it("drops a stale ?focus param after loading", () => {
+    expect(
+      shouldClearFocusParam({ focusId: "missing", loaded: true, ideas }),
+    ).toBe(true);
+    expect(
+      shouldClearFocusParam({ focusId: "overdue", loaded: true, ideas }),
+    ).toBe(false);
+    expect(
+      shouldClearFocusParam({ focusId: "missing", loaded: false, ideas }),
+    ).toBe(false);
+    expect(shouldClearFocusParam({ focusId: null, loaded: true, ideas })).toBe(
+      false,
+    );
+  });
+
+  it("recognizes the tray capture parameter", () => {
+    expect(isNewIdeaRequest("1")).toBe(true);
+    expect(isNewIdeaRequest("true")).toBe(true);
+    expect(isNewIdeaRequest(null)).toBe(false);
+    expect(isNewIdeaRequest("0")).toBe(false);
   });
 });

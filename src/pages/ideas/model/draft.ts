@@ -19,6 +19,7 @@ export interface IdeaDraft {
   reminder: string;
   tags: string;
   body: string;
+  completionNote: string;
 }
 
 export function toIdeaDraft(idea: Idea): IdeaDraft {
@@ -35,6 +36,7 @@ export function toIdeaDraft(idea: Idea): IdeaDraft {
       : "",
     tags: idea.tags.join(", "),
     body: idea.body,
+    completionNote: idea.completionNote ?? "",
   };
 }
 
@@ -71,11 +73,43 @@ export function dirtyFields(draft: IdeaDraft, idea: Idea): string[] {
   }
   if (draft.tags !== idea.tags.join(", ")) changed.push("tags");
   if (draft.body !== idea.body) changed.push("body");
+  if (draft.completionNote !== (idea.completionNote ?? "")) {
+    changed.push("completionNote");
+  }
   return changed;
 }
 
 export function isDraftDirty(draft: IdeaDraft, idea: Idea): boolean {
   return dirtyFields(draft, idea).length > 0;
+}
+
+export function draftsEqual(left: IdeaDraft, right: IdeaDraft): boolean {
+  return (
+    left.title === right.title &&
+    left.status === right.status &&
+    left.projectId === right.projectId &&
+    left.priority === right.priority &&
+    left.dueDate === right.dueDate &&
+    left.dueTime === right.dueTime &&
+    left.reminder === right.reminder &&
+    left.tags === right.tags &&
+    left.body === right.body &&
+    left.completionNote === right.completionNote
+  );
+}
+
+/**
+ * Dirty guard that treats a save still in flight as already part of the
+ * baseline, so closing the drawer during a blur PATCH does not warn.
+ */
+export function draftIsDirty(
+  draft: IdeaDraft,
+  idea: Idea,
+  pendingDraft?: IdeaDraft | null,
+): boolean {
+  return pendingDraft
+    ? !draftsEqual(draft, pendingDraft)
+    : isDraftDirty(draft, idea);
 }
 
 /**
@@ -131,6 +165,9 @@ export function draftPatch(draft: IdeaDraft, idea: Idea): IdeaUpdateInput | null
   if (changed.has("body")) {
     patch.body = draft.body;
   }
+  if (changed.has("completionNote")) {
+    patch.completionNote = draft.completionNote.trim() || null;
+  }
   return Object.keys(patch).length > 0 ? patch : null;
 }
 
@@ -168,6 +205,10 @@ export function draftFieldPatch(
       return full.tags !== undefined ? { tags: full.tags } : null;
     case "body":
       return full.body !== undefined ? { body: full.body } : null;
+    case "completionNote":
+      return full.completionNote !== undefined
+        ? { completionNote: full.completionNote }
+        : null;
   }
 }
 
@@ -210,6 +251,9 @@ export function applyDraftPatch(
   }
   if (patch.body !== undefined) {
     next.body = patch.body;
+  }
+  if (patch.completionNote !== undefined) {
+    next.completionNote = patch.completionNote ?? "";
   }
   return next;
 }

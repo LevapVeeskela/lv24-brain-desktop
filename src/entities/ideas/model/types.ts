@@ -130,3 +130,20 @@ export interface IdeasSource {
 
 export const IDEA_TITLE_MAX = 200;
 export const IDEA_TAGS_MAX = 10;
+
+/** Allowed status moves; `done`/`dropped` reopen to `open` first. */
+export const IDEA_STATUS_TRANSITIONS: Record<IdeaStatus, readonly IdeaStatus[]> = {
+  open: ["doing", "done", "dropped", "someday"],
+  doing: ["open", "done", "dropped", "someday"],
+  someday: ["open", "doing", "done", "dropped"],
+  done: ["open"],
+  dropped: ["open"],
+};
+
+/** Select options: the current status stays first and selectable. */
+export function ideaStatusOptions(current: IdeaStatus): IdeaStatus[] {
+  return [
+    current,
+    ...IDEA_STATUS_TRANSITIONS[current].filter((status) => status !== current),
+  ];
+}

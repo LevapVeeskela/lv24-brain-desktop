@@ -32,17 +32,19 @@ export function IdeaRow({
 }: IdeaRowProps) {
   const { t } = useI18n();
   const closed = isClosedIdeaStatus(idea.status);
-  const chip = dueChip(idea, now, locale);
-  const lead = idea.remindBeforeMinutes
-    ? formatLeadParts(idea.remindBeforeMinutes)
-    : null;
+  // Reminders are cancelled once an idea is closed; no amber overdue chip.
+  const chip = closed ? null : dueChip(idea, now, locale);
+  const lead =
+    !closed && idea.remindBeforeMinutes
+      ? formatLeadParts(idea.remindBeforeMinutes)
+      : null;
   const fullDue = formatIdeaDue(idea, locale);
   const classes = ["idea-row"];
   if (closed) classes.push("is-done");
   if (cursor) classes.push("is-cursor");
 
   return (
-    <li className={classes.join(" ")}>
+    <li className={classes.join(" ")} data-idea-id={idea.id}>
       <input
         type="checkbox"
         className="idea-check"

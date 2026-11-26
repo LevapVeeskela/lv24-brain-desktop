@@ -1,3 +1,5 @@
+export { isTypingTarget } from "@/shared/lib/shortcuts";
+
 export type IdeasCommand =
   | "capture"
   | "search"
@@ -17,14 +19,17 @@ export interface IdeasKeyInput {
   typing?: boolean;
   /** A drawer or dialog owns the keyboard; the page stays passive. */
   drawerOpen?: boolean;
+  /** A native dialog, the command palette or another modal has focus. */
+  modalOpen?: boolean;
 }
 
 /**
- * Maps a keydown to one page command. Text fields keep their own keys, and the
- * drawer traps Escape itself, so the page never steals typed input.
+ * Maps a keydown to one page command. Text fields keep their own keys, modals
+ * own every key, and the drawer handles its own Escape, so the page never
+ * steals typed input or acts behind a dialog.
  */
 export function resolveIdeasShortcut(input: IdeasKeyInput): IdeasCommand | null {
-  if (input.drawerOpen) {
+  if (input.drawerOpen || input.modalOpen) {
     return null;
   }
   if (input.ctrlKey || input.metaKey || input.altKey) {
@@ -56,18 +61,4 @@ export function resolveIdeasShortcut(input: IdeasKeyInput): IdeasCommand | null 
     default:
       return null;
   }
-}
-
-/** True when the event target accepts text; mirrors the inbox helper. */
-export function isTypingTarget(target: unknown): boolean {
-  if (!target || typeof target !== "object") {
-    return false;
-  }
-  const tag = (target as { tagName?: string }).tagName?.toUpperCase();
-  return (
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    tag === "SELECT" ||
-    (target as { isContentEditable?: boolean }).isContentEditable === true
-  );
 }

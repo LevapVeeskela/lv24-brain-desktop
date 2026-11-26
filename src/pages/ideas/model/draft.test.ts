@@ -4,7 +4,9 @@ import {
   applyDraftPatch,
   dirtyFields,
   draftFieldPatch,
+  draftIsDirty,
   draftPatch,
+  draftsEqual,
   isDraftDirty,
   normalizeTags,
   toIdeaDraft,
@@ -125,5 +127,28 @@ describe("idea drawer draft", () => {
       dueAt: undefined,
     };
     expect(isDraftDirty(applied, saved)).toBe(false);
+  });
+
+  it("does not report dirty while the blur save is still in flight", () => {
+    const idea = ideaFixture({ title: "Old" });
+    const baseline = toIdeaDraft(idea);
+    const draft = { ...baseline, title: "New" };
+    const pending = applyDraftPatch(baseline, { title: "New" });
+    expect(draftIsDirty(draft, idea)).toBe(true);
+    expect(draftIsDirty(draft, idea, pending)).toBe(false);
+    expect(draftsEqual(draft, pending)).toBe(true);
+    expect(draftIsDirty({ ...draft, body: "more" }, idea, pending)).toBe(true);
+  });
+
+  it("tracks the completion note for closed ideas", () => {
+    const idea = ideaFixture({ status: "dropped", completionNote: "Not now" });
+    const draft = toIdeaDraft(idea);
+    expect(draft.completionNote).toBe("Not now");
+    expect(dirtyFields(draft, idea)).toEqual([]);
+    const changed = { ...draft, completionNote: "  Reason  " };
+    expect(draftPatch(changed, idea)).toEqual({ completionNote: "Reason" });
+    expect(
+      draftPatch({ ...changed, completionNote: "   " }, idea),
+    ).toEqual({ completionNote: null });
   });
 });

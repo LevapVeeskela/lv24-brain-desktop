@@ -149,14 +149,39 @@ export function dueTodayCount(ideas: readonly Idea[], now: Date): number {
   }).length;
 }
 
-export function overdueCount(ideas: readonly Idea[], now: Date): number {
-  return ideas.filter((idea) => {
-    if (!isOpenIdeaStatus(idea.status)) {
-      return false;
-    }
-    const dueDay = ideaDueDay(idea);
-    return dueDay ? dayDifference(dueDay, now) < 0 : false;
-  }).length;
+/**
+ * Focus drawer opener for `?focus=`: only a loaded, known idea that is not
+ * already open returns a target.
+ */
+export function focusDrawerTarget(input: {
+  focusId: string | null;
+  loaded: boolean;
+  ideas: readonly Idea[];
+  drawerId: string | null;
+}): string | null {
+  if (!input.focusId || !input.loaded || input.drawerId === input.focusId) {
+    return null;
+  }
+  return input.ideas.some((idea) => idea.id === input.focusId)
+    ? input.focusId
+    : null;
+}
+
+/** A stale `?focus=` should leave the URL instead of silently doing nothing. */
+export function shouldClearFocusParam(input: {
+  focusId: string | null;
+  loaded: boolean;
+  ideas: readonly Idea[];
+}): boolean {
+  if (!input.focusId || !input.loaded) {
+    return false;
+  }
+  return !input.ideas.some((idea) => idea.id === input.focusId);
+}
+
+/** Tray "New idea" opens `#/ideas?new=1`; the page focuses quick add once. */
+export function isNewIdeaRequest(param: string | null): boolean {
+  return param === "1" || param === "true";
 }
 
 /** Dashboard preview: overdue first, then today, at most three rows. */

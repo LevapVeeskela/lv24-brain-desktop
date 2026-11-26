@@ -238,7 +238,11 @@ function normalizeTags(tags: string[] | undefined): string[] {
 }
 
 function copyIdea(idea: Idea): Idea {
-  return { ...idea, tags: [...idea.tags] };
+  return {
+    ...idea,
+    tags: [...idea.tags],
+    source: idea.source ? { ...idea.source } : undefined,
+  };
 }
 
 /**
@@ -390,13 +394,6 @@ export class FakeIdeasSource implements IdeasSource {
       this.ideas = [...this.ideas, copyIdea(item)];
     }
     return copyIdea(item);
-  }
-
-  snapshot(): IdeaListResult {
-    return {
-      ideas: this.ideas.map(copyIdea),
-      problems: this.problems.map((item) => ({ ...item })),
-    };
   }
 }
 
