@@ -21,7 +21,9 @@ import {
   ideaExportScope,
 } from "@/features/ideas-export/api/localApiIdeaExport";
 import type { IdeaExportSource } from "@/features/ideas-export/model/types";
+import { RemindersStore } from "@/features/reminders/model/RemindersStore";
 import { IdeasStore } from "@/pages/ideas/model/IdeasStore";
+import { bindRemindersDefaultLead } from "./remindersLead";
 
 export class RootStore {
   readonly engine: EngineStore;
@@ -38,12 +40,15 @@ export class RootStore {
   readonly quarantine: QuarantineStore;
   /** Real local API source; tests and stories inject the fake explicitly. */
   readonly ideas: IdeasStore;
+  /** Reminder settings and scheduler events shared by Settings and the banner. */
+  readonly reminders: RemindersStore;
   /** Real `.ics` export source for the WS9 calendar export surface. */
   readonly ideasExport: IdeaExportSource;
   /** A second search instance keeps the palette from replacing page results. */
   readonly commandSearch: SearchStore;
 
   private stopSelection: (() => void) | null = null;
+  private releaseDefaultLead: (() => void) | null = null;
 
   constructor() {
     const connectionApi = new ConnectionApi();
@@ -59,11 +64,14 @@ export class RootStore {
     this.search = new SearchStore(memoryApi);
     this.review = new ReviewStore(memoryApi);
     this.quarantine = new QuarantineStore(memoryApi);
-    // WS8 integration point: the reminders settings provider calls
-    // `this.ideas.setDefaultLeadMinutes(() =>
-    // reminders.settings?.defaultLeadMinutes ?? null)` once its settings load;
-    // the ideas store writes the concrete value on create/edit.
     this.ideas = new IdeasStore(ideasApi);
+    this.reminders = new RemindersStore();
+    // WS8 -> WS7: the Settings default lead feeds every new or edited idea.
+    // The getter stays live, so a settings load/save later is picked up.
+    this.releaseDefaultLead = bindRemindersDefaultLead(
+      this.ideas,
+      this.reminders,
+    );
     this.ideasExport = createLocalApiIdeaExportSource(() =>
       ideaExportScope({
         scope: this.ideas.scope,
@@ -79,6 +87,7 @@ export class RootStore {
     this.runs.start();
     void this.projects.load();
     void this.ideas.load();
+    void this.reminders.start();
     this.ideas.startClock();
     this.stopSelection = reaction(
       () => ({
@@ -99,6 +108,9 @@ export class RootStore {
   dispose(): void {
     this.stopSelection?.();
     this.stopSelection = null;
+    this.releaseDefaultLead?.();
+    this.releaseDefaultLead = null;
+    this.reminders.dispose();
     this.ideas.dispose();
     this.commandSearch.dispose();
     this.search.dispose();

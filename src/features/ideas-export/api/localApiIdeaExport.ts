@@ -6,9 +6,11 @@ import type { IdeaExportSource } from "../model/types";
 
 /**
  * The visible list filters the local API can express for `/v1/ideas/ical`.
- * The export must follow `ideas.scoped`: a project-scoped page exports only
- * that project. Free-text search is UI-only and cannot narrow the `.ics`
- * route, so the button exports the date range of the scoped list.
+ * The route accepts only `project` and `include_done`, so the export follows
+ * the project scope and the date range, never the transient text query or tag
+ * chips: a searched page exports the whole project (project-only scope). A
+ * WS4 follow-up may add `q`/tag filters; until then this adapter must not fake
+ * them by post-filtering the ICS text.
  */
 export interface IdeaExportScope {
   /** Omitted exports every registered project. */

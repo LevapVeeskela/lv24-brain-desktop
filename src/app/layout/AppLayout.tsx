@@ -132,7 +132,7 @@ export const AppLayout = observer(function AppLayout({
               </span>
             </Notice>
           ) : null}
-          <RemindersProvider>
+          <RemindersProvider store={store.reminders}>
             <RemindersSurface />
             <Outlet />
           </RemindersProvider>
