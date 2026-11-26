@@ -9,6 +9,12 @@ describe("routeTitleKey", () => {
     expect(translate("en", routeTitleKey("/quarantine"))).toBe("Quarantine");
   });
 
+  it("maps the ideas route to the Ideas title", () => {
+    expect(routeTitleKey("/ideas")).toBe("nav.ideas");
+    expect(translate("en", routeTitleKey("/ideas"))).toBe("Ideas");
+    expect(translate("ru", routeTitleKey("/ideas"))).toBe("Идеи");
+  });
+
   it("keeps unknown paths on the not-found title", () => {
     expect(routeTitleKey("/missing-screen")).toBe("app.notFound");
   });

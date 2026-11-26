@@ -6,12 +6,14 @@ import type { EngineStore } from "@/entities/engine/model/EngineStore";
 import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import type { SyncStore } from "@/entities/sync/model/SyncStore";
 import type { RunsStore } from "@/entities/run/model/RunsStore";
+import type { IdeasStore } from "@/pages/ideas/model/IdeasStore";
 import {
   isRunFailure,
   runHealthStatus,
   type RunHealthStatus,
 } from "@/entities/run/model/presentation";
 import { RunStatusBadge } from "@/entities/run/ui/RunStatusBadge";
+import { IdeasTodayCard } from "@/widgets/ideas-today/ui/IdeasTodayCard";
 import { EngineOverview } from "@/widgets/engine-overview/ui/EngineOverview";
 import { RunLogPanel } from "@/widgets/run-log-panel/ui/RunLogPanel";
 import { Button } from "@/shared/ui/Button";
@@ -35,6 +37,7 @@ export interface DashboardPageProps {
   sync: SyncStore;
   settings: SettingsStore;
   runs: RunsStore;
+  ideas: IdeasStore;
 }
 
 export const DashboardPage = observer(function DashboardPage({
@@ -42,6 +45,7 @@ export const DashboardPage = observer(function DashboardPage({
   connections,
   sync,
   runs,
+  ideas,
 }: DashboardPageProps) {
   const { t, locale } = useI18n();
   const [retryFailed, setRetryFailed] = useState(false);
@@ -198,6 +202,8 @@ export const DashboardPage = observer(function DashboardPage({
           </Notice>
         )
       ) : null}
+
+      <IdeasTodayCard ideas={ideas} />
 
       <div className="dashboard-grid">
       <Card className="dashboard-failure">

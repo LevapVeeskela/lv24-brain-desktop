@@ -32,6 +32,11 @@ const primaryLinks: Array<{
     icon: "M11 4a7 7 0 105 12 M16 16l5 5",
   },
   {
+    to: "/ideas",
+    key: "nav.ideas",
+    icon: "M4 4h16v16H4z M8 11l3 3 5-6",
+  },
+  {
     to: "/projects",
     key: "nav.projects",
     icon: "M3 7V4h7l2 3h9v13H3z",
@@ -57,6 +62,7 @@ export const AppRail = observer(function AppRail({ store }: { store: RootStore }
   const { t } = useI18n();
   const projects = store.projects;
   const pending = store.review.pendingCount;
+  const ideas = store.ideas;
   const engine = store.engine;
 
   return (
@@ -126,6 +132,16 @@ export const AppRail = observer(function AppRail({ store }: { store: RootStore }
                 </span>
                 <span className="sr-only">
                   {t("shell.inboxBadge", { count: pending })}
+                </span>
+              </>
+            ) : null}
+            {link.to === "/ideas" && ideas.openCount > 0 ? (
+              <>
+                <span className="rail-badge" aria-hidden="true">
+                  {ideas.openCount}
+                </span>
+                <span className="sr-only">
+                  {t("shell.ideasBadge", { count: ideas.openCount })}
                 </span>
               </>
             ) : null}

@@ -15,6 +15,7 @@ import type {
   SearchPage,
 } from "@/entities/memory/model/types";
 import type { Project, AdoptReport, ProjectState } from "@/entities/project/model/types";
+import type { Idea } from "@/entities/ideas/model/types";
 
 export const timestamp = "2026-11-16T05:30:00Z";
 
@@ -192,6 +193,21 @@ export function projectState(overrides: Partial<ProjectState> = {}): ProjectStat
 
 export function project(overrides: Partial<Project> = {}): Project {
   return { id: "lv24", name: "LV24", paths: [], pathProvenance: {}, ...overrides };
+}
+
+export function ideaFixture(overrides: Partial<Idea> = {}): Idea {
+  return {
+    id: "idea-2026-11-27-fixture-01jcs0000000000000000000",
+    projectId: "lv24",
+    title: "Fixture idea",
+    status: "open",
+    priority: "normal",
+    tags: [],
+    body: "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  };
 }
 
 export function adoptReport(overrides: Partial<AdoptReport> = {}): AdoptReport {

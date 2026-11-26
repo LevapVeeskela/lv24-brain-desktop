@@ -15,6 +15,8 @@ import { ProvidersStore } from "@/entities/provider/model/ProvidersStore";
 import { RunsStore } from "@/entities/run/model/RunsStore";
 import { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import { SyncStore } from "@/entities/sync/model/SyncStore";
+import { createFakeIdeasSource } from "@/pages/ideas/api/fakeIdeas";
+import { IdeasStore } from "@/pages/ideas/model/IdeasStore";
 
 export class RootStore {
   readonly engine: EngineStore;
@@ -29,6 +31,8 @@ export class RootStore {
   readonly search: SearchStore;
   readonly review: ReviewStore;
   readonly quarantine: QuarantineStore;
+  /** Fake source until WS7 wires the local API; the UI shape stays the same. */
+  readonly ideas: IdeasStore;
   /** A second search instance keeps the palette from replacing page results. */
   readonly commandSearch: SearchStore;
 
@@ -48,6 +52,7 @@ export class RootStore {
     this.search = new SearchStore(memoryApi);
     this.review = new ReviewStore(memoryApi);
     this.quarantine = new QuarantineStore(memoryApi);
+    this.ideas = new IdeasStore(createFakeIdeasSource());
     this.commandSearch = new SearchStore(memoryApi, { debounceMs: 160 });
   }
 
@@ -56,6 +61,7 @@ export class RootStore {
     this.connections.start();
     this.runs.start();
     void this.projects.load();
+    void this.ideas.load();
     this.stopSelection = reaction(
       () => ({
         projectId: this.projects.selectedId,

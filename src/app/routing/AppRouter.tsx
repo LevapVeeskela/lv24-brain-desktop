@@ -7,6 +7,7 @@ import { ConnectionWizardPage } from "@/pages/connection-wizard";
 import { ConnectionsPage } from "@/pages/connections";
 import { DashboardPage } from "@/pages/dashboard";
 import { GitSyncPage } from "@/pages/git-sync";
+import { IdeasPage } from "@/pages/ideas";
 import { InboxPage, ProposalDetailPage } from "@/pages/inbox";
 import { MemoryPage, RecordDetailPage } from "@/pages/memory";
 import { NotFoundPage } from "@/pages/not-found";
@@ -30,7 +31,14 @@ export function AppRouter({ store }: { store: RootStore }) {
                 sync={store.sync}
                 settings={store.settings}
                 runs={store.runs}
+                ideas={store.ideas}
               />
+            }
+          />
+          <Route
+            path="ideas"
+            element={
+              <IdeasPage ideas={store.ideas} projects={store.projects} />
             }
           />
           <Route

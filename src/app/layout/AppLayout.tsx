@@ -34,6 +34,8 @@ export function routeTitleKey(pathname: string): MessageKey {
       return "nav.connections";
     case "activity":
       return "nav.activity";
+    case "ideas":
+      return "nav.ideas";
     case "projects":
       return "nav.projects";
     case "settings":
