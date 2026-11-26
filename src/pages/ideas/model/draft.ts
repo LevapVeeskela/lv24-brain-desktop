@@ -231,14 +231,15 @@ export function statusChange(
     status,
     ...(reopening ? { completionNote: "" } : {}),
   };
-  const base = draftFieldPatch(nextDraft, idea, "status");
-  if (!base) {
-    return { draft: nextDraft, patch: null };
+  if (reopening) {
+    // Always write the reopen explicitly: a done save may still be queued, so
+    // relying on the persisted status would leave the record done after it.
+    return {
+      draft: nextDraft,
+      patch: { status: "open", completionNote: null },
+    };
   }
-  return {
-    draft: nextDraft,
-    patch: reopening ? { ...base, completionNote: null } : base,
-  };
+  return { draft: nextDraft, patch: draftFieldPatch(nextDraft, idea, "status") };
 }
 
 /**

@@ -176,7 +176,8 @@ describe("idea drawer draft", () => {
 
   it("clears the hidden note when a done draft reopens before the save lands", () => {
     // Record is still open, but the draft moved to done and the user typed a
-    // completion note; choosing open again must not leave that note dirty.
+    // completion note; choosing open again must still write the reopen so a
+    // queued done save cannot leave the record closed.
     const idea = ideaFixture({ status: "open" });
     const draft = {
       ...toIdeaDraft(idea),
@@ -187,7 +188,19 @@ describe("idea drawer draft", () => {
     const change = statusChange(draft, idea, "open");
     expect(change.draft.completionNote).toBe("");
     expect(change.draft.status).toBe("open");
-    expect(change.patch).toBeNull(); // the record already says open
+    expect(change.patch).toEqual({ status: "open", completionNote: null });
     expect(draftIsDirty(change.draft, idea)).toBe(false);
+
+    // The queued done save is the pending baseline; the reopen must clean it.
+    const pendingDone = applyDraftPatch(toIdeaDraft(idea), {
+      status: "done",
+    });
+    const pendingAfterReopen = applyDraftPatch(
+      pendingDone,
+      change.patch as NonNullable<typeof change.patch>,
+    );
+    expect(pendingAfterReopen.status).toBe("open");
+    expect(pendingAfterReopen.completionNote).toBe("");
+    expect(draftIsDirty(change.draft, idea, pendingAfterReopen)).toBe(false);
   });
 });
