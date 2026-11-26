@@ -1,10 +1,11 @@
-﻿mod api;
+mod api;
 mod autostart;
 mod commands;
 mod deep_link;
 mod engine;
 mod error;
 mod lifecycle;
+mod reminders;
 mod settings;
 mod tray;
 mod watchdog;
@@ -30,6 +31,7 @@ pub fn run() {
             tray::show_main_window(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(autostart.build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(
@@ -54,6 +56,10 @@ pub fn run() {
             api::api_request,
             api::run_log_open,
             api::run_log_close,
+            reminders::reminders_settings_get,
+            reminders::reminders_settings_set,
+            reminders::reminders_dismiss_digest,
+            reminders::ideas_test_notification,
             deep_link::deep_link_take,
         ])
         .setup(|app| {
@@ -63,15 +69,26 @@ pub fn run() {
                 &paths.log_dir,
             ));
             let settings = settings::SettingsStore::load(paths.config_dir.join("settings.json"))?;
-            let supervisor = Arc::new(Supervisor::new(app.handle().clone(), paths, settings)?);
-            let watchdog = watchdog::UiWatchdog::new(
-                supervisor.config_dir().join("ipc-restart.flag"),
-            );
+            let data_dir = paths.config_dir.clone();
+            let supervisor = Arc::new(Supervisor::new(
+                app.handle().clone(),
+                paths,
+                settings.clone(),
+            )?);
+            let watchdog =
+                watchdog::UiWatchdog::new(supervisor.config_dir().join("ipc-restart.flag"));
             app.manage(watchdog.clone());
             watchdog::spawn(app.handle().clone(), watchdog);
             app.manage(supervisor.clone());
             app.manage(api::RunLogState::default());
             app.manage(deep_link::DeepLinkState::default());
+            app.manage(reminders::ReminderEngine::start(
+                app.handle().clone(),
+                supervisor.clone(),
+                settings,
+                data_dir,
+            ));
+            reminders::register_notification_actions(app.handle());
 
             tray::create(app.handle(), supervisor.clone())?;
             if let Err(err) = deep_link::register(app.handle()) {
@@ -129,4 +146,3 @@ pub fn run() {
         _ => {}
     });
 }
-

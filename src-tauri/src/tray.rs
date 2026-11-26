@@ -5,12 +5,13 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::engine::{EnginePhase, EngineStatus, Supervisor};
+use crate::reminders::ReminderEngine;
 
 const TRAY_ID: &str = "main";
 
 pub fn create(app: &AppHandle, supervisor: Arc<Supervisor>) -> tauri::Result<()> {
     let status = supervisor.status();
-    let menu = build_menu(app, &status)?;
+    let menu = build_menu(app, &status, today_count(app))?;
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(tray_icon(&status))
         .tooltip(tooltip(&status))
@@ -18,6 +19,8 @@ pub fn create(app: &AppHandle, supervisor: Arc<Supervisor>) -> tauri::Result<()>
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main_window(app),
+            "new-idea" => crate::reminders::open_new_idea(app),
+            "today" => crate::reminders::open_ideas(app, None),
             "restart" => {
                 crate::lifecycle::record(app, crate::lifecycle::Event::TrayQuit, None);
                 app.restart();
@@ -75,7 +78,7 @@ pub fn refresh(app: &AppHandle, status: &EngineStatus) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    match build_menu(app, status) {
+    match build_menu(app, status, today_count(app)) {
         Ok(menu) => {
             if let Err(err) = tray.set_menu(Some(menu)) {
                 log::warn!("cannot update tray menu: {err}");
@@ -91,6 +94,28 @@ pub fn refresh(app: &AppHandle, status: &EngineStatus) {
     }
 }
 
+/// Refreshes only the "Today · N" item after the reminder scheduler fetches.
+pub fn refresh_reminders(app: &AppHandle, count: u32) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    let status = crate::commands::supervisor(app).status();
+    match build_menu(app, &status, count) {
+        Ok(menu) => {
+            if let Err(err) = tray.set_menu(Some(menu)) {
+                log::warn!("cannot update tray menu: {err}");
+            }
+        }
+        Err(err) => log::warn!("cannot build tray menu: {err}"),
+    }
+}
+
+fn today_count(app: &AppHandle) -> u32 {
+    app.try_state::<Arc<ReminderEngine>>()
+        .map(|state| state.today_count())
+        .unwrap_or(0)
+}
+
 pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -99,8 +124,21 @@ pub fn show_main_window<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn build_menu(app: &AppHandle, status: &EngineStatus) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_menu(
+    app: &AppHandle,
+    status: &EngineStatus,
+    today_count: u32,
+) -> tauri::Result<Menu<tauri::Wry>> {
     let status_item = MenuItem::with_id(app, "status", status_line(status), false, None::<&str>)?;
+    let today = MenuItem::with_id(
+        app,
+        "today",
+        format!("Today · {today_count}"),
+        true,
+        None::<&str>,
+    )?;
+    let new_idea = MenuItem::with_id(app, "new-idea", "New idea", true, None::<&str>)?;
+    let reminder_separator = PredefinedMenuItem::separator(app)?;
     let sync = MenuItem::with_id(app, "sync", "Sync all", true, None::<&str>)?;
     let pause_id = if status.phase == EnginePhase::Paused {
         "resume"
@@ -119,7 +157,18 @@ fn build_menu(app: &AppHandle, status: &EngineStatus) -> tauri::Result<Menu<taur
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     Menu::with_items(
         app,
-        &[&status_item, &sync, &pause, &separator, &open, &restart, &quit],
+        &[
+            &status_item,
+            &today,
+            &new_idea,
+            &reminder_separator,
+            &sync,
+            &pause,
+            &separator,
+            &open,
+            &restart,
+            &quit,
+        ],
     )
 }
 

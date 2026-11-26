@@ -6,6 +6,7 @@ import { settingsApi } from "@/entities/settings/api/settingsApi";
 import type { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import { AutostartToggle } from "@/features/autostart-toggle/ui/AutostartToggle";
 import { LocaleSwitch } from "@/features/locale-switch/ui/LocaleSwitch";
+import { RemindersSettings } from "@/features/reminders/ui/RemindersSettings";
 import { UpdateCheck } from "@/features/update-check/ui/UpdateCheck";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
@@ -111,7 +112,10 @@ export const SettingsPage = observer(function SettingsPage({
           <LocaleSwitch />
         </Card>
 
-        <AutostartToggle engine={engine} />
+        <div id="settings-startup">
+          <AutostartToggle engine={engine} />
+        </div>
+        <RemindersSettings />
         <UpdateCheck settings={settings} />
 </div> },
         { id: "diagnostics", label: t("settings.diagnostics"), content: <div className="page">
