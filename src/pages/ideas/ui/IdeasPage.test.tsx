@@ -73,6 +73,20 @@ describe("IdeasPage", () => {
     expect(html).toContain("Doing");
   });
 
+  it("opens the calendar tab with the grid, agenda and export", () => {
+    const { ideas, projects } = stores();
+    ideas.setView("calendar");
+    const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
+    expect(html).toContain("Calendar");
+    expect(html).toContain('role="grid"');
+    expect(html).toContain("November 2026");
+    expect(html).toContain("Export .ics");
+    expect(html).toContain("Agenda");
+    expect(html).toContain("Тёмная тема для календаря");
+    expect(html).not.toContain("idea-groups");
+    expect((html.match(/role="gridcell"/g) ?? []).length).toBe(42);
+  });
+
   it("filters by search and shows the no-match state", () => {
     const { ideas, projects } = stores();
     ideas.setQuery("стоматолог");

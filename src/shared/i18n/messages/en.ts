@@ -809,6 +809,23 @@ export const en = {
   "ideas.todayCard.open": "{count} open",
   "ideas.todayCard.empty": "Nothing is due today.",
   "ideas.todayCard.all": "Open ideas",
+  "ideas.view.calendar": "Calendar",
+  "ideas.calendar.label": "Ideas calendar",
+  "ideas.calendar.previous": "Previous month",
+  "ideas.calendar.next": "Next month",
+  "ideas.calendar.today": "Today",
+  "ideas.calendar.dayLabel": "{date}. Add an idea.",
+  "ideas.calendar.more": "+{count} more",
+  "ideas.calendar.hint": "Arrow keys move between days; Enter adds an idea. Drag a chip to reschedule.",
+  "ideas.calendar.agenda": "Agenda",
+  "ideas.calendar.agenda.overdue": "Overdue",
+  "ideas.calendar.agenda.today": "Today",
+  "ideas.calendar.agenda.upcoming": "Upcoming",
+  "ideas.calendar.agenda.empty": "No timed ideas in this month.",
+  "ideas.calendar.quickDate": "New idea on {date}",
+  "ideas.calendar.quickDateClear": "Clear date",
+  "ideas.export.ics": "Export .ics",
+  "ideas.export.failed": "Could not export the calendar.",
 } as const;
 
 export type MessageKey = keyof typeof en;

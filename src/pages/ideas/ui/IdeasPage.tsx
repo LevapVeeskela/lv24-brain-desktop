@@ -1,18 +1,26 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Project } from "@/entities/project/model/types";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
+import {
+  createFakeIdeaExportSource,
+  type IdeaExportSource,
+} from "@/features/ideas-export";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { Button } from "@/shared/ui/Button";
 import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { Select } from "@/shared/ui/Select";
+import { formatCalendarDate } from "../model/calendar";
 import type { IdeaScope, IdeasStore, IdeasView } from "../model/IdeasStore";
 import { isTypingTarget, resolveIdeasShortcut } from "../model/keyboard";
 import { IdeaDrawer, type IdeaProjectOption } from "./IdeaDrawer";
 import { IdeaRow } from "./IdeaRow";
+import { IdeasCalendar } from "./IdeasCalendar";
+
+const IDEAS_VIEWS: readonly IdeasView[] = ["focus", "all", "calendar"];
 
 const groupKeys: Record<string, MessageKey> = {
   overdue: "ideas.group.overdue",
@@ -32,17 +40,30 @@ function projectOptions(projects: readonly Project[]): IdeaProjectOption[] {
 export const IdeasPage = observer(function IdeasPage({
   ideas,
   projects,
+  exportSource,
 }: {
   ideas: IdeasStore;
   projects: ProjectsStore;
+  /** Optional injection; WS7 supplies the real `/v1/ideas/ical` source. */
+  exportSource?: IdeaExportSource;
 }) {
   const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   const [quickTitle, setQuickTitle] = useState("");
+  const [quickDate, setQuickDate] = useState<string | null>(null);
   const quickRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const focusId = params.get("focus");
   const now = ideas.nowDate();
+  const defaultExportSource = useMemo(
+    () =>
+      createFakeIdeaExportSource({
+        ideas: () => ideas.items,
+        now: () => ideas.nowDate(),
+      }),
+    [ideas],
+  );
+  const calendarExportSource = exportSource ?? defaultExportSource;
 
   useEffect(() => {
     void ideas.load();
@@ -97,6 +118,18 @@ export const IdeasPage = observer(function IdeasPage({
       if (!command) {
         return;
       }
+      // The calendar owns arrows/Enter; row actions would target an invisible
+      // cursor, so only capture, search and Escape reach the page there.
+      if (
+        ideas.view === "calendar" &&
+        (command === "next" ||
+          command === "previous" ||
+          command === "toggle" ||
+          command === "edit" ||
+          command === "trash")
+      ) {
+        return;
+      }
       switch (command) {
         case "capture":
           event.preventDefault();
@@ -148,12 +181,15 @@ export const IdeasPage = observer(function IdeasPage({
 
   const submitQuickAdd = (): void => {
     const value = quickTitle;
-    void ideas.quickAdd(value).then((created) => {
-      if (created) {
-        setQuickTitle("");
-        quickRef.current?.focus();
-      }
-    });
+    void ideas
+      .quickAdd(value, { dueDate: quickDate ?? undefined })
+      .then((created) => {
+        if (created) {
+          setQuickTitle("");
+          setQuickDate(null);
+          quickRef.current?.focus();
+        }
+      });
   };
 
   const emptyScoped = ideas.scoped.length === 0;
@@ -278,7 +314,7 @@ export const IdeasPage = observer(function IdeasPage({
           role="tablist"
           aria-label={t("ideas.views")}
         >
-          {(["focus", "all"] as const).map((view) => (
+          {IDEAS_VIEWS.map((view) => (
             <button
               key={view}
               type="button"
@@ -286,7 +322,12 @@ export const IdeasPage = observer(function IdeasPage({
               aria-selected={ideas.view === view}
               aria-controls="ideas-list"
               tabIndex={ideas.view === view ? 0 : -1}
-              onClick={() => ideas.setView(view as IdeasView)}
+              onClick={() => {
+                if (view !== "calendar") {
+                  setQuickDate(null);
+                }
+                ideas.setView(view);
+              }}
               onKeyDown={(event) => {
                 if (
                   event.key !== "ArrowRight" &&
@@ -314,7 +355,11 @@ export const IdeasPage = observer(function IdeasPage({
                       : (index +
                           (event.key === "ArrowRight" ? 1 : tabs.length - 1)) %
                         tabs.length;
-                ideas.setView(nextIndex === 0 ? "focus" : "all");
+                const nextView = IDEAS_VIEWS[nextIndex] ?? "focus";
+                if (nextView !== "calendar") {
+                  setQuickDate(null);
+                }
+                ideas.setView(nextView);
                 tabs[nextIndex]?.focus();
               }}
             >
@@ -369,6 +414,21 @@ export const IdeasPage = observer(function IdeasPage({
         <label className="sr-only" htmlFor="ideas-quick-add">
           {t("ideas.quickAddLabel")}
         </label>
+        {quickDate ? (
+          <span className="idea-chip idea-quick-date">
+            {t("ideas.calendar.quickDate", {
+              date: formatCalendarDate(quickDate, locale, "short"),
+            })}
+            <button
+              type="button"
+              className="idea-quick-date-clear"
+              aria-label={t("ideas.calendar.quickDateClear")}
+              onClick={() => setQuickDate(null)}
+            >
+              ×
+            </button>
+          </span>
+        ) : null}
         <input
           id="ideas-quick-add"
           ref={quickRef}
@@ -396,6 +456,20 @@ export const IdeasPage = observer(function IdeasPage({
       >
         {!ideas.loaded ? (
           ideas.error ? null : <Loading label={t("ideas.loading")} />
+        ) : ideas.view === "calendar" ? (
+          <IdeasCalendar
+            ideas={ideas.scoped}
+            now={now}
+            exportSource={calendarExportSource}
+            onCreateForDay={(key) => {
+              setQuickDate(key);
+              quickRef.current?.focus();
+            }}
+            onOpenIdea={(ideaId) => ideas.openDrawer(ideaId)}
+            onReschedule={(ideaId, patch) => {
+              void ideas.save(ideaId, patch);
+            }}
+          />
         ) : emptyScoped ? (
           showSearchEmpty ? (
             <EmptyState

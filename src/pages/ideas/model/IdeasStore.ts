@@ -19,8 +19,9 @@ import {
   todayPreview,
   type IdeaGroup,
 } from "./focus";
+import { parseLocalDateKey } from "./format";
 
-export type IdeasView = "focus" | "all";
+export type IdeasView = "focus" | "all" | "calendar";
 export type IdeaScope = "all" | "project";
 export type IdeaAction = "complete" | "reopen" | "save" | "trash" | "restore";
 
@@ -214,11 +215,22 @@ export class IdeasStore {
     this.drawerId = null;
   }
 
-  async quickAdd(title: string): Promise<boolean> {
+  /**
+   * Title-only capture. `dueDate` is the calendar's all-day prefill; it is
+   * validated here so a malformed key never reaches the source.
+   */
+  async quickAdd(
+    title: string,
+    options: { dueDate?: string } = {},
+  ): Promise<boolean> {
     const value = title.trim();
     if (!value || this.quickAddBusy) {
       return false;
     }
+    const dueDate =
+      options.dueDate && parseLocalDateKey(options.dueDate)
+        ? options.dueDate
+        : undefined;
     runInAction(() => {
       this.quickAddBusy = true;
       this.quickAddError = null;
@@ -228,6 +240,7 @@ export class IdeasStore {
         title: value,
         projectId: this.projectId ?? "personal",
         source: { type: "desktop" },
+        ...(dueDate ? { dueDate } : {}),
       };
       const created = await this.source.create(input);
       runInAction(() => {
