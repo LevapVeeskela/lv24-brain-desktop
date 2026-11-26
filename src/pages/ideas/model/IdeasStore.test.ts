@@ -137,6 +137,24 @@ describe("IdeasStore", () => {
     expect(ideas.items.at(-1)?.projectId).toBe("personal");
   });
 
+  it("quick-adds an all-day idea for a calendar day", async () => {
+    const { ideas } = makeStore();
+    await ideas.load();
+    expect(await ideas.quickAdd("Day idea", { dueDate: "2026-12-01" })).toBe(
+      true,
+    );
+    const created = ideas.items.at(-1);
+    expect(created).toMatchObject({
+      title: "Day idea",
+      dueDate: "2026-12-01",
+    });
+    expect(created?.dueAt).toBeUndefined();
+
+    await ideas.quickAdd("Bad date", { dueDate: "2026-02-31" });
+    expect(ideas.items.at(-1)?.title).toBe("Bad date");
+    expect(ideas.items.at(-1)?.dueDate).toBeUndefined();
+  });
+
   it("trashes a row and restores the last one", async () => {
     const { ideas } = makeStore();
     await ideas.load();

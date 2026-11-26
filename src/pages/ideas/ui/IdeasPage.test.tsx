@@ -5,7 +5,7 @@ import { ProjectsStore } from "@/entities/project/model/ProjectsStore";
 import { project } from "@/test/fixtures";
 import { projectsSource } from "@/test/api";
 import { renderPage } from "@/test/render";
-import { IdeasPage } from "./IdeasPage";
+import { createIdeasPageExportSource, IdeasPage } from "./IdeasPage";
 
 const now = new Date(2026, 10, 27, 12, 0, 0, 0);
 
@@ -71,6 +71,33 @@ describe("IdeasPage", () => {
     expect(html).toContain("Посмотреть курс по Rust");
     expect(html).toContain("Someday");
     expect(html).toContain("Doing");
+  });
+
+  it("opens the calendar tab with the grid, agenda and export", () => {
+    const { ideas, projects } = stores();
+    ideas.setView("calendar");
+    const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
+    expect(html).toContain("Calendar");
+    expect(html).toContain('role="grid"');
+    expect(html).toContain("November 2026");
+    expect(html).toContain("Export .ics");
+    expect(html).toContain("Agenda");
+    expect(html).toContain("Тёмная тема для календаря");
+    expect(html).not.toContain("idea-groups");
+    expect((html.match(/role="gridcell"/g) ?? []).length).toBe(42);
+  });
+
+  it("exports only the visible scope through the default source", async () => {
+    const { ideas } = stores();
+    const source = createIdeasPageExportSource(ideas);
+    const all = await source.fetchIcs();
+    expect(all).toContain("SUMMARY:Тёмная тема для календаря");
+    expect(all).toContain("SUMMARY:Позвонить стоматологу");
+
+    ideas.setQuery("стоматолог");
+    const filtered = await source.fetchIcs();
+    expect(filtered).toContain("SUMMARY:Позвонить стоматологу");
+    expect(filtered).not.toContain("SUMMARY:Тёмная тема для календаря");
   });
 
   it("filters by search and shows the no-match state", () => {

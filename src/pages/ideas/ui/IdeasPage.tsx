@@ -1,9 +1,12 @@
 import { observer } from "mobx-react-lite";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Project } from "@/entities/project/model/types";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
-import type { IdeaExportSource } from "@/features/ideas-export/model/types";
+import {
+  createFakeIdeaExportSource,
+  type IdeaExportSource,
+} from "@/features/ideas-export";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { isInsideBlockingModal } from "@/shared/lib/shortcuts";
 import { Button } from "@/shared/ui/Button";
@@ -11,6 +14,7 @@ import { EmptyState } from "@/shared/ui/EmptyState";
 import { Loading } from "@/shared/ui/Loading";
 import { Notice } from "@/shared/ui/Notice";
 import { Select } from "@/shared/ui/Select";
+import { formatCalendarDate } from "../model/calendar";
 import type { IdeaScope, IdeasStore, IdeasView } from "../model/IdeasStore";
 import {
   focusDrawerTarget,
@@ -20,6 +24,9 @@ import {
 import { isTypingTarget, resolveIdeasShortcut } from "../model/keyboard";
 import { IdeaDrawer, type IdeaProjectOption } from "./IdeaDrawer";
 import { IdeaRow } from "./IdeaRow";
+import { IdeasCalendar } from "./IdeasCalendar";
+
+const IDEAS_VIEWS: readonly IdeasView[] = ["focus", "all", "calendar"];
 
 const groupKeys: Record<string, MessageKey> = {
   overdue: "ideas.group.overdue",
@@ -36,27 +43,48 @@ function projectOptions(projects: readonly Project[]): IdeaProjectOption[] {
   }));
 }
 
+/**
+ * Default 1.8 export source: the same visible scope the calendar renders, so
+ * project/search filters are honored. WS7 swaps the fake for `/v1/ideas/ical`.
+ */
+export function createIdeasPageExportSource(
+  ideas: IdeasStore,
+): IdeaExportSource {
+  return createFakeIdeaExportSource({
+    ideas: () => ideas.scoped,
+    now: () => ideas.nowDate(),
+  });
+}
+
 export const IdeasPage = observer(function IdeasPage({
   ideas,
   projects,
+  exportSource,
 }: {
   ideas: IdeasStore;
   projects: ProjectsStore;
   /**
    * WS9 integration point: the calendar tab's export button consumes this.
-   * WS7 injects the real `GET /v1/ideas/ical` source from `RootStore`.
+   * WS7 injects the real `GET /v1/ideas/ical` source from `RootStore`; the
+   * fake default keeps tests and stories on the visible scope.
    */
   exportSource?: IdeaExportSource;
 }) {
   const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   const [quickTitle, setQuickTitle] = useState("");
+  const [quickDate, setQuickDate] = useState<string | null>(null);
   const quickRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const dismissedFocusRef = useRef<string | null>(null);
   const focusId = params.get("focus");
   const newIdeaParam = params.get("new");
   const now = ideas.nowDate();
+  const defaultExportSource = useMemo(
+    () => createIdeasPageExportSource(ideas),
+    [ideas],
+  );
+  const calendarExportSource = exportSource ?? defaultExportSource;
 
   useEffect(() => {
     void ideas.load();
@@ -148,6 +176,18 @@ export const IdeasPage = observer(function IdeasPage({
       if (!command) {
         return;
       }
+      // The calendar owns arrows/Enter; row actions would target an invisible
+      // cursor, so only capture, search and Escape reach the page there.
+      if (
+        ideas.view === "calendar" &&
+        (command === "next" ||
+          command === "previous" ||
+          command === "toggle" ||
+          command === "edit" ||
+          command === "trash")
+      ) {
+        return;
+      }
       switch (command) {
         case "capture":
           event.preventDefault();
@@ -199,12 +239,15 @@ export const IdeasPage = observer(function IdeasPage({
 
   const submitQuickAdd = (): void => {
     const value = quickTitle;
-    void ideas.quickAdd(value).then((created) => {
-      if (created) {
-        setQuickTitle("");
-        quickRef.current?.focus();
-      }
-    });
+    void ideas
+      .quickAdd(value, { dueDate: quickDate ?? undefined })
+      .then((created) => {
+        if (created) {
+          setQuickTitle("");
+          setQuickDate(null);
+          quickRef.current?.focus();
+        }
+      });
   };
 
   const emptyScoped = ideas.scoped.length === 0;
@@ -329,7 +372,7 @@ export const IdeasPage = observer(function IdeasPage({
           role="tablist"
           aria-label={t("ideas.views")}
         >
-          {(["focus", "all"] as const).map((view) => (
+          {IDEAS_VIEWS.map((view) => (
             <button
               key={view}
               type="button"
@@ -337,7 +380,12 @@ export const IdeasPage = observer(function IdeasPage({
               aria-selected={ideas.view === view}
               aria-controls="ideas-list"
               tabIndex={ideas.view === view ? 0 : -1}
-              onClick={() => ideas.setView(view as IdeasView)}
+              onClick={() => {
+                if (view !== "calendar") {
+                  setQuickDate(null);
+                }
+                ideas.setView(view);
+              }}
               onKeyDown={(event) => {
                 if (
                   event.key !== "ArrowRight" &&
@@ -365,7 +413,11 @@ export const IdeasPage = observer(function IdeasPage({
                       : (index +
                           (event.key === "ArrowRight" ? 1 : tabs.length - 1)) %
                         tabs.length;
-                ideas.setView(nextIndex === 0 ? "focus" : "all");
+                const nextView = IDEAS_VIEWS[nextIndex] ?? "focus";
+                if (nextView !== "calendar") {
+                  setQuickDate(null);
+                }
+                ideas.setView(nextView);
                 tabs[nextIndex]?.focus();
               }}
             >
@@ -420,6 +472,21 @@ export const IdeasPage = observer(function IdeasPage({
         <label className="sr-only" htmlFor="ideas-quick-add">
           {t("ideas.quickAddLabel")}
         </label>
+        {quickDate ? (
+          <span className="idea-chip idea-quick-date">
+            {t("ideas.calendar.quickDate", {
+              date: formatCalendarDate(quickDate, locale, "short"),
+            })}
+            <button
+              type="button"
+              className="idea-quick-date-clear"
+              aria-label={t("ideas.calendar.quickDateClear")}
+              onClick={() => setQuickDate(null)}
+            >
+              ×
+            </button>
+          </span>
+        ) : null}
         <input
           id="ideas-quick-add"
           ref={quickRef}
@@ -447,6 +514,20 @@ export const IdeasPage = observer(function IdeasPage({
       >
         {!ideas.loaded ? (
           ideas.error ? null : <Loading label={t("ideas.loading")} />
+        ) : ideas.view === "calendar" ? (
+          <IdeasCalendar
+            ideas={ideas.scoped}
+            now={now}
+            exportSource={calendarExportSource}
+            onCreateForDay={(key) => {
+              setQuickDate(key);
+              quickRef.current?.focus();
+            }}
+            onOpenIdea={(ideaId) => ideas.openDrawer(ideaId)}
+            onReschedule={(ideaId, patch) => {
+              void ideas.save(ideaId, patch);
+            }}
+          />
         ) : emptyScoped ? (
           showSearchEmpty ? (
             <EmptyState
