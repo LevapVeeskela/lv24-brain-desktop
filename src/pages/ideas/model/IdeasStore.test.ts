@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import type {
+  IdeaCreateInput,
+  IdeaUpdateInput,
+} from "@/entities/ideas/model/types";
 import { ideaFixture } from "@/test/fixtures";
 import { createFakeIdeasSource } from "../api/fakeIdeas";
 import { IdeasStore } from "./IdeasStore";
@@ -221,6 +225,74 @@ describe("IdeasStore", () => {
     expect(ideas.drawerOpen).toBe(false);
   });
 
+  it("loads the full idea body when the drawer opens", async () => {
+    const summary = ideaFixture({
+      id: "detail",
+      projectId: "lv24",
+      body: "",
+    });
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [summary],
+    });
+    source.get = async (id) => ({ ...summary, id, body: "Full body" });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+    expect(ideas.items[0]?.body).toBe("");
+
+    ideas.openDrawer("detail");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ideas.drawerIdea?.body).toBe("Full body");
+  });
+
+  it("keeps the open drawer body across a list refresh", async () => {
+    const full = ideaFixture({
+      id: "detail",
+      projectId: "lv24",
+      body: "Full body",
+    });
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [full],
+    });
+    // The real list omits body; keep the fake detail read full.
+    const list = source.list.bind(source);
+    source.list = async (filter) => {
+      const result = await list(filter);
+      return {
+        ...result,
+        ideas: result.ideas.map((idea) => ({ ...idea, body: "" })),
+      };
+    };
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+    expect(ideas.items[0]?.body).toBe("");
+
+    ideas.openDrawer("detail");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ideas.drawerIdea?.body).toBe("Full body");
+
+    await ideas.save("detail", { title: "Renamed" });
+    expect(ideas.drawerIdea?.title).toBe("Renamed");
+    expect(ideas.drawerIdea?.body).toBe("Full body");
+  });
+
+  it("keeps the summary drawer and reports a failed detail read", async () => {
+    const { source, ideas } = makeStore();
+    await ideas.load();
+    const target = ideas.items[0];
+    source.get = async () => {
+      throw new Error("problem file");
+    };
+    ideas.openDrawer(target.id);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(ideas.drawerId).toBe(target.id);
+    expect(ideas.actionError).toBe("problem file");
+  });
+
   it("reports a load failure and keeps retry possible", async () => {
     const { source, ideas } = makeStore();
     source.list = async () => {
@@ -232,5 +304,217 @@ describe("IdeasStore", () => {
     expect(ideas.error).toBe("engine offline");
     ideas.dismissError();
     expect(ideas.error).toBeNull();
+  });
+
+  it("waits for an in-flight load before a forced refresh", async () => {
+    const { source, ideas } = makeStore();
+    let releaseFirst!: () => void;
+    const firstRead = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const list = source.list.bind(source);
+    let calls = 0;
+    source.list = async (filter) => {
+      calls += 1;
+      if (calls === 1) {
+        await firstRead;
+      }
+      return list(filter);
+    };
+
+    const initial = ideas.load();
+    const refresh = ideas.refresh();
+    releaseFirst();
+    await Promise.all([initial, refresh]);
+    expect(calls).toBe(2);
+  });
+
+  it("writes the desktop default lead into new ideas and untouched edits", async () => {
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [
+        ideaFixture({
+          id: "no-lead",
+          projectId: "lv24",
+          dueDate: "2026-12-01",
+        }),
+      ],
+    });
+    const ideas = new IdeasStore(source, {
+      now: () => now,
+      defaultLeadMinutes: () => 60,
+    });
+    await ideas.load();
+
+    const create = source.create.bind(source);
+    let created: IdeaCreateInput | undefined;
+    source.create = async (input) => {
+      created = input;
+      return create(input);
+    };
+    await ideas.quickAdd("Позвонить стоматологу");
+    expect(created?.remindBeforeMinutes).toBe(60);
+
+    const update = source.update.bind(source);
+    let saved: IdeaUpdateInput | undefined;
+    source.update = async (id, patch) => {
+      saved = patch;
+      return update(id, patch);
+    };
+    await ideas.save("no-lead", { title: "Переименовано" });
+    expect(saved?.remindBeforeMinutes).toBe(60);
+    expect(
+      ideas.items.find((idea) => idea.id === "no-lead")?.remindBeforeMinutes,
+    ).toBe(60);
+  });
+
+  it("keeps an explicit reminder and an explicit clear", async () => {
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [
+        ideaFixture({
+          id: "explicit",
+          projectId: "lv24",
+          dueDate: "2026-12-01",
+          remindBeforeMinutes: 120,
+        }),
+        ideaFixture({
+          id: "empty",
+          projectId: "lv24",
+          dueDate: "2026-12-02",
+        }),
+      ],
+    });
+    const ideas = new IdeasStore(source, {
+      now: () => now,
+      defaultLeadMinutes: () => 60,
+    });
+    await ideas.load();
+
+    const update = source.update.bind(source);
+    const patches: IdeaUpdateInput[] = [];
+    source.update = async (id, patch) => {
+      patches.push(patch);
+      return update(id, patch);
+    };
+
+    await ideas.save("explicit", { title: "Renamed" });
+    expect(patches.at(-1)?.remindBeforeMinutes).toBeUndefined();
+    expect(
+      ideas.items.find((idea) => idea.id === "explicit")?.remindBeforeMinutes,
+    ).toBe(120);
+
+    await ideas.save("empty", { remindBeforeMinutes: null });
+    expect(patches.at(-1)?.remindBeforeMinutes).toBeNull();
+    expect(
+      ideas.items.find((idea) => idea.id === "empty")?.remindBeforeMinutes,
+    ).toBeUndefined();
+  });
+
+  it("accepts the WS8 default-lead hook after construction", async () => {
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [
+        ideaFixture({
+          id: "dated",
+          projectId: "lv24",
+          dueDate: "2026-12-01",
+        }),
+      ],
+    });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+    ideas.setDefaultLeadMinutes(() => 30);
+
+    let patch: IdeaUpdateInput | undefined;
+    const update = source.update.bind(source);
+    source.update = async (id, input) => {
+      patch = input;
+      return update(id, input);
+    };
+    await ideas.save("dated", { title: "Renamed" });
+    expect(patch?.remindBeforeMinutes).toBe(30);
+  });
+
+  it("does not write a lead when reminders are off or the setting is absent", async () => {
+    const source = createFakeIdeasSource({ now: () => now, ideas: [] });
+    const ideas = new IdeasStore(source, {
+      now: () => now,
+      defaultLeadMinutes: () => 0,
+    });
+    await ideas.load();
+    const create = source.create.bind(source);
+    let created: IdeaCreateInput | undefined;
+    source.create = async (input) => {
+      created = input;
+      return create(input);
+    };
+    await ideas.quickAdd("Без напоминания");
+    expect(created?.remindBeforeMinutes).toBeUndefined();
+  });
+
+  it("refreshes after mutations and preserves the open drawer", async () => {
+    const { source, ideas } = makeStore();
+    await ideas.load();
+    const target = ideas.items.find((idea) => idea.status === "open");
+    expect(target).toBeDefined();
+    ideas.openDrawer((target as { id: string }).id);
+
+    let calls = 0;
+    const list = source.list.bind(source);
+    source.list = async (filter) => {
+      calls += 1;
+      return list(filter);
+    };
+
+    await ideas.save((target as { id: string }).id, { title: "Renamed" });
+    expect(calls).toBe(1);
+    expect(ideas.drawerId).toBe(target?.id);
+    expect(ideas.cursorId).toBe(target?.id);
+    expect(ideas.drawerIdea?.title).toBe("Renamed");
+
+    await ideas.quickAdd("Ещё одна");
+    expect(calls).toBe(2);
+
+    const current = ideas.items.find((idea) => idea.status === "open");
+    await ideas.trash((current as { id: string }).id);
+    expect(calls).toBe(3);
+  });
+
+  it("reopens a doing idea through open before restoring doing", async () => {
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [ideaFixture({ id: "doing", projectId: "lv24", status: "doing" })],
+    });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+    const patches: IdeaUpdateInput[] = [];
+    const update = source.update.bind(source);
+    source.update = async (id, patch) => {
+      patches.push(patch);
+      return update(id, patch);
+    };
+
+    await ideas.toggleDone("doing");
+    expect(await ideas.undoComplete()).toBe(true);
+    expect(patches.map((patch) => patch.status)).toEqual([
+      "done",
+      "open",
+      "doing",
+    ]);
+    expect(ideas.items[0]?.status).toBe("doing");
+  });
+
+  it("rolls back a failed trash and reports the error", async () => {
+    const { source, ideas } = makeStore();
+    await ideas.load();
+    const target = ideas.items[0];
+    source.trash = async () => {
+      throw new Error("trash failed");
+    };
+    expect(await ideas.trash(target.id)).toBe(false);
+    expect(ideas.items.some((idea) => idea.id === target.id)).toBe(true);
+    expect(ideas.actionError).toBe("trash failed");
+    expect(ideas.action).toBeNull();
   });
 });

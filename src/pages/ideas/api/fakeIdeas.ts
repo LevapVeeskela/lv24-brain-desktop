@@ -284,6 +284,14 @@ export class FakeIdeasSource implements IdeasSource {
     };
   }
 
+  async get(ideaId: string): Promise<Idea> {
+    const idea = this.find(ideaId);
+    if (!idea) {
+      throw new Error(`unknown idea: ${ideaId}`);
+    }
+    return copyIdea(idea);
+  }
+
   async create(input: IdeaCreateInput): Promise<Idea> {
     const title = input.title.trim().slice(0, IDEA_TITLE_MAX);
     if (!title) {

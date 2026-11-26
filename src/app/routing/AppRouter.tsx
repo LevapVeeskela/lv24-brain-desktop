@@ -38,7 +38,11 @@ export function AppRouter({ store }: { store: RootStore }) {
           <Route
             path="ideas"
             element={
-              <IdeasPage ideas={store.ideas} projects={store.projects} />
+              <IdeasPage
+                ideas={store.ideas}
+                projects={store.projects}
+                exportSource={store.ideasExport}
+              />
             }
           />
           <Route

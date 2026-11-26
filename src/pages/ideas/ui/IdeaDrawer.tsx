@@ -25,6 +25,7 @@ import {
   draftFieldPatch,
   draftIsDirty,
   draftPatch,
+  draftsEqual,
   statusChange,
   toIdeaDraft,
   type IdeaDraft,
@@ -65,6 +66,7 @@ export function IdeaDrawer({
   const titleRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
   const savesInFlight = useRef(0);
+  const baselineRef = useRef<Idea>(idea);
   const [draft, setDraft] = useState<IdeaDraft>(() => toIdeaDraft(idea));
   const [pendingDraft, setPendingDraft] = useState<IdeaDraft | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -72,10 +74,25 @@ export function IdeaDrawer({
   const source = ideaSourceText(idea);
 
   useEffect(() => {
+    const previous = baselineRef.current;
+    baselineRef.current = idea;
     // Keep the pending baseline while a second save is still in flight.
     if (savesInFlight.current === 0) {
       setPendingDraft(null);
     }
+    setDraft((current) => {
+      // A list row omits the body; the store replaces it with the detail read
+      // (or a refresh). Re-seed a draft the user has not edited yet.
+      if (draftsEqual(current, toIdeaDraft(previous))) {
+        return toIdeaDraft(idea);
+      }
+      // The store writes the desktop default lead on an edit that leaves the
+      // reminder untouched; mirror it so the drawer does not look dirty after
+      // that save.
+      return current.reminder === "" && idea.remindBeforeMinutes
+        ? { ...current, reminder: String(idea.remindBeforeMinutes) }
+        : current;
+    });
   }, [idea]);
 
   // The drawer is modal; open on the title and hand focus back to the row.

@@ -2020,6 +2020,316 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ideas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Lists ideas from every registered project by default, or from one resolved project. status and tags/tag are repeated or comma-separated; tags are an exact case-insensitive AND filter. total counts matches before limit. Unparsable or conflicted files are reported in problems and never dropped. An omitted project omits project_source. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A registered project id, alias or path; omit it to list every project. */
+                    project?: string;
+                    /** @description open, doing, done, dropped or someday; repeat or comma-separate for several. */
+                    status?: string;
+                    /** @description Exact case-insensitive AND filter; repeat or comma-separate. tag is an alias. */
+                    tags?: string;
+                    /** @description Alias of tags. */
+                    tag?: string;
+                    /** @description Exclusive RFC3339 upper bound; excludes undated ideas. */
+                    due_before?: string;
+                    /** @description Inclusive RFC3339 lower bound; excludes undated ideas. */
+                    due_after?: string;
+                    /** @description Case-insensitive substring over title, body and tags. */
+                    q?: string;
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Filtered ideas, problem rows and the pre-limit match count */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaPage"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        /** @description Creates one idea through the shared add use case: project resolution, redaction, write limits, ID allocation and search projection are the CLI's. due_at and due_date are mutually exclusive; send one or neither. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IdeaCreate"];
+                };
+            };
+            responses: {
+                /** @description The created idea with its body and the project source */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaWrite"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                403: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ideas/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns exactly the capped session block the CLI, MCP, the local API and the session hook render: text, the selected rows without bodies, the open and due-today counts and the mute flag. max is 1-10; the 700-character budget is fixed. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A registered project id, alias or path; it orders the block for the current project. */
+                    project?: string;
+                    scope?: "current" | "all";
+                    max?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The session block */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaBrief"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ideas/ical": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Exports dated ideas as one iCalendar file through the shared renderer: DTSTART;VALUE=DATE for all-day ideas, a UTC DTSTART for timed ideas, and VALARM from the lead time. This is a file export, not a live subscription. Done ideas are omitted unless include_done=1; dropped ideas are terminal and never exported. */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description A registered project id, alias or path; omit it to export every project. */
+                    project?: string;
+                    include_done?: boolean;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description An iCalendar file export */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/calendar": string;
+                    };
+                };
+                400: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ideas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        /** @description One idea with its body. The id is globally unique, so no project selector is needed. An unknown id is 404; a conflicted or unparsable file is 409 with its path and reason in the message and never a zero idea. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The idea with its body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaShow"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        put?: never;
+        post?: never;
+        /** @description Moves the idea file to the project trash and never hard-deletes it. The move is reversible with POST /v1/ideas/{id}/restore. An unknown live id is 404; a problem file is 409 and stays untouched. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The trashed idea id */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaTrash"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        options?: never;
+        head?: never;
+        /** @description Edits one idea in place. Omitted fields are unchanged; clear_due, clear_reminder and clear_tags are the only way to remove a value. Setting due_at or due_date clears the other and status follows the record transitions. expected_updated_at is the revision read; a stale value returns 409 with error.current_revision and writes nothing. project_source appears only when the request moved the idea. */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["IdeaPatch"];
+                };
+            };
+            responses: {
+                /** @description The edited idea with its body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaWrite"];
+                    };
+                };
+                400: components["responses"]["Error"];
+                403: components["responses"]["Error"];
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                413: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        trace?: never;
+    };
+    "/v1/ideas/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Restores one trashed idea and returns it with its body. A missing trashed id is 404; a live file with the same id is 409 and is never overwritten. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["parameters"]["ID"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The restored idea with its body */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["IdeaShow"];
+                    };
+                };
+                404: components["responses"]["Error"];
+                409: components["responses"]["Error"];
+                500: components["responses"]["Error"];
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2626,6 +2936,147 @@ export interface components {
             last_run: string | null;
             last_event?: string;
             last_error?: string;
+        };
+        Idea: {
+            id: string;
+            project_id: string;
+            title: string;
+            /** @description Present on read and write rows only; a list or brief row omits it. */
+            body?: string;
+            /** @enum {string} */
+            status: "open" | "doing" | "done" | "dropped" | "someday";
+            /** @enum {string} */
+            priority: "low" | "normal" | "high";
+            /**
+             * Format: date-time
+             * @description A timed due instant with its stored offset; null when unset.
+             */
+            due_at?: string | null;
+            /** @description An all-day local date (YYYY-MM-DD); null when unset. */
+            due_date?: string | null;
+            remind_before_minutes?: number | null;
+            tags: string[];
+            source?: {
+                /** @enum {string} */
+                type: "session" | "note" | "decision" | "commit" | "manual" | "desktop";
+                id?: string;
+                harness?: string;
+            } | null;
+            /** Format: date-time */
+            completed_at?: string | null;
+            completion_note?: string;
+            /** Format: date-time */
+            created_at?: string | null;
+            /**
+             * Format: date-time
+             * @description The revision expected_updated_at must carry.
+             */
+            updated_at?: string | null;
+            /** @description Logical data-directory path projects/<project>/ideas/<id>.md. */
+            path: string;
+            provenance: {
+                origin?: string;
+                reviewed?: boolean;
+                trust?: string;
+            };
+            validity: {
+                /** Format: date-time */
+                valid_from?: string | null;
+                /** Format: date-time */
+                valid_to?: string | null;
+                superseded_by?: string;
+                supersedes?: string;
+                confidence?: number;
+            };
+            relations: Record<string, never>[];
+            review: {
+                /** Format: date-time */
+                review_after?: string | null;
+                /** Format: date-time */
+                reviewed_at?: string | null;
+            };
+        };
+        IdeaProblem: {
+            path: string;
+            /** @enum {string} */
+            kind: "idea";
+            reason: string;
+        };
+        IdeaPage: {
+            ideas: components["schemas"]["Idea"][];
+            problems: components["schemas"]["IdeaProblem"][];
+            /** @description Matches before limit. */
+            total: number;
+            /**
+             * @description Present only when the request named one project.
+             * @enum {string}
+             */
+            project_source?: "explicit";
+        };
+        IdeaWrite: {
+            idea: components["schemas"]["Idea"];
+            /**
+             * @description Added to an edit only when the request moved the idea.
+             * @enum {string}
+             */
+            project_source?: "explicit" | "cwd" | "default";
+        };
+        IdeaShow: {
+            idea: components["schemas"]["Idea"];
+        };
+        IdeaTrash: {
+            id: string;
+            trashed: boolean;
+        };
+        IdeaBrief: {
+            /** @description Exactly the session block; never contains body text. */
+            text: string;
+            ideas: components["schemas"]["Idea"][];
+            open: number;
+            due_today: number;
+            muted: boolean;
+        };
+        IdeaCreate: {
+            title: string;
+            body?: string;
+            project?: string;
+            /** @enum {string} */
+            status?: "open" | "doing" | "done" | "dropped" | "someday";
+            /** @enum {string} */
+            priority?: "low" | "normal" | "high";
+            /** Format: date-time */
+            due_at?: string;
+            due_date?: string;
+            remind_before_minutes?: number;
+            tags?: string[];
+            source?: {
+                /** @enum {string} */
+                type: "session" | "note" | "decision" | "commit" | "manual" | "desktop";
+                id?: string;
+                harness?: string;
+            };
+        };
+        IdeaPatch: {
+            title?: string;
+            body?: string;
+            project?: string;
+            /** @enum {string} */
+            status?: "open" | "doing" | "done" | "dropped" | "someday";
+            /** @enum {string} */
+            priority?: "low" | "normal" | "high";
+            /** Format: date-time */
+            due_at?: string;
+            due_date?: string;
+            remind_before_minutes?: number;
+            tags?: string[];
+            /** @default false */
+            clear_due: boolean;
+            /** @default false */
+            clear_reminder: boolean;
+            /** @default false */
+            clear_tags: boolean;
+            /** Format: date-time */
+            expected_updated_at?: string;
         };
     };
     responses: {

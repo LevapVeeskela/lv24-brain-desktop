@@ -1,5 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
+import { ideasApi } from "@/entities/ideas/api/ideasApi";
 import {
+  IDEA_REMIND_MAX,
   isClosedIdeaStatus,
   type Idea,
   type IdeaCreateInput,
@@ -23,9 +25,19 @@ export type IdeasView = "focus" | "all";
 export type IdeaScope = "all" | "project";
 export type IdeaAction = "complete" | "reopen" | "save" | "trash" | "restore";
 
+/** The engine's list maximum; the page has no pager, so ask for everything. */
+const IDEA_LIST_LIMIT = 1000;
+
 export interface IdeasStoreOptions {
   /** Injectable clock keeps grouping and due chips deterministic in tests. */
   now?: () => Date;
+  /**
+   * WS8 integration point: the desktop reminder settings pass their
+   * `defaultLeadMinutes` getter here. The store writes the concrete value into
+   * new ideas and edits that leave the reminder untouched; an explicit record
+   * value always wins.
+   */
+  defaultLeadMinutes?: () => number | null | undefined;
 }
 
 export class IdeasStore {
@@ -58,16 +70,30 @@ export class IdeasStore {
 
   private readonly source: IdeasSource;
   private readonly clock: () => Date;
+  private defaultLeadMinutes?: () => number | null | undefined;
   private listToken = 0;
+  private detailToken = 0;
   private inFlight: Promise<void> | null = null;
   private saveChain: Promise<unknown> = Promise.resolve();
   private clockTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(source: IdeasSource, options: IdeasStoreOptions = {}) {
+  constructor(source: IdeasSource = ideasApi, options: IdeasStoreOptions = {}) {
     this.source = source;
     this.clock = options.now ?? (() => new Date());
+    this.defaultLeadMinutes = options.defaultLeadMinutes;
     this.nowAt = this.clock().getTime();
     makeAutoObservable(this, {}, { autoBind: true });
+  }
+
+  /**
+   * WS8 integration point: the reminders settings provider installs its live
+   * `defaultLeadMinutes` getter here once the settings load, and clears it on
+   * teardown. The value is read at write time and stored concretely.
+   */
+  setDefaultLeadMinutes(
+    source: (() => number | null | undefined) | null,
+  ): void {
+    this.defaultLeadMinutes = source ?? undefined;
   }
 
   /** Current clock value for row formatting; not a cached MobX computed. */
@@ -144,7 +170,11 @@ export class IdeasStore {
 
   load(options: { force?: boolean } = {}): Promise<void> {
     if (this.inFlight) {
-      return this.inFlight;
+      // A forced refresh must observe writes that happened after the current
+      // read started; wait for it, then run a fresh read.
+      return options.force
+        ? this.inFlight.then(() => this.load({ force: true }))
+        : this.inFlight;
     }
     if (this.loaded && !options.force) {
       return Promise.resolve();
@@ -242,6 +272,9 @@ export class IdeasStore {
     }
     this.drawerId = ideaId;
     this.cursorId = ideaId;
+    // List rows omit the body; the detail read fills it before the drawer is
+    // used for editing.
+    void this.loadDetail(ideaId, ++this.detailToken);
   }
 
   closeDrawer(): void {
@@ -259,10 +292,12 @@ export class IdeasStore {
       this.quickAddError = null;
     });
     try {
+      const lead = this.defaultLead();
       const input: IdeaCreateInput = {
         title: value,
         projectId: this.projectId ?? "personal",
         source: { type: "desktop" },
+        ...(lead === null ? {} : { remindBeforeMinutes: lead }),
       };
       const created = await this.source.create(input);
       runInAction(() => {
@@ -270,6 +305,7 @@ export class IdeasStore {
         this.loaded = true;
         this.cursorId = created.id;
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -329,6 +365,7 @@ export class IdeasStore {
       runInAction(() => {
         this.replace(saved);
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -361,15 +398,22 @@ export class IdeasStore {
       this.replace({ ...previous, updatedAt: stamp });
     });
     try {
-      const saved = await this.source.update(previous.id, {
-        status: previous.status,
-        completedAt: previous.completedAt ?? null,
-        completionNote: previous.completionNote ?? null,
+      // The engine only reopens done/dropped to `open`; restoring a `doing`
+      // or `someday` idea is a second allowed transition from `open`.
+      const reopened = await this.source.update(previous.id, {
+        status: "open",
       });
+      const saved =
+        previous.status === "open"
+          ? reopened
+          : await this.source.update(previous.id, {
+              status: previous.status,
+            });
       runInAction(() => {
         this.replace(saved);
         this.lastCompleted = null;
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -414,10 +458,14 @@ export class IdeasStore {
       this.actionError = null;
     });
     try {
-      const saved = await this.source.update(ideaId, patch);
+      const saved = await this.source.update(
+        ideaId,
+        this.withDefaultLead(ideaId, patch),
+      );
       runInAction(() => {
         this.replace(saved);
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -460,6 +508,7 @@ export class IdeasStore {
       runInAction(() => {
         this.lastTrashed = trashed;
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -494,8 +543,10 @@ export class IdeasStore {
       const restored = await this.source.restore(trashed.id);
       runInAction(() => {
         this.replace(restored);
+        this.cursorId = restored.id;
         this.lastTrashed = null;
       });
+      await this.refresh();
       return true;
     } catch (cause) {
       runInAction(() => {
@@ -530,6 +581,81 @@ export class IdeasStore {
     }
   }
 
+  /** The concrete desktop lead, or null when reminders are off. */
+  private defaultLead(): number | null {
+    const minutes = this.defaultLeadMinutes?.();
+    if (minutes === undefined || minutes === null) {
+      return null;
+    }
+    const value = Math.trunc(minutes);
+    return value > 0 && value <= IDEA_REMIND_MAX ? value : null;
+  }
+
+  /**
+   * Applies the desktop default lead when a content edit does not touch the
+   * reminder. An explicit stored value always wins, a status/completion-only
+   * change never adds a lead, and the record receives the concrete minutes,
+   * never a hidden "use default" marker.
+   */
+  private withDefaultLead(
+    ideaId: string,
+    patch: IdeaUpdateInput,
+  ): IdeaUpdateInput {
+    if (patch.remindBeforeMinutes !== undefined) {
+      return patch;
+    }
+    const current = this.items.find((idea) => idea.id === ideaId);
+    if (!current || current.remindBeforeMinutes) {
+      return patch;
+    }
+    const touchesContent =
+      patch.title !== undefined ||
+      patch.body !== undefined ||
+      patch.projectId !== undefined ||
+      patch.priority !== undefined ||
+      patch.dueAt !== undefined ||
+      patch.dueDate !== undefined ||
+      patch.tags !== undefined;
+    if (!touchesContent || patch.completionNote !== undefined) {
+      return patch;
+    }
+    // A lead without a due instant is inert; only edit a dated idea.
+    const dueCleared = patch.dueAt === null && patch.dueDate === null;
+    const hasDue =
+      !dueCleared &&
+      Boolean(patch.dueAt ?? patch.dueDate ?? current.dueAt ?? current.dueDate);
+    if (!hasDue) {
+      return patch;
+    }
+    const lead = this.defaultLead();
+    return lead === null ? patch : { ...patch, remindBeforeMinutes: lead };
+  }
+
+  /**
+   * Reads the full row (with body) for the open drawer. A stale response is
+   * dropped, and a row that was trashed meanwhile is not resurrected.
+   */
+  private async loadDetail(ideaId: string, token: number): Promise<void> {
+    try {
+      const detail = await this.source.get(ideaId);
+      if (token !== this.detailToken) {
+        return;
+      }
+      runInAction(() => {
+        if (this.items.some((idea) => idea.id === ideaId)) {
+          this.replace(detail);
+        }
+      });
+    } catch (cause) {
+      if (token !== this.detailToken) {
+        return;
+      }
+      runInAction(() => {
+        this.actionError = errorMessage(cause);
+      });
+    }
+  }
+
   private async performLoad(): Promise<void> {
     const token = ++this.listToken;
     runInAction(() => {
@@ -538,15 +664,38 @@ export class IdeasStore {
       this.error = null;
     });
     try {
-      const filter: IdeaFilter = {};
+      const filter: IdeaFilter = { limit: IDEA_LIST_LIMIT };
       const result = await this.source.list(filter);
       if (token !== this.listToken) {
         return;
       }
       runInAction(() => {
-        this.items = result.ideas;
+        // List rows omit the body. Keep the open drawer's loaded body across a
+        // refresh so editing a field cannot blank the textarea.
+        const openDetail =
+          this.drawerId === null
+            ? null
+            : (this.items.find((idea) => idea.id === this.drawerId) ?? null);
+        const rows = result.ideas.map((idea) =>
+          openDetail !== null &&
+          idea.id === openDetail.id &&
+          !idea.body &&
+          openDetail.body
+            ? { ...idea, body: openDetail.body }
+            : idea,
+        );
+        this.items = rows;
         this.problems = result.problems;
         this.loaded = true;
+        // A refresh after a mutation must not move the selection; only a row
+        // that truly vanished (trash, another writer) clears the cursor.
+        const ids = new Set(rows.map((idea) => idea.id));
+        if (this.drawerId !== null && !ids.has(this.drawerId)) {
+          this.drawerId = null;
+        }
+        if (this.cursorId !== null && !ids.has(this.cursorId)) {
+          this.cursorId = null;
+        }
       });
     } catch (cause) {
       if (token !== this.listToken) {

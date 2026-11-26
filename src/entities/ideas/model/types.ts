@@ -83,9 +83,16 @@ export interface IdeaProblem {
   reason: string;
 }
 
+/** Where the engine resolved an idea's project from (`project_source`). */
+export type IdeaProjectSource = "explicit" | "cwd" | "default";
+
 export interface IdeaListResult {
   ideas: Idea[];
   problems: IdeaProblem[];
+  /** Matches before the server-side limit; informational for the list. */
+  total?: number;
+  /** Present when the request named one project. */
+  projectSource?: IdeaProjectSource;
 }
 
 export interface IdeaCreateInput {
@@ -122,6 +129,8 @@ export interface IdeaUpdateInput {
 /** The injectable data source; the fake below and the real client share it. */
 export interface IdeasSource {
   list(filter: IdeaFilter): Promise<IdeaListResult>;
+  /** One idea with its body; list rows intentionally omit body. */
+  get(id: string): Promise<Idea>;
   create(input: IdeaCreateInput): Promise<Idea>;
   update(id: string, patch: IdeaUpdateInput): Promise<Idea>;
   trash(id: string): Promise<Idea>;
@@ -130,6 +139,8 @@ export interface IdeasSource {
 
 export const IDEA_TITLE_MAX = 200;
 export const IDEA_TAGS_MAX = 10;
+/** One week, the engine's `remind_before_minutes` ceiling. */
+export const IDEA_REMIND_MAX = 10080;
 
 /** Allowed status moves; `done`/`dropped` reopen to `open` first. */
 export const IDEA_STATUS_TRANSITIONS: Record<IdeaStatus, readonly IdeaStatus[]> = {

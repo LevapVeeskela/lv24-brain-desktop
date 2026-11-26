@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Project } from "@/entities/project/model/types";
 import type { ProjectsStore } from "@/entities/project/model/ProjectsStore";
+import type { IdeaExportSource } from "@/features/ideas-export/model/types";
 import { useI18n, type MessageKey } from "@/shared/i18n";
 import { isInsideBlockingModal } from "@/shared/lib/shortcuts";
 import { Button } from "@/shared/ui/Button";
@@ -41,6 +42,11 @@ export const IdeasPage = observer(function IdeasPage({
 }: {
   ideas: IdeasStore;
   projects: ProjectsStore;
+  /**
+   * WS9 integration point: the calendar tab's export button consumes this.
+   * WS7 injects the real `GET /v1/ideas/ical` source from `RootStore`.
+   */
+  exportSource?: IdeaExportSource;
 }) {
   const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();

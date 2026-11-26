@@ -3,6 +3,7 @@ import { ConnectionApi } from "@/entities/connection/api/connectionApi";
 import { ConnectionsStore } from "@/entities/connection/model/ConnectionsStore";
 import { EngineStore } from "@/entities/engine/model/EngineStore";
 import { GitSyncStore } from "@/entities/git-sync/model/GitSyncStore";
+import { ideasApi } from "@/entities/ideas/api/ideasApi";
 import { memoryApi } from "@/entities/memory/api/memoryApi";
 import { MemoryStore } from "@/entities/memory/model/MemoryStore";
 import { QuarantineStore } from "@/entities/memory/model/QuarantineStore";
@@ -15,7 +16,11 @@ import { ProvidersStore } from "@/entities/provider/model/ProvidersStore";
 import { RunsStore } from "@/entities/run/model/RunsStore";
 import { SettingsStore } from "@/entities/settings/model/SettingsStore";
 import { SyncStore } from "@/entities/sync/model/SyncStore";
-import { createFakeIdeasSource } from "@/pages/ideas/api/fakeIdeas";
+import {
+  createLocalApiIdeaExportSource,
+  ideaExportScope,
+} from "@/features/ideas-export/api/localApiIdeaExport";
+import type { IdeaExportSource } from "@/features/ideas-export/model/types";
 import { IdeasStore } from "@/pages/ideas/model/IdeasStore";
 
 export class RootStore {
@@ -31,8 +36,10 @@ export class RootStore {
   readonly search: SearchStore;
   readonly review: ReviewStore;
   readonly quarantine: QuarantineStore;
-  /** Fake source until WS7 wires the local API; the UI shape stays the same. */
+  /** Real local API source; tests and stories inject the fake explicitly. */
   readonly ideas: IdeasStore;
+  /** Real `.ics` export source for the WS9 calendar export surface. */
+  readonly ideasExport: IdeaExportSource;
   /** A second search instance keeps the palette from replacing page results. */
   readonly commandSearch: SearchStore;
 
@@ -52,7 +59,17 @@ export class RootStore {
     this.search = new SearchStore(memoryApi);
     this.review = new ReviewStore(memoryApi);
     this.quarantine = new QuarantineStore(memoryApi);
-    this.ideas = new IdeasStore(createFakeIdeasSource());
+    // WS8 integration point: the reminders settings provider calls
+    // `this.ideas.setDefaultLeadMinutes(() =>
+    // reminders.settings?.defaultLeadMinutes ?? null)` once its settings load;
+    // the ideas store writes the concrete value on create/edit.
+    this.ideas = new IdeasStore(ideasApi);
+    this.ideasExport = createLocalApiIdeaExportSource(() =>
+      ideaExportScope({
+        scope: this.ideas.scope,
+        projectId: this.ideas.projectId,
+      }),
+    );
     this.commandSearch = new SearchStore(memoryApi, { debounceMs: 160 });
   }
 
