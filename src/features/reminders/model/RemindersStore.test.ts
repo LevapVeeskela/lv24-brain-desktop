@@ -19,7 +19,6 @@ const settings: ReminderSettings = {
 const status: RemindersStatus = {
   settings,
   permission: "granted",
-  todayCount: 2,
   missed: null,
   deliveryError: null,
 };
@@ -64,7 +63,6 @@ describe("RemindersStore", () => {
 
     expect(store.settings?.remindersEnabled).toBe(true);
     expect(store.permission).toBe("granted");
-    expect(store.todayCount).toBe(2);
 
     events.get("ideas-focus")?.({ ideaId: "idea-01J8ZQ4T7X" });
     expect(navigations.at(-1)).toBe("#/ideas?focus=idea-01J8ZQ4T7X");
@@ -182,5 +180,6 @@ describe("RemindersStore", () => {
 
     expect(store.testResult).toBe("failed");
     expect(store.permission).toBe("denied");
+    expect(store.deliveryError).toBeNull();
   });
 });

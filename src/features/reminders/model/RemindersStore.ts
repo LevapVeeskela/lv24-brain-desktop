@@ -41,7 +41,6 @@ function fallbackKey(reminder: InAppReminder): string {
 export class RemindersStore {
   settings: ReminderSettings | null = null;
   permission: NotificationPermission = "prompt";
-  todayCount = 0;
   missed: MissedDigest | null = null;
   /** In-app fallbacks for toasts the OS refused; every failure is kept. */
   fallbacks: InAppReminder[] = [];
@@ -159,11 +158,17 @@ export class RemindersStore {
     this.error = null;
     try {
       const result = await this.deps.api.testNotification();
+      const permission = normalizePermission(result.permission);
       runInAction(() => {
         this.testResult = result.delivered ? "ok" : "failed";
         this.testError = result.delivered ? null : (result.error ?? null);
-        this.permission = normalizePermission(result.permission);
-        this.deliveryError = result.delivered ? null : (result.error ?? null);
+        this.permission = permission;
+        // Mirror the Rust guard: a denial is explained by the permission
+        // notice, so it must not also raise a delivery error.
+        this.deliveryError =
+          result.delivered || permission === "denied"
+            ? null
+            : (result.error ?? null);
       });
     } catch (cause) {
       runInAction(() => {
@@ -238,7 +243,6 @@ export class RemindersStore {
     this.settings = status.settings;
     this.persisted = status.settings;
     this.permission = normalizePermission(status.permission);
-    this.todayCount = status.todayCount;
     this.deliveryError = status.deliveryError ?? null;
     if (status.missed) {
       this.missed = status.missed;

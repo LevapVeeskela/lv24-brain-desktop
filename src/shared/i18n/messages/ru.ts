@@ -839,7 +839,7 @@ export const ru: Messages = {
   "reminders.autostartHint": "Напоминания работают, только пока приложение или его значок в трее запущены.",
   "reminders.missedTitle": "Пока вас не было",
   "reminders.missedOne": "Пропущено одно напоминание.",
-  "reminders.missedMany": "Пропущено {count} напоминаний.",
+  "reminders.missedMany": "Пропущено напоминаний: {count}",
   "reminders.viewIdeas": "Открыть идеи",
   "reminders.fallbackTitle": "Напоминание",
   "reminders.fallbackBody": "Наступил срок напоминания.",

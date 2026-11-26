@@ -5,12 +5,14 @@ use serde::Serialize;
 
 use crate::error::AppResult;
 
-/// Writes pretty JSON through a temporary file and an atomic rename.
+/// Writes pretty JSON through a temporary file and a best-effort replace.
 ///
 /// The desktop settings file, the reminder watermark and any future small
-/// state files share the same crash-safe sequence: create the parent, write
-/// `*.json.tmp`, then rename. Windows cannot rename over an existing file, so
-/// the destination is removed first there.
+/// state files share one write path: create the parent, write `*.json.tmp`,
+/// then replace the destination. Windows cannot rename over an existing file,
+/// so it is removed first there; that leaves a short window where the file is
+/// absent, so this is not a true atomic replace, but readers never observe a
+/// partially written file.
 pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;

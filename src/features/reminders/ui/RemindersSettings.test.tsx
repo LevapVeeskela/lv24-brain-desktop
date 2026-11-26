@@ -14,7 +14,6 @@ const status: RemindersStatus = {
     notifySound: false,
   },
   permission: "granted",
-  todayCount: 1,
   missed: null,
   deliveryError: null,
 };
