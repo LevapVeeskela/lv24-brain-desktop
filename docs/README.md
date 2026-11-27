@@ -15,9 +15,10 @@ single source for the release version.
 
 | File | Scope | Status |
 |---|---|---|
-| `ARCHITECTURE.md` | Current system design for 1.7.2 | Current |
+| `ARCHITECTURE.md` | Current system design for 1.8.0 | Current |
 | `security.md` | Trust boundary, controls, residual risks | Current |
-| `release.md` | Packaging matrix, engine pin, signing, checklist | Current (1.7.2) |
+| `release.md` | Packaging matrix, engine pin, signing, checklist | Current (1.8.0) |
+| `release-1.8.0.md` | 1.8.0 scope, engine floor and pending manual checks | Current release record |
 | `operations.md` | Windows Error Reporting LocalDumps | Current |
 | `architecture-deep-dive.md` | WP5.1–WP5.5 and desktop 1.2 implementation detail | Historical deep dive |
 | `design-refresh.md` | 1.1 visual refresh decisions | Historical record |

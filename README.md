@@ -9,7 +9,8 @@ runner and background agent that you can inspect and control from one window.
 
 - A native shell (Rust) plus a React webview for a **local-first** Brain instance.
 - The place to see engine health, connections, schedules, runs, credentials
-  (provider names and status only), projects, records, review queues and activity.
+  (provider names and status only), projects, records, the idea backlog with
+  reminders and calendar export, review queues and activity.
 - A supervisor for `brain agent`: it spawns the agent, watches its runtime
   record, restarts an unexpected exit and stops it on quit or pause.
 - Not a hosted service. It has no remote API, no multi-user model and no
@@ -23,8 +24,8 @@ runner and background agent that you can inspect and control from one window.
 
 | Item | Value |
 |---|---|
-| Version | 1.7.2 (`package.json`, `src-tauri/Cargo.toml`, tag `v1.7.2`) |
-| Ship state | Tagged desktop release; packaged builds bundle engine 0.27.2. Installer publication is owner-gated (release assets not verified here) |
+| Version | 1.8.0 (`package.json`, `src-tauri/Cargo.toml`; tag `v1.8.0` after owner approval) |
+| Ship state | Release prepared locally, not tagged or published. Packaged builds target engine 0.28.0; the 0.28.0 checksum pin is still pending |
 | Visibility | Public |
 | Repo | <https://github.com/LevapVeeskela/lv24-brain-desktop> |
 | Prod | Desktop installers from GitHub Releases (owner-gated); no web deployment |
@@ -43,6 +44,8 @@ runner and background agent that you can inspect and control from one window.
 - [Tauri v2 system prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
 - An initialized LV24 Brain instance (`brain init`, then `brain config use <path>`)
   or an explicit engine path.
+- LV24 Brain engine **>= 0.28.0** (the Ideas and reminders API); packaged builds
+  bundle the checksum-pinned sidecar.
 
 ## Quick start
 
@@ -83,7 +86,7 @@ Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Path | Purpose |
 |---|---|
 | `src/app/` | Composition root: RootStore, providers, router, layout, global styles |
-| `src/pages/` | Dashboard, memory, inbox, quarantine, search, projects, activity, connections, git sync, settings |
+| `src/pages/` | Dashboard, ideas, memory, inbox, quarantine, search, projects, activity, connections, git sync, settings |
 | `src/widgets/`, `src/features/`, `src/entities/` | FSD slices for shell chrome, user actions and domain models |
 | `src/shared/` | API transport/client, generated schema, i18n, UI primitives, helpers |
 | `src-tauri/src/` | Rust shell: supervisor, allowlisted proxy, SSE, tray, autostart, deep links, updater, settings |
@@ -100,6 +103,7 @@ Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | Shell deep dive (historical detail) | [docs/architecture-deep-dive.md](docs/architecture-deep-dive.md) |
 | Security model | [docs/security.md](docs/security.md) |
 | Packaging and release | [docs/release.md](docs/release.md) |
+| 1.8.0 release notes | [docs/release-1.8.0.md](docs/release-1.8.0.md) |
 | Windows crash dumps | [docs/operations.md](docs/operations.md) |
 | Design refresh and screenshots | [docs/design-refresh.md](docs/design-refresh.md) |
 | Brand assets | [docs/neuro-brand.md](docs/neuro-brand.md) |
@@ -116,9 +120,9 @@ outside the `/v1/` allowlist; regenerate the typed client with
 `npm run api:generate` after any `localapi-v1` change and keep `npm run api:check`
 green; keep FSD imports pointing down; no inline `style` attributes (styles live
 in `global.css` and slice style files); do not bundle an engine older than the
-pin floor in `scripts/engine-checksums.json`.
+pin floor in `scripts/engine-checksums.json`; 1.8.0 requires engine >= 0.28.0.
 
-## Known limitations (1.7.2)
+## Known limitations (1.8.0)
 
 - Local `cargo`/Vite runs resolve the engine from the environment; only packaged
   builds include the sidecar.

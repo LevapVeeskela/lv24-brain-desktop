@@ -1,4 +1,4 @@
-# Security model (v1.7.2)
+# Security model (v1.8.0)
 
 The shell is the only component that ever holds the local API bearer token.
 This document records the boundary and the accepted residual risks.

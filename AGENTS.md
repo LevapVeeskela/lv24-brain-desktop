@@ -41,7 +41,7 @@ cargo test --all-targets
 Packaging smoke test (unsigned, Windows example):
 
 ```bash
-node scripts/fetch-engine.mjs --version 0.27.2 --target x86_64-pc-windows-msvc
+node scripts/fetch-engine.mjs --version 0.28.0 --target x86_64-pc-windows-msvc
 npm run tauri build -- --debug --bundles nsis \
   --config src-tauri/tauri.bundle.conf.json \
   --config src-tauri/tauri.unsigned.conf.json
@@ -78,7 +78,10 @@ packaging.
    `npm run api:check` green. Never hand-edit the generated file.
 4. **Engine pin.** `scripts/engine-checksums.json` is the reviewed pin.
    `desktop.yml` refuses an engine below the highest pinned version; add
-   checksums before raising `engine_version`. Current bundle: `0.27.2`.
+   checksums before raising `engine_version`. Desktop 1.8.0 needs engine
+   `0.28.0`; its pin is not committed yet (engine release unpublished), so
+   packaging fails until the `0.28.0` hashes are pinned. Highest pinned:
+   `0.27.2`.
 5. **FSD direction.** `app → pages → widgets → features → entities → shared`.
    Import slices through `index.ts`; `shared` holds no product logic.
 6. **No inline styles.** Styles live in `src/app/styles/global.css` or a slice

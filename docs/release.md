@@ -1,4 +1,4 @@
-﻿# Packaging and release (v1.7.2)
+﻿# Packaging and release (v1.8.0)
 
 The desktop app downloads the matching engine release binary at build time and
 bundles it as a Tauri sidecar. The supervisor finds it next to the desktop
@@ -13,7 +13,7 @@ Inputs:
 
 | Input | Default | Meaning |
 | --- | --- | --- |
-| `engine_version` | `0.27.2` | LV24 Brain engine release to bundle. |
+| `engine_version` | `0.28.0` | LV24 Brain engine release to bundle. 1.8.0 requires engine >= 0.28.0 (Ideas). |
 | `signed` | `false` | Create updater artifacts and signatures. Requires repo secrets. |
 | `publish_release` | `false` | Publish a GitHub release and `latest.json`. Requires `signed=true` and a tag. |
 | `tag` | empty | Release tag, for example `v1.2.0`. Required only for publishing. |
@@ -36,6 +36,12 @@ the engine release `checksums.txt` and the reviewed pin in
 stays buildable without downloaded sidecars, but bundling still needs the
 updater signing key unless the unsigned override is passed. Engine upgrades
 require updating the pin file.
+
+The 1.8.0 release targets engine `0.28.0`, whose checksums are **not pinned
+yet**: the engine release is not published. Until the reviewed `0.28.0` hashes
+are added to `scripts/engine-checksums.json`, `fetch-engine.mjs` stops with
+`No pinned checksum for ... in engine 0.28.0`. Adding that pin is the only
+remaining packaging step for this release; do not bundle an older engine.
 
 Unsigned build jobs add `src-tauri/tauri.unsigned.conf.json`
 (`createUpdaterArtifacts: false`) and do not need signing secrets.
@@ -77,7 +83,8 @@ OS code signing is separate from updater signing:
 ## Release checklist
 
 1. Merge the desktop change and confirm the normal CI is green.
-2. Check the engine release/tag and its `checksums.txt`.
+2. Check the engine release/tag and its `checksums.txt`; add the reviewed
+   `0.28.0` hashes to `scripts/engine-checksums.json` (not committed yet).
 3. Run `desktop.yml` with `signed=false` to verify unsigned packaging.
 4. Run with `signed=true` (no release) to verify updater artifacts if secrets
    are configured.
@@ -93,7 +100,7 @@ OS code signing is separate from updater signing:
 Windows example (derive the target triple with `rustc -vV` on other hosts):
 
 ```bash
-node scripts/fetch-engine.mjs --version 0.27.2 --target x86_64-pc-windows-msvc
+node scripts/fetch-engine.mjs --version 0.28.0 --target x86_64-pc-windows-msvc
 npm run tauri build -- --debug --bundles nsis \
   --config src-tauri/tauri.bundle.conf.json \
   --config src-tauri/tauri.unsigned.conf.json

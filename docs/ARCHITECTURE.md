@@ -1,6 +1,6 @@
 # LV24 Brain Desktop — system design
 
-Status: current for desktop **1.7.2** (2026-11-27). The older
+Status: current for desktop **1.8.0** (2026-11-27). The older
 [architecture-deep-dive.md](architecture-deep-dive.md) remains as a historical
 deep dive into the WP5.1–WP5.5 implementation and desktop 1.2 detail; this file
 is the current source of truth for the system.
@@ -18,6 +18,8 @@ In scope:
 - supervise the local `brain agent` process for the configured data directory;
 - proxy the frozen `localapi-v1` contract through an allowlisted Rust layer;
 - render the UI from a typed client, FSD slices and MobX stores;
+- track the Ideas backlog (statuses, priorities, due dates, tags), with
+  lead-time reminders, a month calendar and ICS export;
 - package installers with a checksum-pinned engine sidecar and signed updates.
 
 Out of scope (deliberate):
@@ -73,6 +75,7 @@ Errors and events carry the URL without a token.
 | Deep links | Register `lv24brain://`, validate `oauth/` and `auth/` URLs, buffer and emit | `src-tauri/src/deep_link.rs` | OS scheme |
 | Watchdog / lifecycle | Detect a dead or hung UI, restart hints, unclean-session diagnostics | `src-tauri/src/watchdog.rs`, `lifecycle.rs` | local files |
 | Desktop settings | `paused`, optional config path, locale/update preferences | `src-tauri/src/settings.rs`, `src/shared/…/settings` | Tauri app config dir |
+| Reminders | Due-time scheduler, lead times, quiet hours, missed digest, native notifications | `src-tauri/src/reminders.rs` | app config + OS notifications |
 | Typed client | `openapi-fetch` over a Tauri `fetch` replacement | `src/shared/api/`, `generated/schema.d.ts` | in-process |
 | FSD UI | Routes, widgets, features and stores for every screen | `src/main.tsx`, `src/app/App.tsx` | WebView memory |
 | i18n | Typed `en`/`ru`/`zh` dictionaries with key-parity tests | `src/shared/i18n/messages/` | local storage |
@@ -82,14 +85,15 @@ Errors and events carry the URL without a token.
 ```
 src/
   app/        RootStore composition, providers, HashRouter, layout, global.css
-  pages/      dashboard, memory, inbox, quarantine, search, projects,
+  pages/      dashboard, ideas, memory, inbox, quarantine, search, projects,
               project-detail, activity, connections, connection-detail,
               connection-wizard, git-sync, settings, not-found
   widgets/    app header/rail, engine overview/card, paths, connections,
-              run log panel
+              run log panel, ideas-today
   features/   engine controls, autostart, update check, locale, OAuth callback,
-              command palette
-  entities/   engine, connection, run, project, provider, sync, settings, memory
+              command palette, reminders, ideas-export
+  entities/   engine, connection, run, project, provider, sync, settings,
+              memory, ideas
   shared/     API transport/client, i18n, UI primitives, error/format helpers
 ```
 
@@ -109,6 +113,8 @@ builds free of server routes.
 | `SearchStore` | debounced queries, filters, cursor paging, all-projects scope |
 | `ReviewStore` | review report, proposal queue, bounded preview, dry-run/apply fixes |
 | `QuarantineStore` | quarantine paging and review with an optional trust override |
+| `IdeasStore` | idea list and filters, draft editor, focus/keyboard state, month calendar |
+| `RemindersStore` | reminder settings, notification permission, missed digest, in-app banner |
 
 ### Status and events
 
@@ -210,7 +216,7 @@ exits so the installer can replace the sidecar.
 | Local API token, port, PID | engine | `data_dir/agent/runtime.json` | 0600; read per request by Rust |
 | Curated memory, records, state | engine | engine data dir | never copied into the desktop config |
 | Connection credentials | engine / OS keychain | keychain or engine secret store | desktop sees names only |
-| Desktop settings | desktop | Tauri app config dir (`settings.json`) | `paused`, optional config path |
+| Desktop settings | desktop | Tauri app config dir (`settings.json`) | `paused`, optional config path, reminder preferences |
 | Logs | desktop | Tauri log dir | no token; engine stderr passes through redaction |
 | Update artifacts | CI | GitHub Releases + 7-day Actions artifacts | private key never in repo |
 
