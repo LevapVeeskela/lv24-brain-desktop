@@ -37,6 +37,10 @@ export interface IdeaIcalRequest {
   projectId?: string;
   /** Done ideas stay out of the calendar by default. */
   includeDone?: boolean;
+  /** Transient search, mirroring the list `q` filter. */
+  query?: string;
+  /** Exact case-insensitive AND filter; the route also accepts `tag`. */
+  tags?: readonly string[];
 }
 
 export interface IdeaBriefRequest {
@@ -190,6 +194,7 @@ export function ideaCreateBody(input: IdeaCreateInput): IdeaCreateBody {
     remind_before_minutes: input.remindBeforeMinutes,
     tags: input.tags,
     source: input.source,
+    completion_note: input.completionNote,
   };
 }
 
@@ -209,8 +214,10 @@ export type IdeaPatchInput = Omit<
 
 /**
  * Maps the WS6 patch to the wire body. `null` clear signals become the API's
- * explicit `clear_*` flags; an empty tag list means `clear_tags`. Completion
- * metadata is read-only on the API (the status transition owns it).
+ * explicit `clear_*` flags; an empty tag list means `clear_tags`. The
+ * completion note is writable, but a `null` clear travels as an empty string
+ * because the nullable wire field cannot distinguish a clear from an omitted
+ * value. The completion instant stays owned by the status transition.
  */
 export function ideaPatchBody(patch: IdeaUpdateInput): IdeaPatchInput {
   const body: IdeaPatchInput = {};
@@ -251,6 +258,9 @@ export function ideaPatchBody(patch: IdeaUpdateInput): IdeaPatchInput {
   if (patch.body !== undefined) {
     body.body = patch.body;
   }
+  if (patch.completionNote !== undefined) {
+    body.completion_note = patch.completionNote ?? "";
+  }
   return body;
 }
 
@@ -288,10 +298,15 @@ export function ideaBriefQuery(request: IdeaBriefRequest = {}): {
 export function ideaIcalQuery(request: IdeaIcalRequest = {}): {
   project?: string;
   include_done?: boolean;
+  tags?: string;
+  q?: string;
 } {
+  const query = request.query?.trim();
   return {
     project: request.projectId,
     include_done: request.includeDone === true ? true : undefined,
+    tags: request.tags?.length ? request.tags.join(",") : undefined,
+    q: query ? query : undefined,
   };
 }
 
@@ -361,14 +376,8 @@ export async function updateIdea(
 ): Promise<IdeaWriteResult> {
   const body = ideaPatchBody(patch);
   if (Object.keys(body).length === 0) {
-    // The API rejects an empty patch. A completion-note-only edit cannot be
-    // written because the route does not expose completion metadata; say so
-    // instead of silently reporting success.
-    if (patch.completionNote !== undefined || patch.completedAt !== undefined) {
-      throw new Error(
-        "the local API writes completion notes through the status transition, not an idea patch",
-      );
-    }
+    // The API rejects an empty patch. `completedAt` is read-only (the status
+    // transition owns the instant), so a patch that only carries it is empty.
     throw new Error("the idea patch has no writable fields");
   }
   if (expectedUpdatedAt) {

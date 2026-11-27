@@ -310,6 +310,7 @@ export class FakeIdeasSource implements IdeasSource {
       dueAt: input.dueAt,
       dueDate: input.dueAt ? undefined : input.dueDate,
       remindBeforeMinutes: input.remindBeforeMinutes,
+      completionNote: input.completionNote,
       createdAt,
       updatedAt: createdAt,
     };

@@ -47,6 +47,8 @@ export class IdeasStore {
   loading = false;
   loaded = false;
   error: string | null = null;
+  /** Matches before the server-side limit; null until the first read. */
+  total: number | null = null;
 
   view: IdeasView = "focus";
   scope: IdeaScope = "all";
@@ -125,6 +127,11 @@ export class IdeasStore {
   /** Global count for the rail badge; ignores the page scope. */
   get openCount(): number {
     return openIdeaCount(this.items);
+  }
+
+  /** True when the engine matched more rows than the page loaded. */
+  get truncated(): boolean {
+    return this.total !== null && this.total > this.items.length;
   }
 
   get dueTodayCount(): number {
@@ -500,6 +507,8 @@ export class IdeasStore {
     }
     this.refreshNow();
     const previous = this.items;
+    const previousDrawerId = this.drawerId;
+    const previousCursorId = this.cursorId;
     const current = this.items.find((idea) => idea.id === ideaId);
     if (!current) {
       return false;
@@ -526,6 +535,14 @@ export class IdeasStore {
     } catch (cause) {
       runInAction(() => {
         this.items = previous;
+        // Restore the drawer/cursor the optimistic removal cleared, unless the
+        // user already moved on to another row while the request was in flight.
+        if (this.drawerId === null) {
+          this.drawerId = previousDrawerId;
+        }
+        if (this.cursorId === null) {
+          this.cursorId = previousCursorId;
+        }
         this.actionError = errorMessage(cause);
       });
       return false;
@@ -632,8 +649,9 @@ export class IdeasStore {
     if (!touchesContent || patch.completionNote !== undefined) {
       return patch;
     }
-    // A lead without a due instant is inert; only edit a dated idea.
-    const dueCleared = patch.dueAt === null && patch.dueDate === null;
+    // A lead without a due instant is inert; only edit a dated idea. Either
+    // explicit due clear (the drawer always sends both) clears the day.
+    const dueCleared = patch.dueAt === null || patch.dueDate === null;
     const hasDue =
       !dueCleared &&
       Boolean(patch.dueAt ?? patch.dueDate ?? current.dueAt ?? current.dueDate);
@@ -655,9 +673,25 @@ export class IdeasStore {
         return;
       }
       runInAction(() => {
-        if (this.items.some((idea) => idea.id === ideaId)) {
-          this.replace(detail);
+        const current = this.items.find((idea) => idea.id === ideaId);
+        if (!current) {
+          // Trashed while the read was in flight; do not resurrect it.
+          return;
         }
+        if (isOlderRevision(detail.updatedAt, current.updatedAt)) {
+          // A save or refresh landed after this read started; its row is
+          // newer than the detail response.
+          return;
+        }
+        // A summary row may already carry a body from a finished save; do not
+        // blank it with an equal-revision empty detail body.
+        const next =
+          !detail.body &&
+          current.body &&
+          detail.updatedAt === current.updatedAt
+            ? { ...detail, body: current.body }
+            : detail;
+        this.replace(next);
       });
     } catch (cause) {
       if (token !== this.detailToken) {
@@ -699,6 +733,7 @@ export class IdeasStore {
         );
         this.items = rows;
         this.problems = result.problems;
+        this.total = result.total ?? result.ideas.length;
         this.loaded = true;
         // A refresh after a mutation must not move the selection; only a row
         // that truly vanished (trash, another writer) clears the cursor.
@@ -725,4 +760,17 @@ export class IdeasStore {
       }
     }
   }
+}
+
+/** Compares engine revisions; invalid or empty stamps never count as older. */
+function isOlderRevision(candidate: string, current: string): boolean {
+  if (!candidate || !current) {
+    return false;
+  }
+  const candidateTime = Date.parse(candidate);
+  const currentTime = Date.parse(current);
+  if (Number.isNaN(candidateTime) || Number.isNaN(currentTime)) {
+    return candidate < current;
+  }
+  return candidateTime < currentTime;
 }

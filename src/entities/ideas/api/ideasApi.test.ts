@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { LocalApiError, toApiError } from "@/shared/api/client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiClient, LocalApiError, toApiError } from "@/shared/api/client";
 import { errorMessage } from "@/shared/lib/errors";
 import {
   ideaBriefQuery,
@@ -10,6 +10,7 @@ import {
   parseIdea,
   parseIdeaBrief,
   parseIdeaList,
+  updateIdea,
 } from "./ideasApi";
 
 const timedRow = {
@@ -193,10 +194,26 @@ describe("idea API mapping", () => {
     expect(ideaIcalQuery({ projectId: "lv24", includeDone: true })).toEqual({
       project: "lv24",
       include_done: true,
+      tags: undefined,
+      q: undefined,
+    });
+    expect(
+      ideaIcalQuery({
+        projectId: "lv24",
+        query: "  theme  ",
+        tags: ["ui", "calendar"],
+      }),
+    ).toEqual({
+      project: "lv24",
+      include_done: undefined,
+      tags: "ui,calendar",
+      q: "theme",
     });
     expect(ideaIcalQuery()).toEqual({
       project: undefined,
       include_done: undefined,
+      tags: undefined,
+      q: undefined,
     });
   });
 });
@@ -243,9 +260,47 @@ describe("idea API patch mapping", () => {
     expect(ideaPatchBody({ tags: ["ui"] })).toEqual({ tags: ["ui"] });
   });
 
-  it("ignores completion metadata the API does not expose", () => {
-    expect(ideaPatchBody({ completionNote: "done" })).toEqual({});
+  it("maps the completion note and ignores the read-only completion instant", () => {
+    expect(ideaPatchBody({ completionNote: "done" })).toEqual({
+      completion_note: "done",
+    });
+    expect(ideaPatchBody({ completionNote: null })).toEqual({
+      completion_note: "",
+    });
     expect(ideaPatchBody({ completedAt: null })).toEqual({});
+  });
+});
+
+describe("idea API note-only save", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("PATCHes a completion note with no other writable field", async () => {
+    const row = {
+      ...timedRow,
+      status: "done",
+      completion_note: "shipped",
+    };
+    const patch = vi.spyOn(apiClient, "PATCH").mockResolvedValue({
+      data: { idea: row },
+      error: undefined,
+      response: new Response("{}", { status: 200 }),
+    } as never);
+
+    const saved = await updateIdea("idea-1", { completionNote: "shipped" });
+
+    expect(saved.idea.completionNote).toBe("shipped");
+    expect(patch).toHaveBeenCalledTimes(1);
+    expect(patch).toHaveBeenCalledWith("/v1/ideas/{id}", {
+      params: { path: { id: "idea-1" } },
+      body: {
+        clear_due: false,
+        clear_reminder: false,
+        clear_tags: false,
+        completion_note: "shipped",
+      },
+    });
   });
 });
 
@@ -262,6 +317,7 @@ describe("idea API create mapping", () => {
         tags: ["ui"],
         body: "Body",
         source: { type: "desktop" },
+        completionNote: "shipped",
       }),
     ).toEqual({
       title: "Idea",
@@ -273,10 +329,15 @@ describe("idea API create mapping", () => {
       remind_before_minutes: 60,
       tags: ["ui"],
       source: { type: "desktop" },
+      completion_note: "shipped",
     });
     expect(
       ideaCreateBody({ title: "All day", dueDate: "2026-11-28" }),
-    ).toMatchObject({ due_date: "2026-11-28", due_at: undefined });
+    ).toMatchObject({
+      due_date: "2026-11-28",
+      due_at: undefined,
+      completion_note: undefined,
+    });
   });
 });
 

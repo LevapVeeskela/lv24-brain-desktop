@@ -105,6 +105,8 @@ export interface IdeaCreateInput {
   tags?: string[];
   body?: string;
   source?: IdeaSourceRef;
+  /** Completion note when the idea is created already done/dropped. */
+  completionNote?: string;
 }
 
 /**

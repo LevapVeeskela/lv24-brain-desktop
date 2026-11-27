@@ -2031,7 +2031,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description A registered project id, alias or path; omit it to list every project. */
+                    /** @description A registered project id, alias or path; auto resolves the working directory or default; omit it to list every project. */
                     project?: string;
                     /** @description open, doing, done, dropped or someday; repeat or comma-separate for several. */
                     status?: string;
@@ -2113,7 +2113,7 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description A registered project id, alias or path; it orders the block for the current project. */
+                    /** @description A registered project id, alias or path; auto resolves the working directory or default; it orders the block for the current project. */
                     project?: string;
                     scope?: "current" | "all";
                     max?: number;
@@ -2152,13 +2152,21 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Exports dated ideas as one iCalendar file through the shared renderer: DTSTART;VALUE=DATE for all-day ideas, a UTC DTSTART for timed ideas, and VALARM from the lead time. This is a file export, not a live subscription. Done ideas are omitted unless include_done=1; dropped ideas are terminal and never exported. */
+        /** @description Exports dated ideas as one iCalendar file through the shared renderer: DTSTART;VALUE=DATE for all-day ideas, a UTC DTSTART for timed ideas, and VALARM from the lead time. This is a file export, not a live subscription. Done ideas are omitted unless include_done=1; explicit status values override the default and include_done; dropped ideas are terminal and never exported. */
         get: {
             parameters: {
                 query?: {
-                    /** @description A registered project id, alias or path; omit it to export every project. */
+                    /** @description A registered project id, alias or path; auto resolves the working directory or default; omit it to export every project. */
                     project?: string;
                     include_done?: boolean;
+                    /** @description open, doing, done, dropped or someday; repeat or comma-separate. Explicit statuses override the default and include_done; dropped is never exported. */
+                    status?: string;
+                    /** @description Exact case-insensitive AND filter; repeat or comma-separate. tag is an alias. */
+                    tags?: string;
+                    /** @description Alias of tags. */
+                    tag?: string;
+                    /** @description Case-insensitive substring over title, body and tags. */
+                    q?: string;
                 };
                 header?: never;
                 path?: never;
@@ -2988,7 +2996,7 @@ export interface components {
                 supersedes?: string;
                 confidence?: number;
             };
-            relations: Record<string, never>[];
+            relations: components["schemas"]["Relation"][];
             review: {
                 /** Format: date-time */
                 review_after?: string | null;
@@ -3008,10 +3016,10 @@ export interface components {
             /** @description Matches before limit. */
             total: number;
             /**
-             * @description Present only when the request named one project.
+             * @description Present when the request named one project; auto resolves to cwd or default.
              * @enum {string}
              */
-            project_source?: "explicit";
+            project_source?: "explicit" | "cwd" | "default";
         };
         IdeaWrite: {
             idea: components["schemas"]["Idea"];
@@ -3038,16 +3046,18 @@ export interface components {
         };
         IdeaCreate: {
             title: string;
+            /** @description Markdown body; the enforced write limit is 1 MiB of bytes. */
             body?: string;
+            /** @description A registered project id, alias or checkout path; auto resolves the working directory or default. */
             project?: string;
             /** @enum {string} */
             status?: "open" | "doing" | "done" | "dropped" | "someday";
             /** @enum {string} */
             priority?: "low" | "normal" | "high";
             /** Format: date-time */
-            due_at?: string;
-            due_date?: string;
-            remind_before_minutes?: number;
+            due_at?: string | null;
+            due_date?: string | null;
+            remind_before_minutes?: number | null;
             tags?: string[];
             source?: {
                 /** @enum {string} */
@@ -3055,19 +3065,23 @@ export interface components {
                 id?: string;
                 harness?: string;
             };
+            /** @description Optional completion or drop note; reopening via status open clears it. */
+            completion_note?: string | null;
         };
         IdeaPatch: {
             title?: string;
+            /** @description Markdown body; the enforced write limit is 1 MiB of bytes. */
             body?: string;
+            /** @description A registered project id, alias or checkout path; auto resolves the working directory or default. */
             project?: string;
             /** @enum {string} */
             status?: "open" | "doing" | "done" | "dropped" | "someday";
             /** @enum {string} */
             priority?: "low" | "normal" | "high";
             /** Format: date-time */
-            due_at?: string;
-            due_date?: string;
-            remind_before_minutes?: number;
+            due_at?: string | null;
+            due_date?: string | null;
+            remind_before_minutes?: number | null;
             tags?: string[];
             /** @default false */
             clear_due: boolean;
@@ -3077,6 +3091,8 @@ export interface components {
             clear_tags: boolean;
             /** Format: date-time */
             expected_updated_at?: string;
+            /** @description Optional completion or drop note; reopening via status open clears it. */
+            completion_note?: string | null;
         };
     };
     responses: {

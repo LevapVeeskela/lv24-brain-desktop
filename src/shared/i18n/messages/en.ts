@@ -807,6 +807,7 @@ export const en = {
   "ideas.undo": "Undo",
   "ideas.problemTitle": "Unreadable idea files",
   "ideas.problemHint": "Resolve these files in git; the rest of the list stays usable.",
+  "ideas.truncated": "Showing {loaded} of {total} ideas. Narrow the search or project scope to see the rest.",
   "ideas.todayCard.title": "Ideas today",
   "ideas.todayCard.open": "{count} open",
   "ideas.todayCard.empty": "Nothing is due today.",

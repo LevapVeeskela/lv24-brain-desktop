@@ -76,6 +76,9 @@ export class RootStore {
       ideaExportScope({
         scope: this.ideas.scope,
         projectId: this.ideas.projectId,
+        // The real export honors the transient search; the page has no tag
+        // chips yet, so `tags` stays unset until a filter surface exists.
+        query: this.ideas.query,
       }),
     );
     this.commandSearch = new SearchStore(memoryApi, { debounceMs: 160 });

@@ -809,6 +809,7 @@ export const ru: Messages = {
   "ideas.undo": "Вернуть",
   "ideas.problemTitle": "Нечитаемые файлы идей",
   "ideas.problemHint": "Разрешите эти файлы в git; остальной список продолжает работать.",
+  "ideas.truncated": "Показано {loaded} из {total} идей. Уточните поиск или проект, чтобы увидеть остальные.",
   "ideas.todayCard.title": "Идеи на сегодня",
   "ideas.todayCard.open": "{count} открыто",
   "ideas.todayCard.empty": "На сегодня ничего не назначено.",

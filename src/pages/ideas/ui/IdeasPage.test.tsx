@@ -131,6 +131,13 @@ describe("IdeasPage", () => {
     expect(html).toContain("No ideas in this project.");
   });
 
+  it("surfaces a truncated list instead of silently dropping rows", () => {
+    const { ideas, projects } = stores();
+    ideas.total = 1001;
+    const html = renderPage(<IdeasPage ideas={ideas} projects={projects} />);
+    expect(html).toContain("Showing 8 of 1001 ideas.");
+  });
+
   it("shows loading, load errors and problem rows", () => {
     const { ideas, projects } = stores();
     ideas.loaded = false;

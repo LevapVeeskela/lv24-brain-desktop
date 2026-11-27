@@ -323,6 +323,17 @@ export const IdeasPage = observer(function IdeasPage({
         </Notice>
       ) : null}
 
+      {ideas.truncated ? (
+        <Notice variant="warning">
+          <span>
+            {t("ideas.truncated", {
+              loaded: ideas.items.length,
+              total: ideas.total ?? ideas.items.length,
+            })}
+          </span>
+        </Notice>
+      ) : null}
+
       {ideas.lastCompleted ? (
         <Notice
           variant="info"

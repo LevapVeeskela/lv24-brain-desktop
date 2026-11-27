@@ -22,6 +22,8 @@ describe("local API idea export source", () => {
     expect(ical).toHaveBeenLastCalledWith({
       projectId: "lv24",
       includeDone: false,
+      query: undefined,
+      tags: undefined,
     });
 
     // The scope is read at call time, so a selector change reaches the route.
@@ -30,6 +32,30 @@ describe("local API idea export source", () => {
     expect(ical).toHaveBeenLastCalledWith({
       projectId: undefined,
       includeDone: false,
+      query: undefined,
+      tags: undefined,
+    });
+  });
+
+  it("passes the transient search and tags to the route", async () => {
+    const ical = vi.fn(async () => ics);
+    const source = createLocalApiIdeaExportSource(
+      () =>
+        ideaExportScope({
+          scope: "project",
+          projectId: "lv24",
+          query: "  calendar  ",
+          tags: ["ui", "calendar"],
+        }),
+      { ical },
+    );
+
+    await source.fetchIcs();
+    expect(ical).toHaveBeenLastCalledWith({
+      projectId: "lv24",
+      includeDone: false,
+      query: "calendar",
+      tags: ["ui", "calendar"],
     });
   });
 

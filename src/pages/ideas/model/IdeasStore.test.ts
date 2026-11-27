@@ -31,6 +31,8 @@ describe("IdeasStore", () => {
     expect(ideas.problems).toHaveLength(1);
     expect(ideas.openCount).toBe(5);
     expect(ideas.dueTodayCount).toBe(2);
+    expect(ideas.total).toBe(8);
+    expect(ideas.truncated).toBe(false);
     expect(ideas.error).toBeNull();
 
     await ideas.load();
@@ -534,5 +536,106 @@ describe("IdeasStore", () => {
     expect(ideas.items.some((idea) => idea.id === target.id)).toBe(true);
     expect(ideas.actionError).toBe("trash failed");
     expect(ideas.action).toBeNull();
+  });
+
+  it("restores the drawer and cursor after a failed trash", async () => {
+    const { source, ideas } = makeStore();
+    await ideas.load();
+    const target = ideas.items[1];
+    ideas.openDrawer(target.id);
+    source.trash = async () => {
+      throw new Error("trash failed");
+    };
+
+    expect(await ideas.trash(target.id)).toBe(false);
+    expect(ideas.drawerId).toBe(target.id);
+    expect(ideas.cursorId).toBe(target.id);
+  });
+
+  it("reports list truncation when the engine matched more rows", async () => {
+    const source = createFakeIdeasSource({ now: () => now, ideas: [] });
+    const visible = ideaFixture({ id: "visible", projectId: "lv24" });
+    source.list = async () => ({
+      ideas: [visible],
+      problems: [],
+      total: 1001,
+    });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+
+    expect(ideas.items).toHaveLength(1);
+    expect(ideas.total).toBe(1001);
+    expect(ideas.truncated).toBe(true);
+  });
+
+  it("drops a detail read older than the current row", async () => {
+    const summary = ideaFixture({
+      id: "detail",
+      projectId: "lv24",
+      body: "",
+      updatedAt: "2026-11-26T07:00:00Z",
+    });
+    const source = createFakeIdeasSource({ now: () => now, ideas: [summary] });
+    let release!: (idea: typeof summary) => void;
+    source.get = () =>
+      new Promise((resolve) => {
+        release = resolve;
+      });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+
+    ideas.openDrawer("detail");
+    await ideas.save("detail", { body: "New body" });
+    release({ ...summary, body: "Old body" });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ideas.drawerIdea?.body).toBe("New body");
+  });
+
+  it("keeps a loaded body when an equal-revision detail row is empty", async () => {
+    const full = ideaFixture({
+      id: "detail",
+      projectId: "lv24",
+      body: "Full body",
+    });
+    const source = createFakeIdeasSource({ now: () => now, ideas: [full] });
+    source.get = async () => ({ ...full, body: "" });
+    const ideas = new IdeasStore(source, { now: () => now });
+    await ideas.load();
+
+    ideas.openDrawer("detail");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(ideas.drawerIdea?.body).toBe("Full body");
+  });
+
+  it("treats either explicit due clear as clearing the default lead", async () => {
+    const source = createFakeIdeasSource({
+      now: () => now,
+      ideas: [
+        ideaFixture({
+          id: "dated",
+          projectId: "lv24",
+          dueDate: "2026-12-01",
+        }),
+      ],
+    });
+    const ideas = new IdeasStore(source, {
+      now: () => now,
+      defaultLeadMinutes: () => 60,
+    });
+    await ideas.load();
+
+    let patch: IdeaUpdateInput | undefined;
+    const update = source.update.bind(source);
+    source.update = async (id, input) => {
+      patch = input;
+      return update(id, input);
+    };
+
+    await ideas.save("dated", { title: "Renamed", dueAt: null });
+    expect(patch?.remindBeforeMinutes).toBeUndefined();
   });
 });

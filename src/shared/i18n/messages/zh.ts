@@ -809,6 +809,7 @@ export const zh: Messages = {
   "ideas.undo": "撤销",
   "ideas.problemTitle": "无法读取的想法文件",
   "ideas.problemHint": "请在 git 中解决这些文件；其余列表仍可使用。",
+  "ideas.truncated": "已显示 {total} 个想法中的 {loaded} 个。缩小搜索范围或项目以查看其余内容。",
   "ideas.todayCard.title": "今天的想法",
   "ideas.todayCard.open": "{count} 个未完成",
   "ideas.todayCard.empty": "今天没有到期事项。",
