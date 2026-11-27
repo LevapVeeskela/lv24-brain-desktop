@@ -1,0 +1,20 @@
+flowchart LR
+    subgraph CI["ci.yml on push / PR"]
+        W["web checks"]
+        R["rust fmt / clippy / test"]
+    end
+    subgraph PKG["desktop.yml manual"]
+        VF["validate pin + fetch engine"]
+        B["Tauri build"]
+    end
+    subgraph OUT["Outputs"]
+        U["unsigned artifacts 7d"]
+        S["signed installers"]
+        G["GitHub release + latest.json"]
+    end
+    W -->|"gate"| B
+    R -->|"gate"| B
+    VF -->|"sidecar"| B
+    B -->|"signed=false"| U
+    B -->|"signed=true"| S
+    S -->|"publish=true"| G

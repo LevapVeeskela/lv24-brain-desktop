@@ -6,7 +6,7 @@ Debug build outputs and node_modules are intentionally not committed.
 ## Source, configuration and documentation
 
 - [README.md](../../README.md)
-- [docs/architecture.md](../../docs/architecture.md)
+- [docs/architecture-deep-dive.md](../../docs/architecture-deep-dive.md)
 - [docs/design-refresh.md](../../docs/design-refresh.md)
 - [docs/design-refresh/brand-contact.png](../../docs/design-refresh/brand-contact.png)
 - [docs/design-refresh/changed-files.md](../../docs/design-refresh/changed-files.md)
@@ -66,7 +66,7 @@ Debug build outputs and node_modules are intentionally not committed.
 - [src/shared/ui/primitives.test.tsx](../../src/shared/ui/primitives.test.tsx)
 - [src/shared/ui/theme.test.ts](../../src/shared/ui/theme.test.ts)
 - [src/widgets/app-header/ui/AppHeader.tsx](../../src/widgets/app-header/ui/AppHeader.tsx)
-- [src/widgets/app-nav/ui/AppNav.tsx](../../src/widgets/app-nav/ui/AppNav.tsx)
+- [src/widgets/app-rail/ui/AppRail.tsx](../../src/widgets/app-rail/ui/AppRail.tsx) (formerly `app-nav/AppNav.tsx`)
 - [src/widgets/connections-card/ui/ConnectionsCard.tsx](../../src/widgets/connections-card/ui/ConnectionsCard.tsx)
 - [src/widgets/engine-overview/ui/EngineOverview.tsx](../../src/widgets/engine-overview/ui/EngineOverview.tsx)
 - [src/widgets/run-log-panel/ui/RunLogPanel.tsx](../../src/widgets/run-log-panel/ui/RunLogPanel.tsx)

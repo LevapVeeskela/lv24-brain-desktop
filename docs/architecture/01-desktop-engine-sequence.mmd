@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant UI as Webview
+    participant Shell as Rust shell
+    participant Sup as Supervisor
+    participant Rec as runtime.json
+    participant Eng as brain agent
+    UI->>Shell: invoke shell_status
+    Note right of Shell: returns the full snapshot
+    Shell->>Sup: read supervisor state
+    Sup->>Rec: read port + token
+    Note right of Rec: owner-only 0600 record
+    Sup->>Eng: spawn --parent-pid
+    Sup->>Eng: GET /v1/health every 2s
+    UI->>Shell: api_request GET /v1/records
+    Note right of Shell: re-reads token, adds Bearer
+    Shell->>Eng: allowlisted path on loopback
+    Note right of Eng: JSON body or SSE frames
+    Note right of Shell: returns body only, no token

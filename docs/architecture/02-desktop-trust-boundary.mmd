@@ -1,0 +1,16 @@
+flowchart LR
+    subgraph WV["Webview: no token, port or URL"]
+        UI["FSD UI + MobX stores"]
+    end
+    subgraph RS["Rust shell: token holder"]
+        CMD["Tauri commands"]
+        PRX["/v1 allowlist proxy"]
+    end
+    subgraph LM["Local machine"]
+        RT["agent/runtime.json 0600"]
+        API["Local API + OS keychain"]
+    end
+    UI -->|"invoke"| CMD
+    CMD -->|"api_request"| PRX
+    PRX -->|"read token + port"| RT
+    PRX -->|"Bearer + /v1"| API
