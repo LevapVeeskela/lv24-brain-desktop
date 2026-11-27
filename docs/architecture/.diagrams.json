@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "diagrams": {
+    "desktop-engine-sequence": {
+      "index": "01",
+      "title": "Desktop engine sequence",
+      "slug": "desktop-engine-sequence",
+      "hash": "cec0340860e1b065",
+      "updatedAt": "2026-11-27",
+      "png": true,
+      "svg": true
+    },
+    "desktop-trust-boundary": {
+      "index": "02",
+      "title": "Desktop trust boundary",
+      "slug": "desktop-trust-boundary",
+      "hash": "8d7a7bfda6462a70",
+      "updatedAt": "2026-11-27",
+      "png": true,
+      "svg": true
+    },
+    "release-pipeline": {
+      "index": "03",
+      "title": "Release pipeline",
+      "slug": "release-pipeline",
+      "hash": "d79e0345558aba89",
+      "updatedAt": "2026-11-27",
+      "png": true,
+      "svg": true
+    }
+  }
+}

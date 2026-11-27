@@ -1,255 +1,140 @@
 ﻿# LV24 Brain Desktop
 
-[![ci](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/LevapVeeskela/lv24-brain-desktop/actions/workflows/ci.yml)
+Tauri v2 desktop client for LV24 Brain: a local memory engine, connection
+runner and background agent that you can inspect and control from one window.
 
-The local memory control app for [LV24 Brain](https://github.com/LevapVeeskela/lv24-brain),
-built with Tauri v2. See connection results, investigate failed runs and manage
-the background agent, schedules and credentials from one offline-first interface.
+**Docs:** [Architecture](docs/ARCHITECTURE.md) · [Agent entry](AGENTS.md) · [Docs index](docs/README.md)
 
-**Status: v1.7.2, all-project activity feed and journal.** The dashboard, connections
-list, add connection wizard, connection detail (schedule, credentials, runs,
-received logs), activity, projects, settings, memory and review screens are
-implemented. Desktop 1.2 adds the record browser and detail (body, provenance,
-links, relations, history), inline record editing with `expected_updated_at`
-compare-and-swap, reversible trash/restore, the proposal queue with bounded body
-previews, safe `review --fix` dry-run/apply, a quarantine inbox, project-state
-CAS saves and an all-projects scope for memory, search and review. Packaging
-bundles a checksum-pinned engine sidecar; the WP5.5 pass added accessible
-dialogs, phase-based engine recovery, truthful offline/paused states and update
-progress.
+## What it is / What it is not
 
-The 1.1 design refresh added a semantic dark theme, a shared memory mark,
-last-known connection results, a clearer setup wizard and persistent feedback.
-The 1.2 release refreshes the pinned `localapi-v1` contract and regenerates the
-typed client. See the [design audit](docs/design-refresh.md),
-[verification report](docs/design-refresh/report.md) and
-[before/after screenshots](docs/design-refresh/screenshots/README.md).
+- A native shell (Rust) plus a React webview for a **local-first** Brain instance.
+- The place to see engine health, connections, schedules, runs, credentials
+  (provider names and status only), projects, records, review queues and activity.
+- A supervisor for `brain agent`: it spawns the agent, watches its runtime
+  record, restarts an unexpected exit and stops it on quit or pause.
+- Not a hosted service. It has no remote API, no multi-user model and no
+  server mode.
+- Not a token broker for the webview. The local API bearer token never enters
+  JavaScript.
+- Not an engine installer: packaged builds bundle a checksum-pinned engine
+  sidecar, while development resolves `brain` from the environment.
 
-The current mark is **Neuro**, selected by the owner: a two-hemisphere brain
-silhouette shared by the header, application icon and all tray states.
-See [the source and asset checks](docs/neuro-brand.md).
+## Status
 
-![Neuro dashboard preview with fictional local fixture data, not a live engine](docs/neuro-dashboard.jpg)
+| Item | Value |
+|---|---|
+| Version | 1.7.2 (`package.json`, `src-tauri/Cargo.toml`, tag `v1.7.2`) |
+| Ship state | Tagged desktop release; packaged builds bundle engine 0.27.2. Installer publication is owner-gated (release assets not verified here) |
+| Visibility | Public |
+| Repo | <https://github.com/LevapVeeskela/lv24-brain-desktop> |
+| Prod | Desktop installers from GitHub Releases (owner-gated); no web deployment |
+| License | Apache-2.0 |
 
-## What works
+## At a glance
 
-- **Tray** with a status dot, agent state, Sync all, Pause/Resume, Open and Quit.
-- **Agent supervision**: spawns `brain agent --parent-pid <desktop>`, watches
-  the runtime record, restarts an unexpected exit with backoff and stops the
-  agent gracefully on quit.
-- **Single instance**: a second launch focuses the existing window.
-- **Autostart**: HKCU Run on Windows, XDG autostart on Linux, and
-  `SMAppService.mainApp` on macOS 13+. Starts hidden in the tray with
-  `--autostart`.
-- **Local API proxy**: the webview calls `api_request` / `run_log_open`; the
-  Rust process adds the bearer token. The token never enters JavaScript.
-- **Ed25519 updater**: Tauri updater signatures verified against the public key
-  in `src-tauri/tauri.conf.json`; check and install commands are implemented.
-- **OAuth deep links**: registers `lv24brain://`, validates only
-  `lv24brain://oauth/...` and `lv24brain://auth/...`, buffers the URL for the UI
-  and emits `oauth-callback`. The engine OAuth wiring is consumed by WP5.3.
-- **Persistent pause**: pausing stops the agent and survives desktop restarts.
-- **FSD UI foundation (v0.2.0)**: `app / pages / widgets / features / entities /
-  shared`, MobX stores for Engine, Connections, Sync and Settings, shared UI
-  primitives.
-- **Typed local API client (v0.2.0)**: generated from the vendored
-  `localapi-v1` OpenAPI file; `openapi-fetch` uses a custom Tauri transport, so
-  the webview never sees the bearer token or loopback port.
-- **i18n (v0.2.0)**: English, Russian and Chinese dictionaries with a typed key
-  set, persisted locale and a header switcher.
-- **Screens (v0.3.0)**: dashboard, connections list, add-connection wizard
-  (provider descriptors, auth modes, settings, secrets, save + test),
-  connection detail (schedule, credentials, runs, SSE log output, OAuth, delete),
-  activity, projects and settings (paths, autostart, language, desktop update,
-  update channel and OS keychain secret names).
-- **Packaging (WP5.4)**: manual `desktop.yml` builds NSIS (Windows),
-  DMG + app zip + `.app.tar.gz` (macOS arm64/x64), and AppImage + deb + rpm
-  (Linux) with a checksum-pinned engine sidecar, 7-day artifacts, and an
-  owner-gated signed release path. Updater manifests include all six
-  platform entries (including deb/rpm) and `requireSignedVersion` is enabled.
-  See [docs/release.md](docs/release.md).
-- **UX and accessibility (WP5.5)**: phase-based Start/Pause/Resume, truthful
-  unavailable/paused/loading/stale states, localized errors, skip link and
-  per-route focus/title, accessible confirm dialogs, form labels/validation,
-  OAuth success/failure/callback hardening, live log follow and stable ids,
-  update confirmation/progress/locks, autostart retry, dashboard sync retry,
-  and contrast/focus/reduced-motion fixes across ru/en/zh.
-- **Read-only engine CLI bridge (v0.3.0)**: `engine_providers`,
-  `engine_secrets` and streaming `engine_connection_auth` commands reuse the
-  engine binary/config; the webview never receives a secret value.
-- **Structured tests** for path allow-listing, config discovery, runtime
-  records, SSE parsing, settings persistence, the HTTP proxy, the typed
-  transport, API parsers, stores, provider descriptors and i18n key parity.
-
-## Architecture
-
-```
-+-------------------------------+        +-------------------------------+
-| Webview (React + TS)          |        | Rust shell                    |
-|  invoke("shell_status")       |  IPC   |  supervisor ------------------+--> brain agent
-|  invoke("api_request", ...)   |------->|  proxy (adds bearer token) ---+    (sidecar/PATH)
-|                               |        |  tray / autostart / updater   |    loopback API
-+-------------------------------+        |  deep-link router             |    agent/runtime.json (0600)
-                                         +-------------------------------+
-```
-
-The webview never sees the bearer token or the loopback port.
-See [docs/architecture.md](docs/architecture.md) and
-[docs/security.md](docs/security.md).
+| Stack | Entry point | Ports | Data | Deploy |
+|---|---|---|---|---|
+| React 19 + TypeScript + Vite, MobX; Rust + Tauri 2 | `src/main.tsx`, `src-tauri/src/lib.rs` | Vite dev `1420`; local API port comes from the engine runtime record | Engine data dir (`brain.yaml`), `agent/runtime.json` (0600), desktop settings in the Tauri config dir | GitHub Actions `desktop.yml` (manual, owner-gated) + Ed25519 updater |
 
 ## Requirements
 
-- Node.js 22+ (CI uses 24) and npm.
+- Node.js 22+ and npm (CI uses Node 24).
 - Rust 1.90+ with the platform toolchain (MSVC on Windows).
-- Tauri v2 system prerequisites for your OS.
-- The LV24 Brain engine `0.22.2` or newer, initialized with `brain init` and
-  selected with `brain config use <path>` (or `BRAIN_CONFIG`).
+- [Tauri v2 system prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS.
+- An initialized LV24 Brain instance (`brain init`, then `brain config use <path>`)
+  or an explicit engine path.
 
-The engine sidecar is fetched per target during packaging CI; see
-[docs/release.md](docs/release.md). Local development still resolves the engine
-in this order:
-
-1. `LV24_BRAIN_BIN`
-2. `<resource-dir>/engine/brain[.exe]` or `<resource-dir>/brain[.exe]`
-3. `<app-dir>/engine/brain[.exe]` or `<app-dir>/brain[.exe]`
-4. `PATH`
-5. the npm global platform package (`@lv24/brain-<os>-<arch>`)
-
-Release installers bundle `brain` next to the desktop executable through the
-`src-tauri/tauri.bundle.conf.json` override.
-
-## Development
+## Quick start
 
 ```bash
 npm install
-npm run tauri dev
+brain init                       # once per machine, if no instance exists
+npm run tauri dev                # builds the Rust shell and starts Vite on :1420
+npm run typecheck                # tsc for the app and Node configs
+npm test                         # vitest run
 ```
 
-Useful environment variables:
+The engine is resolved in this order: `LV24_BRAIN_BIN` → `<resource-dir>/engine/`
+or `<resource-dir>/` → `<app-dir>/engine/` or `<app-dir>/` → `PATH` → npm global
+platform package (`@lv24/brain-<os>-<arch>`). Set `LV24_BRAIN_BIN` to an absolute
+path when developing against a custom engine build.
 
-| Variable | Meaning |
-| --- | --- |
-| `LV24_BRAIN_BIN` | Absolute path to the engine executable. |
-| `BRAIN_CONFIG` | Explicit `brain.yaml` (the engine's own variable). |
-| `LV24_BRAIN_CONFIG` | Desktop override for `BRAIN_CONFIG`. |
-| `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` | `--remote-debugging-port=9222` for local CDP smoke tests. |
+## Architecture
 
-Checks:
+- **Rust shell is the only token holder.** It reads the loopback port and bearer
+  token from `agent/runtime.json`, adds the header and returns only data to the
+  webview.
+- **Allowlisted proxy.** `api_request` accepts `GET/POST/PUT/PATCH/DELETE` on
+  `/v1/` paths only; traversal, absolute URLs, fragments, control characters and
+  oversized bodies are rejected.
+- **Engine supervisor.** Spawns `brain agent --parent-pid <desktop>`, polls the
+  runtime record and `/v1/health`, and restarts with capped backoff.
+- **Typed client.** `openapi-fetch` over a custom Tauri transport, generated from
+  the vendored `localapi-v1` OpenAPI file.
+- **FSD renderer.** `app / pages / widgets / features / entities / shared`, with
+  MobX stores composed once by `RootStoreProvider`.
+- **Packaging.** `scripts/fetch-engine.mjs` verifies the engine checksum against
+  the release and the reviewed pin, then Tauri bundles it as a sidecar.
 
-```bash
-npm run typecheck
-npm test
-npm run build
-npm run api:check
-cd src-tauri
-cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-```
+Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-`npm run api:generate` regenerates `src/shared/api/generated/schema.d.ts` from
-`src/shared/api/openapi/localapi-v1.json`. The OpenAPI file is a copy of the
-engine's `internal/adapters/localapi/openapi.json`; keep them in sync when the
-`localapi-v1` contract changes. `api:check` fails if the generated file is stale.
+## Repository map
 
-A full desktop build without an installer:
+| Path | Purpose |
+|---|---|
+| `src/app/` | Composition root: RootStore, providers, router, layout, global styles |
+| `src/pages/` | Dashboard, memory, inbox, quarantine, search, projects, activity, connections, git sync, settings |
+| `src/widgets/`, `src/features/`, `src/entities/` | FSD slices for shell chrome, user actions and domain models |
+| `src/shared/` | API transport/client, generated schema, i18n, UI primitives, helpers |
+| `src-tauri/src/` | Rust shell: supervisor, allowlisted proxy, SSE, tray, autostart, deep links, updater, settings |
+| `src-tauri/capabilities/`, `src-tauri/tauri*.json` | Window capabilities and Tauri configuration overrides |
+| `scripts/` | Engine fetch/verification, updater manifest, icons, crash-dump helper |
+| `docs/` | Architecture, security, release, operations and design records |
+| `.github/workflows/` | `ci.yml` checks and the manual `desktop.yml` packaging matrix |
 
-```bash
-npm run tauri build -- --debug --no-bundle
-```
+## Documentation & links
 
-A local packaged build with the engine sidecar (Windows example; derive the
-target triple with `rustc -vV` on other hosts):
+| Doc / surface | Link |
+|---|---|
+| System design | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Shell deep dive (historical detail) | [docs/architecture-deep-dive.md](docs/architecture-deep-dive.md) |
+| Security model | [docs/security.md](docs/security.md) |
+| Packaging and release | [docs/release.md](docs/release.md) |
+| Windows crash dumps | [docs/operations.md](docs/operations.md) |
+| Design refresh and screenshots | [docs/design-refresh.md](docs/design-refresh.md) |
+| Brand assets | [docs/neuro-brand.md](docs/neuro-brand.md) |
+| Agent entry | [AGENTS.md](AGENTS.md) |
+| Engine repository | <https://github.com/LevapVeeskela/lv24-brain> |
 
-```bash
-node scripts/fetch-engine.mjs --version 0.12.0 \
-  --target x86_64-pc-windows-msvc
-npm run tauri build -- --debug --bundles nsis \
-  --config src-tauri/tauri.bundle.conf.json \
-  --config src-tauri/tauri.unsigned.conf.json
-```
+## For AI agents
 
-See [docs/release.md](docs/release.md) for the CI matrix, release gating and
-artifact list.
+Read order: `AGENTS.md` → `docs/ARCHITECTURE.md` → `docs/README.md` → the code
+entry points above.
 
-## Packaging and release
+Hard invariants: no token, port or raw URL in the webview; no new proxy path
+outside the `/v1/` allowlist; regenerate the typed client with
+`npm run api:generate` after any `localapi-v1` change and keep `npm run api:check`
+green; keep FSD imports pointing down; no inline `style` attributes (styles live
+in `global.css` and slice style files); do not bundle an engine older than the
+pin floor in `scripts/engine-checksums.json`.
 
-`.github/workflows/desktop.yml` is a manual workflow that builds NSIS (Windows),
-DMG + app zip + `.app.tar.gz` (macOS arm64/x64), and AppImage/deb/rpm (Linux) on
-free standard runners. It downloads the matching engine release with
-`scripts/fetch-engine.mjs`, verifies its release checksum and reviewed pin, and
-bundles it as a Tauri sidecar. Artifacts are retained for 7 days; publishing a
-GitHub release is an explicit owner-gated input and requires a signed build and
-tag.
+## Known limitations (1.7.2)
 
-Updater signing uses `TAURI_SIGNING_PRIVATE_KEY` and
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets. The current public key
-is a development key; rotate it before a public release. OS code signing remains
-deferred until Apple Developer Program and SignPath approvals.
-
-## Updates and signing
-
-The updater is enabled with Tauri's Ed25519 (minisign-compatible) signatures.
-The public key is committed in `src-tauri/tauri.conf.json`. The private key is
-**not** in this repository. `requireSignedVersion` binds each update signature
-to the app version, preventing manifest downgrade substitution.
-
-The current public key belongs to the development key generated for the v0.1.0
-shell. Before the first public release:
-
-1. Generate a production key and store the private key in the release secret
-   store (`TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
-2. Replace `plugins.updater.pubkey` with the new public key.
-3. Build installers with `createUpdaterArtifacts: true` and publish a
-   `latest.json` at the endpoint in `tauri.conf.json`
-   (`https://github.com/LevapVeeskela/lv24-brain-desktop/releases/latest/download/latest.json`).
-4. Keep the previous public key available for one release so existing installs
-   can migrate, then retire it.
-
-Signing status: macOS signing/notarization waits for Apple Developer Program
-approval; Windows signing waits for SignPath Foundation approval. Until then,
-release test builds are unsigned and will show SmartScreen/Gatekeeper warnings.
-
-## Known limitations (v1.3.0)
-
-- Local `cargo`/Vite development still resolves the engine from the
-  environment; only packaged builds include the sidecar.
-- Pause stops the agent. If an agent was started outside the desktop, Pause
-  asks it to shut down through the local API; if it refuses, the shell reports
-  an error instead of pretending it is paused.
+- Local `cargo`/Vite runs resolve the engine from the environment; only packaged
+  builds include the sidecar.
+- Pause stops the agent. If the agent was started outside the desktop, Pause
+  asks it to shut down and reports an error if it refuses.
 - The local API is single-user and loopback-only; the bearer token grants full
-  local control. Same-user malware can read `agent/runtime.json`, as documented
-  by the engine's security acceptance.
-- macOS autostart requires the signed app bundle and macOS 13+.
-- OAuth callbacks are routed to the UI and the detail page can run the engine
-  OAuth command; a live GitHub/GitLab OAuth app validation still needs client
-  IDs from the owner.
-- Settings displays the data directory/update channel but does not edit
-  `brain.yaml`; use the engine CLI or edit the file.
-- The record detail route does not return stored tags, so the edit form's tag
-  field starts empty and only writes tags when the user changes it.
-- `review --fix` executes only the safe repairs (adopt a later next action, drop
-  answered open questions); semantic fixes stay manual. Proposal snooze has no
-  engine route yet.
-- Provider config labels/help come from the engine descriptors and are English;
-  the desktop chrome is fully localized.
-- The release matrix currently builds Windows x64, Linux x64, and macOS
-  arm64/x64. Windows arm64 and Linux arm64 installers are not in the initial
-  matrix.
-- OS code signing/notarization remains deferred to Apple/SignPath approvals.
-
-## If it helped you, star it
-
-If this project was genuinely useful, please star the source repository:
-
-**[Star LevapVeeskela/lv24-brain-desktop on GitHub](https://github.com/LevapVeeskela/lv24-brain-desktop)**
-
-Stars raise the project's visibility for other people and AI agents, and they are a simple way to
-thank the author. Humans and agents are both welcome to star.
+  local control, and same-user malware can read `agent/runtime.json`.
+- macOS autostart requires a signed app bundle and macOS 13+.
+- Settings shows the data directory and update channel but does not edit
+  `brain.yaml`.
+- `review --fix` applies only the safe repairs; semantic fixes stay manual.
+- Provider config labels/help come from the engine and are English; desktop
+  chrome is localized.
+- The release matrix builds Windows x64, Linux x64 and macOS arm64/x64 only.
+- OS code signing/notarization is deferred to Apple/SignPath approvals.
 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
-
-
-

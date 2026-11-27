@@ -93,7 +93,7 @@ OS code signing is separate from updater signing:
 Windows example (derive the target triple with `rustc -vV` on other hosts):
 
 ```bash
-node scripts/fetch-engine.mjs --version 0.14.0 --target x86_64-pc-windows-msvc
+node scripts/fetch-engine.mjs --version 0.27.2 --target x86_64-pc-windows-msvc
 npm run tauri build -- --debug --bundles nsis \
   --config src-tauri/tauri.bundle.conf.json \
   --config src-tauri/tauri.unsigned.conf.json

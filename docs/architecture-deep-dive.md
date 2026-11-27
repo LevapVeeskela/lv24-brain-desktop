@@ -1,4 +1,8 @@
-# Shell architecture (WP5.1–WP5.5, desktop 1.2)
+# Shell architecture (WP5.1-WP5.5, desktop 1.2)
+
+> Historical deep dive. For the current design (desktop 1.7.2) read
+> [ARCHITECTURE.md](ARCHITECTURE.md). This file preserves the WP5.1–WP5.5 and
+> desktop 1.2 implementation detail and decisions.
 
 This document describes the desktop shell. WP5.2 added the UI foundation, WP5.3
 the screens, WP5.4 packaging, WP5.5 the UX/accessibility pass, and desktop 1.2
