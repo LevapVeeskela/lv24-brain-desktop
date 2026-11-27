@@ -37,11 +37,10 @@ stays buildable without downloaded sidecars, but bundling still needs the
 updater signing key unless the unsigned override is passed. Engine upgrades
 require updating the pin file.
 
-The 1.8.0 release targets engine `0.28.0`, whose checksums are **not pinned
-yet**: the engine release is not published. Until the reviewed `0.28.0` hashes
-are added to `scripts/engine-checksums.json`, `fetch-engine.mjs` stops with
-`No pinned checksum for ... in engine 0.28.0`. Adding that pin is the only
-remaining packaging step for this release; do not bundle an older engine.
+The 1.8.0 release targets engine `0.28.0`, whose reviewed checksums are pinned
+in `scripts/engine-checksums.json` (it is now the highest pinned version).
+`fetch-engine.mjs` verifies every download against that pin, so packaging is
+unblocked; do not bundle an older engine.
 
 Unsigned build jobs add `src-tauri/tauri.unsigned.conf.json`
 (`createUpdaterArtifacts: false`) and do not need signing secrets.
@@ -83,8 +82,9 @@ OS code signing is separate from updater signing:
 ## Release checklist
 
 1. Merge the desktop change and confirm the normal CI is green.
-2. Check the engine release/tag and its `checksums.txt`; add the reviewed
-   `0.28.0` hashes to `scripts/engine-checksums.json` (not committed yet).
+2. Confirm the pinned `0.28.0` hashes in `scripts/engine-checksums.json` still
+   match the engine release `checksums.txt` (`fetch-engine.mjs` enforces this
+   during packaging).
 3. Run `desktop.yml` with `signed=false` to verify unsigned packaging.
 4. Run with `signed=true` (no release) to verify updater artifacts if secrets
    are configured.

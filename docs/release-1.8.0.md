@@ -49,11 +49,9 @@ Desktop 1.8.0 requires **LV24 Brain engine >= 0.28.0** (Ideas and reminders
 API). Packaged builds must bundle `0.28.0` or newer; `0.27.2` does not expose
 the Ideas endpoints.
 
-The `0.28.0` checksum pin is **not committed yet** because the engine release
-is not published. `scripts/engine-checksums.json` still ends at `0.27.2`, so
-`fetch-engine.mjs` stops with `No pinned checksum ... in engine 0.28.0`. Adding
-the reviewed `0.28.0` hashes is the remaining packaging step before the final
-release. Do not ship 1.8.0 with an older engine.
+The `0.28.0` checksums are pinned in `scripts/engine-checksums.json`, now the
+highest pinned version, and `fetch-engine.mjs` verifies each download against
+it. Packaging is unblocked; do not ship 1.8.0 with an older engine.
 
 ## Upgrade and compatibility
 

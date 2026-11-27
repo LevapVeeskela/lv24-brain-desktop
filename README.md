@@ -25,7 +25,7 @@ runner and background agent that you can inspect and control from one window.
 | Item | Value |
 |---|---|
 | Version | 1.8.0 (`package.json`, `src-tauri/Cargo.toml`; tag `v1.8.0` after owner approval) |
-| Ship state | Release prepared locally, not tagged or published. Packaged builds target engine 0.28.0; the 0.28.0 checksum pin is still pending |
+| Ship state | Release prepared locally, not tagged or published. Packaged builds target engine 0.28.0, whose checksums are pinned |
 | Visibility | Public |
 | Repo | <https://github.com/LevapVeeskela/lv24-brain-desktop> |
 | Prod | Desktop installers from GitHub Releases (owner-gated); no web deployment |
